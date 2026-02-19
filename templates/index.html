@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DevBot - Coding Assistant</title>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background-color: #0f172a;
+            color: white;
+        }
+
+        .container {
+            width: 70%;
+            margin: auto;
+            margin-top: 50px;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        .chat-box {
+            background-color: #1e293b;
+            padding: 20px;
+            border-radius: 10px;
+            min-height: 20px;
+            margin-bottom: 20px;
+        }
+
+        .input-area {
+            display: flex;
+            gap: 1px;
+        }
+
+        input {
+            flex: 1;
+            padding: 10px;
+            border-radius: 5px;
+            border: none;
+            font-size: 16px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            background-color: #22c55e;
+            color: white;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #16a34a;
+        }
+
+        .message {
+            margin-bottom: 10px;
+        }
+
+        .user {
+            color: #38bdf8;
+        }
+
+        .bot {
+            color: #22c55e;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>💻 DevBot - Coding Assistant</h1>
+
+    <div class="chat-box" id="chatBox">
+        <div class="message bot">Hello! Ask me coding questions 🚀</div>
+    </div>
+
+    <div class="input-area">
+        <input type="text" id="message" placeholder="Ask a coding question..." />
+        <button onclick="sendMessage()">Send</button>
+    </div>
+</div>
+
+<script>
+async function sendMessage() {
+    const inputField = document.getElementById("message");
+    const message = inputField.value.trim();
+
+    if (!message) return;
+
+    const chatBox = document.getElementById("chatBox");
+
+    // Show user message
+    chatBox.innerHTML += `<div class="message user"><b>You:</b> ${message}</div>`;
+
+    inputField.value = "";
+
+    try {
+        const response = await fetch("/chat", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ message: message })
+        });
+
+        const data = await response.json();
+
+        chatBox.innerHTML += `<div class="message bot"><b>DevBot:</b> ${data.reply}</div>`;
+
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+    } catch (error) {
+        chatBox.innerHTML += `<div class="message bot">⚠ Error connecting to server.</div>`;
+    }
+}
+</script>
+
+</body>
+</html>
