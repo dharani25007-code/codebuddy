@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Register - CodeBuddy</title>
+    <style>
+        body {
+            background: #0f172a;
+            font-family: system-ui;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: white;
+        }
+
+        .card {
+            background: #1e293b;
+            padding: 40px;
+            border-radius: 12px;
+            width: 320px;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            margin-top: 10px;
+            border-radius: 8px;
+            border: none;
+        }
+
+        button {
+            width: 100%;
+            margin-top: 15px;
+            padding: 12px;
+            border-radius: 8px;
+            border: none;
+            background: #22c55e;
+            color: white;
+            cursor: pointer;
+        }
+
+        a {
+            color: #38bdf8;
+            text-decoration: none;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>Register</h2>
+    <form method="POST">
+        <input name="username" placeholder="Username" required>
+        <input name="password" type="password" placeholder="Password" required>
+        <button type="submit">Register</button>
+    </form>
+    <p>Already have account? <a href="/login">Login</a></p>
+</div>
+
+</body>
+</html>

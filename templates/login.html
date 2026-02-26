@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login | CodeBuddy</title>
+    <meta charset="UTF-8">
+    <style>
+        body{
+            margin:0;
+            height:100vh;
+            display:flex;
+            justify-content:center;
+            align-items:center;
+            background:linear-gradient(135deg,#0f172a,#1e293b);
+            font-family:system-ui;
+            color:white;
+        }
+        .card{
+            background:#111827;
+            padding:40px;
+            width:350px;
+            border-radius:15px;
+            box-shadow:0 0 40px rgba(0,0,0,0.6);
+        }
+        h2{text-align:center;margin-bottom:25px;}
+        input{
+            width:100%;
+            padding:12px;
+            margin-bottom:15px;
+            border-radius:8px;
+            border:none;
+        }
+        button{
+            width:100%;
+            padding:12px;
+            border-radius:8px;
+            border:none;
+            background:#22c55e;
+            color:white;
+            font-weight:bold;
+            cursor:pointer;
+        }
+        button:hover{background:#16a34a;}
+        .link{text-align:center;margin-top:15px;}
+        .link a{color:#38bdf8;text-decoration:none;}
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>💻 CodeBuddy Login</h2>
+    <form method="POST">
+        <input name="username" placeholder="Username" required>
+        <input type="password" name="password" placeholder="Password" required>
+        <button>Login</button>
+    </form>
+    <div class="link">
+        No account? <a href="/register">Register</a>
+    </div>
+</div>
+
+</body>
+</html>

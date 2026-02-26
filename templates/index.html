@@ -1,123 +1,422 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>DevBot - Coding Assistant</title>
-    <meta charset="UTF-8">
-    <style>
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            background-color: #0f172a;
-            color: white;
-        }
+<meta charset="UTF-8">
+<title>CodeBuddy</title>
 
-        .container {
-            width: 70%;
-            margin: auto;
-            margin-top: 50px;
-        }
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet"
+href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 
-        h1 {
-            text-align: center;
-        }
+<style>
+body{
+ margin:0;
+ font-family:system-ui;
+ background:#0f172a;
+ color:white;
+ display:flex;
+ height:100vh;
+ transition:0.3s;
+}
 
-        .chat-box {
-            background-color: #1e293b;
-            padding: 20px;
-            border-radius: 10px;
-            min-height: 20px;
-            margin-bottom: 20px;
-        }
+/* LIGHT MODE */
+body.light{
+ background:#e6eefc;
+ color:#111;
+}
+body.light .sidebar{ background:#dbeafe; }
+body.light .chat-item{ background:#c7d2fe; }
+body.light .bot{ background:#e0e7ff; }
+body.light .input-area{ background:#dbeafe; }
+body.light .topbar{ background:#c7d2fe; }
 
-        .input-area {
-            display: flex;
-            gap: 1px;
-        }
+/* SIDEBAR */
+.sidebar{
+ width:260px;
+ background:#111827;
+ padding:20px;
+ display:flex;
+ flex-direction:column;
+ overflow-y:auto;
+}
 
-        input {
-            flex: 1;
-            padding: 10px;
-            border-radius: 5px;
-            border: none;
-            font-size: 16px;
-        }
+.search{
+ padding:8px;
+ border-radius:6px;
+ border:none;
+ margin-bottom:10px;
+}
 
-        button {
-            padding: 10px 20px;
-            border: none;
-            background-color: #22c55e;
-            color: white;
-            font-size: 16px;
-            border-radius: 5px;
-            cursor: pointer;
-        }
+.new-chat{
+ padding:8px;
+ background:#22c55e;
+ border:none;
+ border-radius:6px;
+ color:white;
+ margin-bottom:10px;
+ cursor:pointer;
+}
 
-        button:hover {
-            background-color: #16a34a;
-        }
+.chat-item{
+ padding:8px;
+ border-radius:6px;
+ margin-bottom:6px;
+ background:#1f2937;
+ display:flex;
+ justify-content:space-between;
+ align-items:center;
+ cursor:pointer;
+}
 
-        .message {
-            margin-bottom: 10px;
-        }
+.chat-item.active{ background:#22c55e; }
 
-        .user {
-            color: #38bdf8;
-        }
+.menu{ position:relative; }
 
-        .bot {
-            color: #22c55e;
-        }
-    </style>
+.menu-btn{
+ background:none;
+ border:none;
+ color:white;
+ cursor:pointer;
+ font-size:16px;
+}
+
+.dropdown{
+ display:none;
+ position:absolute;
+ right:0;
+ background:#1f2937;
+ border-radius:6px;
+ min-width:90px;
+ z-index:1000;
+}
+
+.menu.active .dropdown{ display:block; }
+
+.dropdown div{
+ padding:6px;
+ cursor:pointer;
+}
+
+.dropdown div:hover{ background:#374151; }
+
+/* MAIN */
+.main{
+ flex:1;
+ display:flex;
+ flex-direction:column;
+}
+
+/* TOPBAR */
+.topbar{
+ background:#1f2937;
+ padding:10px 20px;
+ display:flex;
+ justify-content:space-between;
+ align-items:center;
+}
+
+.mode-select{
+ padding:6px;
+ border-radius:6px;
+}
+
+/* CHAT */
+.chat-box{
+ flex:1;
+ padding:20px;
+ overflow-y:auto;
+}
+
+.bubble{
+ max-width:75%;
+ padding:14px;
+ border-radius:10px;
+ margin-bottom:15px;
+}
+
+.user{
+ background:#22c55e;
+ margin-left:auto;
+}
+
+.bot{
+ background:#1f2937;
+}
+
+/* CODE BUTTONS */
+.copy-btn,.run-btn{
+ background:#2563eb;
+ padding:4px 8px;
+ border:none;
+ border-radius:5px;
+ font-size:12px;
+ margin-right:5px;
+ cursor:pointer;
+}
+
+.output-box{
+ background:#111827;
+ padding:8px;
+ border-radius:6px;
+ margin-top:8px;
+ font-size:13px;
+ white-space:pre-wrap;
+}
+
+/* INPUT */
+.input-area{
+ padding:15px;
+ background:#1f2937;
+ display:flex;
+ gap:10px;
+ align-items:center;
+}
+
+input[type=text]{
+ flex:1;
+ padding:12px;
+ border-radius:8px;
+ border:none;
+}
+
+button{
+ background:#22c55e;
+ border:none;
+ padding:8px 12px;
+ border-radius:6px;
+ color:white;
+ cursor:pointer;
+}
+</style>
 </head>
+
 <body>
 
-<div class="container">
-    <h1>💻 DevBot - Coding Assistant</h1>
+<div class="sidebar">
+<h2>💻 CodeBuddy</h2>
 
-    <div class="chat-box" id="chatBox">
-        <div class="message bot">Hello! Ask me coding questions 🚀</div>
-    </div>
+<input class="search" placeholder="Search..."
+oninput="filterChats(this.value)">
 
-    <div class="input-area">
-        <input type="text" id="message" placeholder="Ask a coding question..." />
-        <button onclick="sendMessage()">Send</button>
-    </div>
+<button class="new-chat" onclick="newChat()">+ New Chat</button>
+
+<div id="chatList">
+{% for chat in chats %}
+<div class="chat-item"
+onclick="loadChat({{ chat['id'] }},this)">
+<span>{{ chat['title'] }}</span>
+
+<div class="menu">
+<button class="menu-btn" onclick="toggleMenu(event,this)">⋮</button>
+<div class="dropdown">
+<div onclick="renameChat({{ chat['id'] }})">Rename</div>
+<div onclick="deleteChat({{ chat['id'] }})">Delete</div>
+<div onclick="shareChat({{ chat['id'] }})">Share</div>
+</div>
+</div>
+
+</div>
+{% endfor %}
+</div>
+</div>
+
+<div class="main">
+
+<div class="topbar">
+<div>Welcome {{ username }}</div>
+
+<div style="display:flex; gap:10px;">
+<select id="mode" class="mode-select">
+<option value="general">General</option>
+<option value="debug">Debug</option>
+<option value="optimize">Optimize</option>
+<option value="ml">ML Architect</option>
+<option value="ds">Data Science</option>
+<option value="interview">Interview</option>
+</select>
+
+<button onclick="toggleTheme()" id="themeBtn">🌙</button>
+<a href="/profile"><button>Profile</button></a>
+<a href="/logout"><button>Logout</button></a>
+</div>
+</div>
+
+<div class="chat-box" id="chatBox"></div>
+
+<div class="input-area">
+<input type="text" id="message"
+placeholder="Ask programming question..."
+onkeydown="if(event.key==='Enter')sendMessage()">
+
+<button onclick="sendMessage()">Send</button>
+</div>
+
 </div>
 
 <script>
-async function sendMessage() {
-    const inputField = document.getElementById("message");
-    const message = inputField.value.trim();
 
-    if (!message) return;
+let currentChatId=null;
+const chatBox=document.getElementById("chatBox");
 
-    const chatBox = document.getElementById("chatBox");
-
-    // Show user message
-    chatBox.innerHTML += `<div class="message user"><b>You:</b> ${message}</div>`;
-
-    inputField.value = "";
-
-    try {
-        const response = await fetch("/chat", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ message: message })
-        });
-
-        const data = await response.json();
-
-        chatBox.innerHTML += `<div class="message bot"><b>DevBot:</b> ${data.reply}</div>`;
-
-        chatBox.scrollTop = chatBox.scrollHeight;
-
-    } catch (error) {
-        chatBox.innerHTML += `<div class="message bot">⚠ Error connecting to server.</div>`;
-    }
+/* NEW CHAT */
+function newChat(){
+ fetch("/new_chat",{method:"POST"})
+ .then(()=>location.reload());
 }
-</script>
 
+/* DROPDOWN */
+function toggleMenu(e,btn){
+ e.stopPropagation();
+ document.querySelectorAll(".menu")
+ .forEach(m=>m.classList.remove("active"));
+ btn.parentElement.classList.toggle("active");
+}
+document.addEventListener("click",()=>{
+ document.querySelectorAll(".menu")
+ .forEach(m=>m.classList.remove("active"));
+});
+
+/* SEARCH */
+function filterChats(val){
+ document.querySelectorAll(".chat-item").forEach(c=>{
+  c.style.display=c.innerText.toLowerCase()
+  .includes(val.toLowerCase())?"flex":"none";
+ });
+}
+
+/* THEME */
+function toggleTheme(){
+ document.body.classList.toggle("light");
+ const isLight=document.body.classList.contains("light");
+ document.getElementById("themeBtn").innerText=isLight?"☀️":"🌙";
+ localStorage.setItem("theme",isLight?"light":"dark");
+}
+window.onload=function(){
+ if(localStorage.getItem("theme")==="light"){
+  document.body.classList.add("light");
+  document.getElementById("themeBtn").innerText="☀️";
+ }
+};
+
+/* LOAD CHAT */
+function loadChat(id,el){
+ currentChatId=id;
+ document.querySelectorAll(".chat-item")
+ .forEach(e=>e.classList.remove("active"));
+ el.classList.add("active");
+
+ fetch("/load_messages/"+id)
+ .then(r=>r.json())
+ .then(data=>{
+  chatBox.innerHTML="";
+  data.messages.forEach(m=>{
+   chatBox.innerHTML+=
+   `<div class="bubble ${m[0]}">
+   ${marked.parse(m[1])}</div>`;
+  });
+  hljs.highlightAll();
+  enhanceCode(chatBox);
+ });
+}
+
+/* SEND */
+async function sendMessage(){
+ if(!currentChatId){alert("Select chat");return;}
+ const msg=document.getElementById("message").value;
+ if(!msg)return;
+
+ const mode=document.getElementById("mode").value;
+ const fd=new FormData();
+ fd.append("message",msg);
+ fd.append("conversation_id",currentChatId);
+ fd.append("mode",mode);
+
+ document.getElementById("message").value="";
+ chatBox.innerHTML+=`<div class="bubble user">${msg}</div>`;
+
+ const bot=document.createElement("div");
+ bot.className="bubble bot";
+ chatBox.appendChild(bot);
+
+ const res=await fetch("/chat",{method:"POST",body:fd});
+ const reader=res.body.getReader();
+ const decoder=new TextDecoder();
+
+ let full="";
+ while(true){
+  const {done,value}=await reader.read();
+  if(done)break;
+  full+=decoder.decode(value);
+  bot.innerHTML=marked.parse(full);
+  hljs.highlightAll();
+  enhanceCode(bot);
+ }
+}
+
+/* COPY + RUN */
+function enhanceCode(container){
+ container.querySelectorAll("pre code").forEach(block=>{
+  const wrapper=block.parentElement;
+  if(wrapper.querySelector(".copy-btn")) return;
+
+  const copy=document.createElement("button");
+  copy.innerText="Copy";
+  copy.className="copy-btn";
+  copy.onclick=()=>{
+   navigator.clipboard.writeText(block.innerText);
+  };
+
+  const run=document.createElement("button");
+  run.innerText="Run";
+  run.className="run-btn";
+  run.onclick=async()=>{
+   const res=await fetch("/run_code",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({code:block.innerText})
+   });
+   const data=await res.json();
+   const out=document.createElement("div");
+   out.className="output-box";
+   out.innerText=data.output;
+   wrapper.appendChild(out);
+  };
+
+  wrapper.insertBefore(copy,block);
+  wrapper.insertBefore(run,block);
+ });
+}
+
+/* RENAME */
+function renameChat(id){
+ const newName=prompt("New name:");
+ if(!newName)return;
+ fetch("/rename_chat",{method:"POST",
+ headers:{"Content-Type":"application/json"},
+ body:JSON.stringify({chat_id:id,title:newName})
+ }).then(()=>location.reload());
+}
+
+/* DELETE */
+function deleteChat(id){
+ if(!confirm("Delete chat?"))return;
+ fetch("/delete_chat",{method:"POST",
+ headers:{"Content-Type":"application/json"},
+ body:JSON.stringify({chat_id:id})
+ }).then(()=>location.reload());
+}
+
+/* SHARE */
+function shareChat(id){
+ fetch("/share_chat",{method:"POST",
+ headers:{"Content-Type":"application/json"},
+ body:JSON.stringify({chat_id:id})
+ })
+ .then(res=>res.json())
+ .then(data=>alert("Share URL: "+data.share_url));
+}
+
+</script>
 </body>
 </html>

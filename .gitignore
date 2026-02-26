@@ -1,2 +1,22 @@
-.env
+# Python
 __pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual Environment
+.venv/
+venv/
+
+# Environment Variables
+.env
+
+# Database
+codebuddy.db
+
+# VS Code
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db

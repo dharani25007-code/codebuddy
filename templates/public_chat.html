@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Public Chat</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+
+    <style>
+        body {
+            background: #0f172a;
+            font-family: system-ui;
+            color: white;
+            padding: 40px;
+        }
+
+        .bubble {
+            background: #1e293b;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<h2>Public Chat</h2>
+
+<div id="chatArea">
+    {% for msg in messages %}
+    <div class="bubble">
+        {{ msg[0] }}:
+        <div>{{ msg[1] }}</div>
+    </div>
+    {% endfor %}
+</div>
+
+</body>
+</html>
