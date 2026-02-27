@@ -1,62 +1,456 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Login | CodeBuddy</title>
-    <meta charset="UTF-8">
-    <style>
-        body{
-            margin:0;
-            height:100vh;
-            display:flex;
-            justify-content:center;
-            align-items:center;
-            background:linear-gradient(135deg,#0f172a,#1e293b);
-            font-family:system-ui;
-            color:white;
-        }
-        .card{
-            background:#111827;
-            padding:40px;
-            width:350px;
-            border-radius:15px;
-            box-shadow:0 0 40px rgba(0,0,0,0.6);
-        }
-        h2{text-align:center;margin-bottom:25px;}
-        input{
-            width:100%;
-            padding:12px;
-            margin-bottom:15px;
-            border-radius:8px;
-            border:none;
-        }
-        button{
-            width:100%;
-            padding:12px;
-            border-radius:8px;
-            border:none;
-            background:#22c55e;
-            color:white;
-            font-weight:bold;
-            cursor:pointer;
-        }
-        button:hover{background:#16a34a;}
-        .link{text-align:center;margin-top:15px;}
-        .link a{color:#38bdf8;text-decoration:none;}
-    </style>
+<meta charset="UTF-8">
+<title>Login | CodeBuddy</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@300;400;500&family=Exo+2:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --void: #020408;
+  --deep: #060d1a;
+  --plasma: #00ffe0;
+  --plasma-dim: rgba(0,255,224,0.1);
+  --plasma-glow: rgba(0,255,224,0.2);
+  --nova: #a855f7;
+  --fire: #ff6b2b;
+  --text: #e2f4ff;
+  --text-2: rgba(226,244,255,0.45);
+  --text-3: rgba(226,244,255,0.18);
+  --border: rgba(0,255,224,0.08);
+  --border-hi: rgba(0,255,224,0.3);
+  --surface: rgba(0,255,224,0.03);
+  --mono: 'IBM Plex Mono', monospace;
+  --display: 'Orbitron', monospace;
+  --body: 'Exo 2', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+
+body {
+  font-family: var(--body);
+  background: var(--void);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: none;
+}
+
+/* ── NEURAL CANVAS ── */
+#neuralCanvas {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.5;
+}
+
+/* ── GRAIN ── */
+body::after {
+  content: '';
+  position: fixed; inset: 0; z-index: 1;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none; opacity: 0.4;
+}
+
+/* ── CUSTOM CURSOR ── */
+#cursor {
+  position: fixed; width: 10px; height: 10px; border-radius: 50%;
+  background: var(--plasma);
+  box-shadow: 0 0 12px var(--plasma), 0 0 24px var(--plasma-glow);
+  pointer-events: none; z-index: 99999;
+  transform: translate(-50%,-50%);
+  mix-blend-mode: screen; transition: width 0.2s, height 0.2s;
+}
+#cursor-ring {
+  position: fixed; width: 30px; height: 30px; border-radius: 50%;
+  border: 1px solid rgba(0,255,224,0.6);
+  pointer-events: none; z-index: 99998;
+  transform: translate(-50%,-50%);
+  transition: transform 0.12s ease, width 0.25s, height 0.25s;
+  opacity: 0.5;
+}
+.trail-dot {
+  position: fixed; width: 4px; height: 4px; border-radius: 50%;
+  background: var(--plasma); pointer-events: none; z-index: 99990;
+  transform: translate(-50%,-50%);
+  animation: trailFade 0.5s ease forwards;
+}
+@keyframes trailFade { to { opacity:0; transform: translate(-50%,-50%) scale(0); } }
+
+/* ── CARD WRAPPER ── */
+.forge-card {
+  position: relative; z-index: 10;
+  width: 400px;
+  background: rgba(6,13,26,0.92);
+  backdrop-filter: blur(40px) saturate(180%);
+  border: 1px solid var(--border-hi);
+  border-radius: 2px;
+  padding: 42px 40px 36px;
+  box-shadow:
+    0 0 0 1px rgba(0,255,224,0.04),
+    0 24px 80px rgba(0,0,0,0.7),
+    0 0 60px rgba(0,255,224,0.06);
+  animation: cardIn 0.6s cubic-bezier(0.34,1.2,0.64,1);
+}
+
+@keyframes cardIn {
+  from { opacity:0; transform: translateY(24px) scale(0.97); }
+  to   { opacity:1; transform: none; }
+}
+
+/* corner accents */
+.forge-card::before, .forge-card::after {
+  content: '';
+  position: absolute;
+  width: 16px; height: 16px;
+  border-color: var(--plasma);
+  border-style: solid;
+  opacity: 0.6;
+}
+.forge-card::before { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
+.forge-card::after  { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
+
+/* top scan line */
+.card-scanline {
+  position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--plasma), var(--nova), transparent);
+  background-size: 200% 100%;
+  animation: scanMove 3s linear infinite;
+  border-radius: 2px 2px 0 0;
+}
+@keyframes scanMove { 0%{background-position:0% 0} 100%{background-position:200% 0} }
+
+/* ── LOGO AREA ── */
+.logo-area {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 10px; margin-bottom: 32px;
+}
+
+.logo-hex {
+  width: 56px; height: 56px; position: relative;
+  animation: hexPulse 3s ease infinite;
+}
+.logo-hex svg { width: 56px; height: 56px; }
+.logo-hex-inner {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px;
+  filter: drop-shadow(0 0 10px var(--plasma));
+}
+@keyframes hexPulse {
+  0%,100% { filter: drop-shadow(0 0 6px var(--plasma-glow)); }
+  50%      { filter: drop-shadow(0 0 20px var(--plasma)); }
+}
+
+.logo-title {
+  font-family: var(--display);
+  font-size: 18px; font-weight: 800;
+  letter-spacing: 4px; text-transform: uppercase;
+  color: var(--plasma);
+  text-shadow: 0 0 30px var(--plasma-glow);
+}
+
+.logo-sub {
+  font-family: var(--display);
+  font-size: 8px; font-weight: 400;
+  letter-spacing: 4px; text-transform: uppercase;
+  color: var(--text-3);
+}
+
+/* ── DIVIDER ── */
+.divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border-hi), transparent);
+  margin-bottom: 28px;
+}
+
+/* ── FIELD ── */
+.field {
+  margin-bottom: 16px; position: relative;
+}
+
+.field-label {
+  font-family: var(--display);
+  font-size: 8px; font-weight: 600;
+  letter-spacing: 2.5px; text-transform: uppercase;
+  color: var(--text-3); margin-bottom: 7px; display: block;
+}
+
+.field-wrap {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: var(--surface);
+  transition: border-color 0.25s, box-shadow 0.25s;
+  overflow: hidden;
+}
+.field-wrap::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(0,255,224,0.02), transparent);
+  transform: translateX(-100%);
+  transition: none;
+}
+.field-wrap:focus-within {
+  border-color: var(--border-hi);
+  box-shadow: 0 0 0 1px rgba(0,255,224,0.08), 0 0 20px rgba(0,255,224,0.05);
+}
+.field-wrap:focus-within::before {
+  animation: inputScan 2s linear infinite;
+}
+@keyframes inputScan { 0%{transform:translateX(-100%)} 100%{transform:translateX(200%)} }
+
+.field-icon {
+  position: absolute; left: 13px; top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-3); font-size: 14px;
+  transition: color 0.2s; pointer-events: none;
+  z-index: 2;
+}
+.field-wrap:focus-within .field-icon { color: var(--plasma); }
+
+.field-input {
+  width: 100%; padding: 12px 14px 12px 40px;
+  background: transparent; border: none; outline: none;
+  color: var(--text);
+  font-family: var(--mono); font-size: 13px;
+  letter-spacing: 0.5px;
+}
+.field-input::placeholder { color: var(--text-3); }
+
+/* password toggle */
+.pwd-toggle {
+  position: absolute; right: 12px; top: 50%;
+  transform: translateY(-50%);
+  background: none; border: none; cursor: none;
+  color: var(--text-3); font-size: 14px;
+  transition: color 0.2s; padding: 2px;
+  z-index: 2;
+}
+.pwd-toggle:hover { color: var(--plasma); }
+
+/* ── ERROR / FLASH ── */
+{% with messages = get_flashed_messages() %}
+{% if messages %}
+.flash-msg {
+  font-family: var(--mono); font-size: 11px;
+  color: var(--fire);
+  border: 1px solid rgba(255,107,43,0.25);
+  background: rgba(255,107,43,0.08);
+  padding: 9px 12px; border-radius: 2px;
+  margin-bottom: 16px;
+  display: flex; align-items: center; gap: 8px;
+  animation: fadeUp 0.3s ease;
+}
+{% endif %}
+{% endwith %}
+
+@keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+
+/* ── SUBMIT BUTTON ── */
+.forge-btn {
+  width: 100%; padding: 13px;
+  margin-top: 8px;
+  border: 1px solid var(--border-hi);
+  background: var(--plasma-dim);
+  color: var(--plasma);
+  font-family: var(--display); font-size: 10px; font-weight: 700;
+  letter-spacing: 3px; text-transform: uppercase;
+  cursor: none; border-radius: 2px;
+  position: relative; overflow: hidden;
+  transition: all 0.25s;
+  box-shadow: 0 0 12px var(--plasma-glow);
+}
+.forge-btn::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(0,255,224,0.08), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.5s;
+}
+.forge-btn:hover::before { transform: translateX(100%); }
+.forge-btn:hover {
+  background: rgba(0,255,224,0.15);
+  box-shadow: 0 0 28px var(--plasma), inset 0 0 16px var(--plasma-dim);
+  border-color: var(--plasma);
+}
+.forge-btn:active { transform: scale(0.98); }
+
+.btn-arrow { margin-left: 8px; transition: transform 0.2s; display: inline-block; }
+.forge-btn:hover .btn-arrow { transform: translateX(4px); }
+
+/* ── REGISTER LINK ── */
+.register-row {
+  text-align: center; margin-top: 22px;
+  font-family: var(--display); font-size: 9px;
+  letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--text-3);
+}
+.register-row a {
+  color: var(--plasma); text-decoration: none;
+  position: relative; transition: all 0.2s;
+}
+.register-row a::after {
+  content: '';
+  position: absolute; bottom: -2px; left: 0; right: 0; height: 1px;
+  background: var(--plasma); transform: scaleX(0);
+  transition: transform 0.2s; transform-origin: left;
+}
+.register-row a:hover::after { transform: scaleX(1); }
+.register-row a:hover { text-shadow: 0 0 10px var(--plasma-glow); }
+
+/* ── STATUS LINE ── */
+.status-line {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 20px; padding-top: 16px;
+  border-top: 1px solid var(--border);
+  font-family: var(--display); font-size: 8px;
+  letter-spacing: 1.5px; color: var(--text-3);
+}
+.status-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--plasma); box-shadow: 0 0 5px var(--plasma);
+  animation: blink 1.8s ease infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+</style>
 </head>
 <body>
 
-<div class="card">
-    <h2>💻 CodeBuddy Login</h2>
-    <form method="POST">
-        <input name="username" placeholder="Username" required>
-        <input type="password" name="password" placeholder="Password" required>
-        <button>Login</button>
-    </form>
-    <div class="link">
-        No account? <a href="/register">Register</a>
+<div id="cursor"></div>
+<div id="cursor-ring"></div>
+<canvas id="neuralCanvas"></canvas>
+
+<div class="forge-card">
+  <div class="card-scanline"></div>
+
+  <!-- LOGO -->
+  <div class="logo-area">
+    <div class="logo-hex">
+      <svg viewBox="0 0 56 56" fill="none">
+        <polygon points="28,2 52,15 52,41 28,54 4,41 4,15"
+          fill="rgba(0,255,224,0.06)" stroke="rgba(0,255,224,0.5)" stroke-width="1"/>
+        <polygon points="28,10 44,19 44,37 28,46 12,37 12,19"
+          fill="rgba(0,255,224,0.03)" stroke="rgba(0,255,224,0.2)" stroke-width="0.5"/>
+      </svg>
+      <div class="logo-hex-inner">⚡</div>
     </div>
+    <div class="logo-title">CODEBUDDY</div>
+    <div class="logo-sub">Access Terminal</div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- FLASH MESSAGES -->
+  {% with messages = get_flashed_messages() %}
+  {% if messages %}
+    {% for msg in messages %}
+    <div class="flash-msg">⚠ {{ msg }}</div>
+    {% endfor %}
+  {% endif %}
+  {% endwith %}
+
+  <!-- FORM -->
+  <form method="POST">
+
+    <div class="field">
+      <label class="field-label">Identifier</label>
+      <div class="field-wrap">
+        <span class="field-icon">◈</span>
+        <input class="field-input" name="username" placeholder="Enter username" required autocomplete="off">
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="field-label">Access Key</label>
+      <div class="field-wrap">
+        <span class="field-icon">⬡</span>
+        <input class="field-input" type="password" name="password" id="pwdField" placeholder="Enter password" required>
+        <button type="button" class="pwd-toggle" onclick="togglePwd()" id="pwdToggle" title="Toggle">👁</button>
+      </div>
+    </div>
+
+    <button type="submit" class="forge-btn">
+      INITIALIZE SESSION <span class="btn-arrow">▶</span>
+    </button>
+
+  </form>
+
+  <div class="register-row">
+    No credentials? <a href="/register">Register access →</a>
+  </div>
+
+  <div class="status-line">
+    <div class="status-dot"></div>
+    CODEBUDDY · SECURE CONNECTION · AES-256
+  </div>
 </div>
 
+<script>
+/* ── CURSOR ── */
+const cur=document.getElementById('cursor'), ring=document.getElementById('cursor-ring');
+let cx=0,cy=0,rx=0,ry=0,trailT=0;
+document.addEventListener('mousemove',e=>{
+  cx=e.clientX; cy=e.clientY;
+  cur.style.left=cx+'px'; cur.style.top=cy+'px';
+  const now=Date.now();
+  if(now-trailT>40){
+    trailT=now;
+    const d=document.createElement('div');
+    d.className='trail-dot';
+    d.style.left=cx+'px'; d.style.top=cy+'px';
+    document.body.appendChild(d);
+    setTimeout(()=>d.remove(),500);
+  }
+});
+(function animRing(){
+  rx+=(cx-rx)*0.12; ry+=(cy-ry)*0.12;
+  ring.style.left=rx+'px'; ring.style.top=ry+'px';
+  requestAnimationFrame(animRing);
+})();
+
+/* ── PASSWORD TOGGLE ── */
+function togglePwd(){
+  const f=document.getElementById('pwdField');
+  const t=document.getElementById('pwdToggle');
+  if(f.type==='password'){ f.type='text'; t.textContent='🙈'; }
+  else { f.type='password'; t.textContent='👁'; }
+}
+
+/* ── NEURAL CANVAS ── */
+(function(){
+  const canvas=document.getElementById('neuralCanvas');
+  const ctx=canvas.getContext('2d');
+  let W,H,nodes=[];
+  function resize(){ W=canvas.width=window.innerWidth; H=canvas.height=window.innerHeight; }
+  resize(); window.addEventListener('resize',resize);
+  class Node{
+    constructor(){ this.x=Math.random()*W; this.y=Math.random()*H; this.vx=(Math.random()-.5)*.35; this.vy=(Math.random()-.5)*.35; this.r=Math.random()*1.5+0.8; this.p=Math.random()*Math.PI*2; }
+    update(){ this.x+=this.vx; this.y+=this.vy; if(this.x<0||this.x>W)this.vx*=-1; if(this.y<0||this.y>H)this.vy*=-1; this.p+=0.02; }
+  }
+  for(let i=0;i<55;i++) nodes.push(new Node());
+  let mx=W/2,my=H/2;
+  document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;});
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    nodes.forEach(n=>n.update());
+    for(let i=0;i<nodes.length;i++){
+      for(let j=i+1;j<nodes.length;j++){
+        const dx=nodes[i].x-nodes[j].x,dy=nodes[i].y-nodes[j].y,d=Math.sqrt(dx*dx+dy*dy);
+        if(d<130){ ctx.beginPath(); ctx.moveTo(nodes[i].x,nodes[i].y); ctx.lineTo(nodes[j].x,nodes[j].y); ctx.strokeStyle=`rgba(0,255,224,${(1-d/130)*.22})`; ctx.lineWidth=.5; ctx.stroke(); }
+      }
+      const dx=nodes[i].x-mx,dy=nodes[i].y-my,d=Math.sqrt(dx*dx+dy*dy);
+      if(d<200){ ctx.beginPath(); ctx.moveTo(nodes[i].x,nodes[i].y); ctx.lineTo(mx,my); ctx.strokeStyle=`rgba(0,255,224,${(1-d/200)*.35})`; ctx.lineWidth=.8; ctx.stroke(); }
+    }
+    nodes.forEach(n=>{
+      const g=(Math.sin(n.p)+1)/2;
+      ctx.beginPath(); ctx.arc(n.x,n.y,n.r*(1+g*.5),0,Math.PI*2);
+      ctx.fillStyle=`rgba(0,255,224,${.35+g*.45})`; ctx.fill();
+    });
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+</script>
 </body>
 </html>
