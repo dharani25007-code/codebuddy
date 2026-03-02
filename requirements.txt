@@ -1,5 +1,17 @@
-flask
-requests
-python-dotenv
-flask-login
-flask-bcrypt
+# CodeBuddy v4.0 — All Zero-Cost Dependencies
+# Install: pip install -r requirements.txt
+
+flask>=3.0.0
+flask-login>=0.6.3
+flask-bcrypt>=1.0.1
+python-dotenv>=1.0.0
+requests>=2.31.0
+gtts>=2.5.0
+
+# CHANGE 10: Redis for persistent rate limiting (optional — falls back to memory if unavailable)
+# Free tier: Upstash Redis (https://upstash.com) — 10k req/day free
+redis>=5.0.0
+
+# For generating streak card SVGs server-side (already using f-strings, no extra lib needed)
+# Pillow is optional — only if you want PNG icons for PWA manifest
+# Pillow>=10.0.0

@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CodeBuddy — Leaderboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Exo+2:wght@200;300;400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --void: #020408; --deep: #060d1a;
+      --plasma: #00ffe0; --plasma-dim: rgba(0,255,224,0.1); --plasma-glow: rgba(0,255,224,0.25);
+      --fire: #ff6b2b; --nova: #a855f7; --gold: #fbbf24; --silver: #94a3b8; --bronze: #c2813a; --ice: #38bdf8;
+      --text: #e2f4ff; --text-2: rgba(226,244,255,0.45); --text-3: rgba(226,244,255,0.15);
+      --border: rgba(0,255,224,0.08);
+      --mono: 'IBM Plex Mono', monospace; --display: 'Orbitron', monospace; --body: 'Exo 2', sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { min-height: 100%; background: var(--void); color: var(--text); font-family: var(--body); overflow-x: hidden; }
+
+    body::before {
+      content: ''; position: fixed; inset: 0; z-index: 0;
+      background-image: linear-gradient(rgba(0,255,224,0.025) 1px, transparent 1px), linear-gradient(90deg, rgba(0,255,224,0.025) 1px, transparent 1px);
+      background-size: 48px 48px; animation: gridDrift 30s linear infinite;
+    }
+    @keyframes gridDrift { 0%{background-position:0 0} 100%{background-position:48px 48px} }
+    body::after {
+      content: ''; position: fixed; inset: 0; z-index: 0;
+      background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,255,224,0.006) 3px, rgba(0,255,224,0.006) 4px);
+      pointer-events: none;
+    }
+
+    .page { position: relative; z-index: 1; min-height: 100vh; display: flex; flex-direction: column; }
+
+    /* ── HEADER ── */
+    .header { padding: 48px 32px 32px; text-align: center; position: relative; overflow: hidden; }
+    .header::after {
+      content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--plasma), transparent);
+      animation: scanLine 3s ease infinite;
+    }
+    @keyframes scanLine { 0%,100%{opacity:0.4} 50%{opacity:1} }
+    .header-eyebrow { font-family: var(--mono); font-size: 10px; letter-spacing: 4px; color: var(--plasma); opacity: 0.6; margin-bottom: 12px; }
+    .header h1 {
+      font-family: var(--display); font-size: clamp(28px,5vw,52px); font-weight: 900; letter-spacing: 8px;
+      background: linear-gradient(135deg,#fff 0%,var(--plasma) 50%,var(--nova) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 10px;
+    }
+    .header-sub { font-family: var(--mono); font-size: 11px; letter-spacing: 3px; color: var(--text-2); }
+    .live-badge {
+      display: inline-flex; align-items: center; gap: 7px; margin-top: 14px;
+      padding: 6px 16px; border: 1px solid rgba(0,255,224,0.2); border-radius: 20px;
+      background: rgba(0,255,224,0.04); font-family: var(--mono); font-size: 9px; letter-spacing: 2px; color: var(--plasma);
+    }
+    .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--plasma); animation: livePulse 1.2s ease infinite; }
+    @keyframes livePulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.7)} }
+
+    /* ── NAV ── */
+    .nav { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 14px 24px; border-bottom: 1px solid var(--border); }
+    .back-btn {
+      display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px;
+      border: 1px solid rgba(0,255,224,0.15); border-radius: 6px; color: var(--plasma); text-decoration: none;
+      font-family: var(--display); font-size: 8px; font-weight: 700; letter-spacing: 2px; transition: all 0.2s;
+    }
+    .back-btn:hover { background: var(--plasma-dim); border-color: var(--plasma); box-shadow: 0 0 16px var(--plasma-glow); }
+    .tabs { display: flex; gap: 4px; background: rgba(0,255,224,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 4px; }
+    .tab { padding: 6px 14px; border-radius: 5px; cursor: pointer; font-family: var(--display); font-size: 8px; font-weight: 700; letter-spacing: 1.5px; color: var(--text-2); transition: all 0.2s; border: none; background: none; }
+    .tab.active { background: var(--plasma-dim); color: var(--plasma); }
+    .tab:hover:not(.active) { color: var(--text); }
+    .refresh-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border: 1px solid rgba(0,255,224,0.12); border-radius: 6px; color: var(--text-2); background: none; cursor: pointer; font-family: var(--display); font-size: 8px; letter-spacing: 1px; transition: all 0.2s; }
+    .refresh-btn:hover { color: var(--plasma); border-color: rgba(0,255,224,0.3); }
+    .refresh-btn.spinning svg { animation: spin 1s linear infinite; }
+    @keyframes spin { 100%{transform:rotate(360deg)} }
+
+    /* ── CONTENT ── */
+    .content { max-width: 920px; margin: 0 auto; padding: 28px 16px 80px; width: 100%; }
+
+    /* ── STATS BAR ── */
+    .stats-bar { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 36px; }
+    .stat-card { padding: 16px; border: 1px solid var(--border); border-radius: 8px; background: rgba(0,255,224,0.02); text-align: center; transition: all 0.2s; }
+    .stat-card:hover { border-color: rgba(0,255,224,0.2); background: var(--plasma-dim); }
+    .stat-val { font-family: var(--display); font-size: 24px; font-weight: 900; color: var(--plasma); }
+    .stat-label { font-family: var(--mono); font-size: 9px; letter-spacing: 2px; color: var(--text-3); text-transform: uppercase; margin-top: 4px; }
+
+    /* ── SECTION TITLE ── */
+    .section-title { font-family: var(--display); font-size: 8px; font-weight: 700; letter-spacing: 4px; color: var(--text-3); text-transform: uppercase; margin-bottom: 18px; display: flex; align-items: center; gap: 12px; }
+    .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    /* ── PODIUM ── */
+    .podium { display: grid; grid-template-columns: 1fr 1.1fr 1fr; gap: 14px; align-items: end; margin-bottom: 40px; }
+    .podium-card {
+      border-radius: 10px; padding: 22px 14px 26px; text-align: center;
+      border: 1px solid var(--border); background: rgba(0,255,224,0.02);
+      transition: all 0.3s; cursor: pointer; position: relative; overflow: hidden;
+      animation: podiumRise 0.6s ease backwards;
+    }
+    .podium-card:hover { transform: translateY(-6px); }
+    .podium-card::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at top, var(--glow) 0%, transparent 65%); opacity: 0; transition: opacity 0.3s; }
+    .podium-card:hover::before { opacity: 1; }
+    @keyframes podiumRise { from{opacity:0;transform:translateY(30px)} to{opacity:1;transform:translateY(0)} }
+    .podium-card.r1 { --glow: rgba(251,191,36,0.12); border-color: rgba(251,191,36,0.3); background: rgba(251,191,36,0.03); }
+    .podium-card.r2 { --glow: rgba(148,163,184,0.1); border-color: rgba(148,163,184,0.2); animation-delay:0.1s; }
+    .podium-card.r3 { --glow: rgba(180,83,9,0.1); border-color: rgba(180,83,9,0.2); animation-delay:0.2s; }
+    .podium-medal { font-size: 34px; margin-bottom: 8px; }
+    .podium-rank-label { font-family: var(--display); font-size: 8px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 10px; }
+    .r1 .podium-rank-label { color: var(--gold); }
+    .r2 .podium-rank-label { color: var(--silver); }
+    .r3 .podium-rank-label { color: var(--bronze); }
+    .podium-avatar { width: 52px; height: 52px; border-radius: 50%; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; font-family: var(--display); font-size: 18px; font-weight: 900; border: 2px solid currentColor; position: relative; }
+    .podium-avatar::after { content: ''; position: absolute; inset: -5px; border-radius: 50%; border: 1px solid currentColor; opacity: 0.25; animation: aRing 2s ease infinite; }
+    @keyframes aRing { 0%,100%{transform:scale(1);opacity:0.25} 50%{transform:scale(1.1);opacity:0.08} }
+    .podium-name { font-family: var(--display); font-size: 13px; font-weight: 700; margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .podium-val { font-size: 30px; font-weight: 900; font-family: var(--display); line-height: 1; }
+    .podium-val-unit { font-size: 10px; color: var(--text-2); font-family: var(--mono); letter-spacing: 1px; margin-top: 3px; }
+    .podium-mini { display: flex; justify-content: center; gap: 14px; margin-top: 10px; }
+    .podium-mini span { font-family: var(--mono); font-size: 9px; color: var(--text-3); }
+    .share-btn { display: inline-flex; align-items: center; gap: 5px; margin-top: 12px; padding: 5px 12px; border: 1px solid rgba(0,255,224,0.15); border-radius: 20px; color: rgba(0,255,224,0.5); background: none; cursor: pointer; font-family: var(--display); font-size: 7px; letter-spacing: 1px; transition: all 0.2s; }
+    .share-btn:hover { color: var(--plasma); border-color: var(--plasma); background: var(--plasma-dim); }
+
+    /* ── TABLE ── */
+    .lb-table { width: 100%; border-collapse: collapse; }
+    .lb-table thead th { font-family: var(--display); font-size: 7px; font-weight: 700; letter-spacing: 2px; color: var(--text-3); text-transform: uppercase; padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); }
+    .lb-table thead th.r { text-align: right; }
+    .lb-table tbody tr { transition: background 0.15s; cursor: pointer; animation: rowFade 0.35s ease backwards; }
+    .lb-table tbody tr:hover { background: rgba(0,255,224,0.03); }
+    .lb-table tbody td { padding: 11px 10px; border-bottom: 1px solid rgba(0,255,224,0.04); vertical-align: middle; }
+    @keyframes rowFade { from{opacity:0;transform:translateX(-8px)} to{opacity:1;transform:translateX(0)} }
+    .rank-num { text-align: center; font-family: var(--display); font-size: 11px; font-weight: 700; color: var(--text-3); width: 44px; }
+    .rank-num.hi { color: var(--plasma); }
+    .user-cell { display: flex; align-items: center; gap: 10px; }
+    .av-sm { width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-family: var(--display); font-size: 12px; font-weight: 900; border: 1px solid currentColor; opacity: 0.85; }
+    .u-name { font-weight: 600; font-size: 13px; }
+    .u-sub { font-family: var(--mono); font-size: 9px; color: var(--text-3); margin-top: 1px; }
+    .str-cell { font-family: var(--display); font-size: 13px; font-weight: 700; color: var(--fire); }
+    .msg-cell { font-family: var(--mono); font-size: 12px; color: var(--text-2); text-align: right; }
+    .run-cell { font-family: var(--mono); font-size: 12px; color: var(--ice); text-align: right; }
+    .bar-wrap { width: 100px; }
+    .bar-bg { height: 4px; background: rgba(0,255,224,0.08); border-radius: 2px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--plasma), var(--nova)); transition: width 1s ease; }
+    .card-btn { padding: 4px 10px; border: 1px solid var(--border); border-radius: 4px; color: var(--text-3); background: none; cursor: pointer; font-family: var(--display); font-size: 7px; letter-spacing: 1px; transition: all 0.15s; }
+    .card-btn:hover { color: var(--plasma); border-color: rgba(0,255,224,0.3); background: var(--plasma-dim); }
+
+    /* ── EMPTY ── */
+    .empty-state { text-align: center; padding: 70px 20px; }
+    .empty-icon { font-size: 60px; margin-bottom: 16px; }
+    .empty-text { font-family: var(--display); font-size: 13px; letter-spacing: 4px; color: var(--text-3); }
+
+    /* ── FOOTER ── */
+    .footer { margin-top: auto; padding: 18px 28px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; font-family: var(--mono); font-size: 9px; color: var(--text-3); letter-spacing: 1px; flex-wrap: wrap; gap: 8px; }
+    .footer-brand { color: var(--plasma); opacity: 0.6; }
+
+    /* ── TOAST ── */
+    .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px); background: rgba(4,8,20,0.97); border: 1px solid var(--plasma); padding: 10px 22px; border-radius: 6px; font-family: var(--mono); font-size: 11px; color: var(--plasma); transition: transform 0.3s ease; z-index: 1000; pointer-events: none; box-shadow: 0 0 24px rgba(0,255,224,0.2); white-space: nowrap; }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+
+    @media (max-width: 640px) {
+      .podium { grid-template-columns: 1fr; }
+      .podium-card.r1 { order: -1; }
+      .stats-bar { grid-template-columns: 1fr 1fr; }
+      .run-cell, .bar-wrap { display: none; }
+      .nav { flex-direction: column; align-items: stretch; }
+      .tabs { justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <div class="header">
+    <div class="header-eyebrow">CodeBuddy Neural AI · Global Rankings</div>
+    <h1>LEADERBOARD</h1>
+    <div class="header-sub">Top Coders · Ranked by Streak &amp; Activity</div>
+    <div><div class="live-badge"><div class="live-dot"></div>LIVE · AUTO-REFRESHES EVERY 60s</div></div>
+  </div>
+
+  <div class="nav">
+    <a href="/" class="back-btn">← BACK TO CODEBUDDY</a>
+    <div class="tabs">
+      <button class="tab active" onclick="setSort('streak',this)">🔥 STREAK</button>
+      <button class="tab" onclick="setSort('messages',this)">💬 MESSAGES</button>
+      <button class="tab" onclick="setSort('runs',this)">▶ CODE RUNS</button>
+    </div>
+    <button class="refresh-btn" id="refreshBtn" onclick="loadData()">
+      <svg id="rIcon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M23 4v6h-6M1 20v-6h6"/>
+        <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+      </svg>
+      REFRESH
+    </button>
+  </div>
+
+  <div class="content">
+
+    <div class="stats-bar">
+      <div class="stat-card"><div class="stat-val" id="sUsers">—</div><div class="stat-label">Total Coders</div></div>
+      <div class="stat-card"><div class="stat-val" id="sStreak">—</div><div class="stat-label">Top Streak</div></div>
+      <div class="stat-card"><div class="stat-val" id="sMsgs">—</div><div class="stat-label">Total Messages</div></div>
+      <div class="stat-card"><div class="stat-val" id="sRuns">—</div><div class="stat-label">Code Runs</div></div>
+    </div>
+
+    <div class="section-title">TOP 3 CHAMPIONS</div>
+    <div class="podium" id="podium">
+      <div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">⏳</div><div class="empty-text">LOADING...</div></div>
+    </div>
+
+    <div class="section-title">FULL RANKINGS</div>
+    <table class="lb-table">
+      <thead>
+        <tr>
+          <th>#</th><th>CODER</th><th>STREAK</th>
+          <th class="r">MESSAGES</th><th class="r run-cell">CODE RUNS</th>
+          <th class="bar-wrap"></th><th class="r">CARD</th>
+        </tr>
+      </thead>
+      <tbody id="tbody">
+        <tr><td colspan="7" style="padding:40px;text-align:center;color:var(--text-3);font-family:var(--mono);font-size:11px">Loading...</td></tr>
+      </tbody>
+    </table>
+
+  </div>
+
+  <div class="footer">
+    <span class="footer-brand">CODEBUDDY NEURAL AI v4.0</span>
+    <span id="lastUpdated">—</span>
+    <span>INDIA'S FIRST TANGLISH CODING AI</span>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  let allData = [], sortBy = 'streak';
+  const COLORS = ['#00ffe0','#a855f7','#ff6b2b','#38bdf8','#fbbf24','#4ade80','#f472b6','#fb923c','#818cf8','#34d399'];
+  const MEDALS = ['👑','🥈','🥉'], RC = ['r1','r2','r3'], RL = ['CHAMPION','2ND PLACE','3RD PLACE'];
+
+  function toast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  function setSort(type, btn) {
+    sortBy = type;
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active'); renderAll();
+  }
+
+  function val(u) {
+    if (sortBy === 'messages') return u.total_messages || 0;
+    if (sortBy === 'runs') return u.code_runs || 0;
+    return u.streak_days || 0;
+  }
+
+  function color(username) {
+    let h = 0;
+    for (let c of username) h = (h * 31 + c.charCodeAt(0)) & 0xffffffff;
+    return COLORS[Math.abs(h) % COLORS.length];
+  }
+
+  function renderAll() {
+    const sorted = [...allData].sort((a,b) => val(b) - val(a));
+    renderStats(sorted); renderPodium(sorted.slice(0,3)); renderTable(sorted);
+  }
+
+  function renderStats(d) {
+    document.getElementById('sUsers').textContent = d.length;
+    document.getElementById('sStreak').textContent = d[0] ? (d[0].streak_days||0)+'d' : '0d';
+    const m = d.reduce((s,u)=>s+(u.total_messages||0),0);
+    document.getElementById('sMsgs').textContent = m>999?(m/1000).toFixed(1)+'k':m;
+    const r = d.reduce((s,u)=>s+(u.code_runs||0),0);
+    document.getElementById('sRuns').textContent = r>999?(r/1000).toFixed(1)+'k':r;
+  }
+
+  function renderPodium(top) {
+    const el = document.getElementById('podium');
+    if (!top.length) { el.innerHTML='<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">🚀</div><div class="empty-text">BE THE FIRST CODER</div></div>'; return; }
+    const order = top.length>=3 ? [top[1],top[0],top[2]] : top.length===2 ? [top[1],top[0]] : [top[0]];
+    const ri = top.length>=3 ? [1,0,2] : top.length===2 ? [1,0] : [0];
+    const unitLabel = sortBy==='messages'?'MESSAGES':sortBy==='runs'?'CODE RUNS':'DAY STREAK';
+    const col = u => u.avatar_color || color(u.username);
+    el.innerHTML = order.map((u,i) => {
+      const r = ri[i], c = col(u), v = val(u);
+      return `<div class="podium-card ${RC[r]}" style="animation-delay:${i*0.1}s" onclick="shareCard('${u.username}')">
+        <div class="podium-medal">${MEDALS[r]}</div>
+        <div class="podium-rank-label">${RL[r]}</div>
+        <div class="podium-avatar" style="color:${c};border-color:${c}">${u.username[0].toUpperCase()}</div>
+        <div class="podium-name">${u.username}</div>
+        <div class="podium-val" style="color:${c}">${v}</div>
+        <div class="podium-val-unit">${unitLabel}</div>
+        <div class="podium-mini">
+          <span>💬 ${u.total_messages||0}</span>
+          <span>▶ ${u.code_runs||0}</span>
+          <span>🐛 ${u.debug_count||0}</span>
+        </div>
+        <button class="share-btn" onclick="event.stopPropagation();shareCard('${u.username}')">⟦ SHARE CARD ⟧</button>
+      </div>`;
+    }).join('');
+  }
+
+  function renderTable(data) {
+    const tb = document.getElementById('tbody');
+    if (data.length <= 3) { tb.innerHTML='<tr><td colspan="7" style="padding:20px;text-align:center;color:var(--text-3);font-family:var(--mono);font-size:10px">No more entries</td></tr>'; return; }
+    const maxV = Math.max(...data.map(val)) || 1;
+    tb.innerHTML = data.slice(3).map((u,i) => {
+      const rank=i+4, c=u.avatar_color||color(u.username), v=val(u), pct=Math.round(v/maxV*100);
+      return `<tr style="animation-delay:${i*0.04}s" onclick="shareCard('${u.username}')">
+        <td class="rank-num ${rank<=10?'hi':''}">${rank}</td>
+        <td><div class="user-cell">
+          <div class="av-sm" style="color:${c};border-color:${c}">${u.username[0].toUpperCase()}</div>
+          <div><div class="u-name">${u.username}</div><div class="u-sub">${u.debug_count||0} bugs fixed · ${u.optimize_count||0} optimized</div></div>
+        </div></td>
+        <td class="str-cell">🔥 ${u.streak_days||0}d</td>
+        <td class="msg-cell">${u.total_messages||0}</td>
+        <td class="run-cell">${u.code_runs||0}</td>
+        <td class="bar-wrap"><div class="bar-bg"><div class="bar-fill" style="width:${pct}%"></div></div></td>
+        <td style="text-align:right"><button class="card-btn" onclick="event.stopPropagation();shareCard('${u.username}')">CARD</button></td>
+      </tr>`;
+    }).join('');
+  }
+
+  function shareCard(username) {
+    window.open('/streak_card/'+username+'.svg','_blank');
+    toast('Opening streak card for '+username+' ✦');
+  }
+
+  async function loadData() {
+    const btn = document.getElementById('refreshBtn');
+    btn.classList.add('spinning');
+    try {
+      const res = await fetch('/api/leaderboard');
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      allData = data.leaderboard || [];
+      renderAll();
+      document.getElementById('lastUpdated').textContent = 'Updated '+new Date().toLocaleTimeString();
+      toast('Rankings refreshed ✦');
+    } catch {
+      // Demo mode
+      allData = demoData();
+      renderAll();
+      document.getElementById('lastUpdated').textContent = 'Demo mode — connect backend';
+    } finally {
+      btn.classList.remove('spinning');
+    }
+  }
+
+  function demoData() {
+    const names = ['neural_ninja','codesamurai','Arjun_Dev','priya_codes','TamilCoder','debugmaster','pymaster','JSjedi','rustacean','KannadaDev','BengaliByte','TeluguTech'];
+    return names.map((name,i) => ({
+      username: name, avatar_color: COLORS[i%COLORS.length],
+      streak_days: Math.max(1, 85-i*7+Math.floor(Math.random()*8)),
+      total_messages: Math.max(1, 420-i*32+Math.floor(Math.random()*40)),
+      code_runs: Math.max(0, 180-i*14+Math.floor(Math.random()*20)),
+      debug_count: Math.floor(Math.random()*60)+5,
+      optimize_count: Math.floor(Math.random()*30)+2,
+    })).sort((a,b)=>b.streak_days-a.streak_days);
+  }
+
+  loadData();
+  setInterval(loadData, 60000);
+</script>
+</body>
+</html>

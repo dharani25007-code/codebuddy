@@ -1,1627 +1,1381 @@
-/* ╔══════════════════════════════════════════════════════════════════════╗
-   ║  CODEBUDDY NEURAL VOICE ENGINE v3.0                                 ║
-   ║  The World's Most Advanced Programming Voice Assistant              ║
-   ║                                                                     ║
-   ║  PATENT-WORTHY FEATURES:                                            ║
-   ║  1. Voice Command Routing — intent detection for mode switching     ║
-   ║  2. Code Dictation Mode — speaks code with symbol pronunciation     ║
-   ║  3. Emotion-Adaptive TTS — adjusts voice tone per response type     ║
-   ║  4. Multilingual Code-Switching — mid-sentence language detection   ║
-   ║  5. Voice Confidence Meter — real-time input quality visualization  ║
-   ║  6. Smart Punctuation Injection — auto-adds . , ; : from pauses    ║
-   ║  7. Wake Word Listener — "Hey CodeBuddy" always-on activation       ║
-   ║  8. Silence Detection — auto-sends after user stops speaking        ║
-   ║  9. Speaker Visualization — live waveform + spectrum analyzer       ║
-   ║  10. Voice Shortcuts — "run it", "copy that", "clear screen"        ║
-   ║  11. TTS Code Filtering — reads explanations, skips raw code        ║
-   ║  12. Session Voice Replay — re-read any previous AI response        ║
-   ╚══════════════════════════════════════════════════════════════════════╝ */
+/**
+ * ╔══════════════════════════════════════════════════════════════════╗
+ * ║  CODEBUDDY NEURAL VOICE ENGINE v4.0                             ║
+ * ║  World's First Programming-Focused Multilingual Voice AI        ║
+ * ║  UPGRADED: +10 Indic langs · Memory UI · Leaderboard · PWA     ║
+ * ╚══════════════════════════════════════════════════════════════════╝
+ */
 
-'use strict';
+(function () {
+  'use strict';
 
-window.CBVoice = (function () {
-
-  // ═══════════════ CONFIG ═══════════════
-  const CFG = {
-    WAKE_WORD: 'hey codebuddy',
-    SILENCE_TIMEOUT_MS: 1800,   // auto-send after 1.8s silence
-    MAX_RECORD_MS: 60000,
-    CONFIDENCE_THRESHOLD: 0.55, // min confidence to auto-send
-    WAVEFORM_BARS: 48,
-    SPECTRUM_BARS: 32,
-    SUPPORTED_LANGS: [
-      { code: 'en-US', label: 'EN', name: 'English' },
-      { code: 'ta-IN', label: 'TA', name: 'Tamil' },
-      { code: 'hi-IN', label: 'HI', name: 'Hindi' },
-      { code: 'zh-CN', label: 'ZH', name: 'Chinese' },
-      { code: 'fr-FR', label: 'FR', name: 'French' },
-      { code: 'de-DE', label: 'DE', name: 'German' },
-      { code: 'ja-JP', label: 'JA', name: 'Japanese' },
-      { code: 'es-ES', label: 'ES', name: 'Spanish' },
-    ],
-    TTS_VOICES: {
-      mentor: { pitch: 1.05, rate: 0.92, volume: 1.0 },
-      strict: { pitch: 0.88, rate: 0.82, volume: 1.0 },
-      excited: { pitch: 1.2,  rate: 1.05, volume: 1.0 },
-      calm:    { pitch: 0.95, rate: 0.78, volume: 0.9 },
-    },
-    CODE_SYMBOLS: {
-      '===': 'triple equals',  '!==': 'strict not equals',
-      '==': 'equals',          '!=': 'not equals',
-      '>=': 'greater or equal','<=': 'less or equal',
-      '=>': 'arrow',           '->': 'pointer arrow',
-      '++': 'increment',       '--': 'decrement',
-      '&&': 'and',             '||': 'or',
-      '**': 'power',           '//': 'comment',
-      '/*': 'block comment start', '*/': 'block comment end',
-      '<<<': 'triple less than', '>>>': 'triple right shift',
-      '{': 'open brace',       '}': 'close brace',
-      '[': 'open bracket',     ']': 'close bracket',
-      '(': 'open paren',       ')': 'close paren',
-      '<': 'less than',        '>': 'greater than',
-      '!': 'exclamation',      '@': 'at',
-      '#': 'hash',             '$': 'dollar',
-      '%': 'percent',          '^': 'caret',
-      '&': 'ampersand',        '*': 'star',
-      '-': 'dash',             '_': 'underscore',
-      '=': 'equals',           '+': 'plus',
-      '|': 'pipe',             '~': 'tilde',
-      '`': 'backtick',         '\\': 'backslash',
-      '/': 'slash',            ':': 'colon',
-      ';': 'semicolon',        ',': 'comma',
-      '.': 'dot',              '?': 'question mark',
-    },
-    VOICE_COMMANDS: {
-      // Navigation
-      'new chat': () => document.querySelector('.new-chat-btn')?.click(),
-      'clear chat': () => _clearScreen(),
-      'scroll down': () => document.getElementById('chatBox')?.scrollTo({ top: 99999, behavior: 'smooth' }),
-      'scroll up': () => document.getElementById('chatBox')?.scrollTo({ top: 0, behavior: 'smooth' }),
-      // Mode switching
-      'switch to debug': () => _setMode('debug'),
-      'debug mode': () => _setMode('debug'),
-      'interview mode': () => _setMode('interview'),
-      'optimize mode': () => _setMode('optimize'),
-      'machine learning mode': () => _setMode('ml'),
-      'general mode': () => _setMode('general'),
-      // Actions
-      'run it': () => document.querySelector('.run-btn')?.click(),
-      'run code': () => document.querySelector('.run-btn')?.click(),
-      'copy that': () => _copyLastResponse(),
-      'copy code': () => document.querySelector('.code-btn')?.click(),
-      'read that': () => CBVoice.speakLast(),
-      'stop reading': () => CBVoice.stopSpeaking(),
-      'repeat that': () => CBVoice.speakLast(),
-      'pause': () => CBVoice.pauseSpeaking(),
-      'resume': () => CBVoice.resumeSpeaking(),
-      // Theme
-      'dark mode': () => { document.body.classList.remove('light'); },
-      'light mode': () => { document.body.classList.add('light'); },
-      'toggle theme': () => document.querySelector('.theme-morph')?.click(),
-      // Panel
-      'show live': () => document.getElementById('liveBtn')?.click(),
-      'hide live': () => { if (!document.getElementById('liveOverlay')?.classList.contains('hidden')) document.getElementById('liveBtn')?.click(); },
-    },
-  };
-
-  // ═══════════════ STATE ═══════════════
-  const S = {
-    recognition: null,
+  /* ═══════════════════════════════════════
+     CORE STATE
+  ═══════════════════════════════════════ */
+  const STATE = {
+    isOpen: false,
     isListening: false,
-    isWakeListening: false,
     isSpeaking: false,
+    isPaused: false,
     currentLang: 'en-US',
-    silenceTimer: null,
-    audioCtx: null,
-    analyser: null,
-    mediaStream: null,
-    animFrame: null,
-    waveformData: new Uint8Array(CFG.WAVEFORM_BARS),
-    spectrumData: new Uint8Array(CFG.SPECTRUM_BARS),
-    lastTranscript: '',
-    commandMode: false,
-    ttsPersonality: 'mentor',
-    voiceHistory: [],        // array of {text, role, ts}
-    historyIndex: -1,
-    autoSend: true,
-    codeDictation: false,
-    wakeEnabled: false,
-    wakeRecognition: null,
-    uiMounted: false,
+    wakeWordActive: false,
+    uploadedFile: null,
+    uploadedFileType: null,
+    recognition: null,
+    synth: window.speechSynthesis,
+    voices: [],
+    currentUtterance: null,
+    transcript: '',
+    interimTranscript: '',
+    lastCommand: '',
+    volume: 0.85,
+    rate: 0.95,
+    pitch: 1.05,
+    autoSpeak: false,
+    codeContext: true,
+    initialized: false,
   };
 
-  // ═══════════════ DOM REFS ═══════════════
-  let UI = {};
+  /* ═══════════════════════════════════════════════════════
+     CHANGE 3: LANGUAGES — 10 Indic + World Languages
+  ═══════════════════════════════════════════════════════ */
+  const LANGS = {
+    'en-US': {
+      name: 'English', short: 'EN', flag: '🇺🇸',
+      greet: 'CodeBuddy Neural Voice ready. Say "Hey Buddy" to activate.',
+      listening: 'Listening...',
+      processing: 'Processing your code query...',
+      error: 'Voice recognition error. Please try again.',
+      noSupport: 'Speech recognition not supported in this browser.',
+      commands: {
+        'run code': () => triggerRun(),
+        'execute': () => triggerRun(),
+        'debug this': () => triggerDebug(),
+        'explain code': () => triggerExplain(),
+        'optimize': () => triggerOptimize(),
+        'clear chat': () => clearConversation(),
+        'new session': () => newSession(),
+        'stop speaking': () => CBVoice.stop(),
+        'pause': () => CBVoice.pause(),
+        'resume': () => CBVoice.resume(),
+        'hey buddy': () => activateWakeWord(),
+        'show memory': () => CBVoice.showMemory(),
+        'open leaderboard': () => window.open('/leaderboard', '_blank'),
+        'share my streak': () => CBVoice.shareStreak(),
+      }
+    },
+    'ta-IN': {
+      name: 'Tamil', short: 'TA', flag: '🇮🇳',
+      greet: 'கோட்பட்டி தயார். "ஹே பட்டி" என்று சொல்லுங்கள்.',
+      listening: 'கேட்கிறேன்...',
+      processing: 'செயலாக்குகிறேன்...',
+      error: 'பிழை. மீண்டும் முயற்சிக்கவும்.',
+      noSupport: 'இந்த உலாவியில் குரல் ஆதரவு இல்லை.',
+      commands: {
+        'கோட் இயக்கு': () => triggerRun(),
+        'பிழை திருத்து': () => triggerDebug(),
+        'விளக்கு': () => triggerExplain(),
+        'நிறுத்து': () => CBVoice.stop(),
+        'ஹே பட்டி': () => activateWakeWord(),
+      }
+    },
+    'ta-en': {
+      name: 'Tanglish', short: 'TA-EN', flag: '🇮🇳',
+      greet: 'Tanglish mode ready. "Hey Buddy" nu sollunga.',
+      listening: 'Kekuren...',
+      processing: 'Process panren...',
+      error: 'Voice error. Thirumba try pannunga.',
+      noSupport: 'Not supported in this browser.',
+      commands: {
+        'run code': () => triggerRun(),
+        'debug this': () => triggerDebug(),
+        'explain code': () => triggerExplain(),
+        'stop speaking': () => CBVoice.stop(),
+        'hey buddy': () => activateWakeWord(),
+      },
+      textOutputLang: 'en-US',
+      voiceOutputLang: 'ta-IN'
+    },
+    'hi-IN': {
+      name: 'हिन्दी', short: 'HI', flag: '🇮🇳',
+      greet: 'कोडबडी न्यूरल वॉयस तैयार है। "हे बडी" कहें।',
+      listening: 'सुन रहा हूँ...',
+      processing: 'आपकी कोड क्वेरी प्रोसेस हो रही है...',
+      error: 'वॉयस पहचान में त्रुटि। कृपया पुनः प्रयास करें।',
+      noSupport: 'इस ब्राउज़र में वॉयस पहचान समर्थित नहीं है।',
+      commands: {
+        'कोड चलाओ': () => triggerRun(),
+        'डिबग करो': () => triggerDebug(),
+        'समझाओ': () => triggerExplain(),
+        'रोको': () => CBVoice.stop(),
+        'हे बडी': () => activateWakeWord(),
+      }
+    },
+    // ── NEW INDIC LANGUAGES ──
+    'te-IN': {
+      name: 'Telugu', short: 'TE', flag: '🇮🇳',
+      greet: 'కోడ్‌బడ్డీ సిద్ధంగా ఉంది. "హే బడ్డీ" అని చెప్పండి.',
+      listening: 'వింటున్నాను...',
+      processing: 'ప్రాసెస్ చేస్తున్నాను...',
+      error: 'వాయిస్ లోపం. దయచేసి మళ్ళీ ప్రయత్నించండి.',
+      noSupport: 'ఈ బ్రౌజర్‌లో వాయిస్ మద్దతు లేదు.',
+      commands: {
+        'కోడ్ రన్ చేయి': () => triggerRun(),
+        'డీబగ్ చేయి': () => triggerDebug(),
+        'వివరించు': () => triggerExplain(),
+        'ఆపు': () => CBVoice.stop(),
+        'హే బడ్డీ': () => activateWakeWord(),
+      }
+    },
+    'kn-IN': {
+      name: 'Kannada', short: 'KN', flag: '🇮🇳',
+      greet: 'ಕೋಡ್‌ಬಡ್ಡಿ ಸಿದ್ಧವಾಗಿದೆ. "ಹೇ ಬಡ್ಡಿ" ಎಂದು ಹೇಳಿ.',
+      listening: 'ಕೇಳುತ್ತಿದ್ದೇನೆ...',
+      processing: 'ಪ್ರಕ್ರಿಯೆಗೊಳಿಸುತ್ತಿದ್ದೇನೆ...',
+      error: 'ಧ್ವನಿ ದೋಷ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.',
+      noSupport: 'ಈ ಬ್ರೌಸರ್‌ನಲ್ಲಿ ಧ್ವನಿ ಬೆಂಬಲ ಇಲ್ಲ.',
+      commands: {
+        'ಕೋಡ್ ರನ್ ಮಾಡು': () => triggerRun(),
+        'ಡೀಬಗ್ ಮಾಡು': () => triggerDebug(),
+        'ವಿವರಿಸು': () => triggerExplain(),
+        'ನಿಲ್ಲಿಸು': () => CBVoice.stop(),
+        'ಹೇ ಬಡ್ಡಿ': () => activateWakeWord(),
+      }
+    },
+    'ml-IN': {
+      name: 'Malayalam', short: 'ML', flag: '🇮🇳',
+      greet: 'കോഡ്ബഡ്ഡി തയ്യാർ. "ഹേ ബഡ്ഡി" എന്ന് പറയൂ.',
+      listening: 'കേൾക്കുന്നു...',
+      processing: 'പ്രോസസ്സ് ചെയ്യുന്നു...',
+      error: 'വോയ്‌സ് പിശക്. വീണ്ടും ശ്രമിക്കൂ.',
+      noSupport: 'ഈ ബ്രൗസറിൽ വോയ്‌സ് പിന്തുണ ഇല്ല.',
+      commands: {
+        'കോഡ് റൺ ചെയ്യൂ': () => triggerRun(),
+        'ഡീബഗ് ചെയ്യൂ': () => triggerDebug(),
+        'വിശദീകരിക്കൂ': () => triggerExplain(),
+        'നിർത്തൂ': () => CBVoice.stop(),
+        'ഹേ ബഡ്ഡി': () => activateWakeWord(),
+      }
+    },
+    'bn-IN': {
+      name: 'Bengali', short: 'BN', flag: '🇮🇳',
+      greet: 'কোডবাডি প্রস্তুত। "হে বাডি" বলুন।',
+      listening: 'শুনছি...',
+      processing: 'প্রক্রিয়া করছি...',
+      error: 'ভয়েস ত্রুটি। আবার চেষ্টা করুন।',
+      noSupport: 'এই ব্রাউজারে ভয়েস সমর্থন নেই।',
+      commands: {
+        'কোড রান করো': () => triggerRun(),
+        'ডিবাগ করো': () => triggerDebug(),
+        'ব্যাখ্যা করো': () => triggerExplain(),
+        'থামো': () => CBVoice.stop(),
+        'হে বাডি': () => activateWakeWord(),
+      }
+    },
+    'mr-IN': {
+      name: 'Marathi', short: 'MR', flag: '🇮🇳',
+      greet: 'कोडबडी तयार आहे. "हे बडी" म्हणा.',
+      listening: 'ऐकत आहे...',
+      processing: 'प्रक्रिया करत आहे...',
+      error: 'आवाज त्रुटी. पुन्हा प्रयत्न करा.',
+      noSupport: 'या ब्राउझरमध्ये आवाज समर्थन नाही.',
+      commands: {
+        'कोड चालवा': () => triggerRun(),
+        'डीबग करा': () => triggerDebug(),
+        'समजावून सांगा': () => triggerExplain(),
+        'थांबा': () => CBVoice.stop(),
+        'हे बडी': () => activateWakeWord(),
+      }
+    },
+  };
 
-  // ═══════════════════════════════════════════
-  // FEATURE 1: VOICE PANEL UI CONSTRUCTION
-  // ═══════════════════════════════════════════
-  function mountUI() {
-    if (S.uiMounted) return;
-    S.uiMounted = true;
+  /* ═══════════════════════════════════════
+     CODE SYMBOL VOICE DICTATION MAP
+  ═══════════════════════════════════════ */
+  const CODE_SYMBOLS = {
+    'arrow function': ' => ',
+    'arrow': ' => ',
+    'equals equals': ' === ',
+    'not equals': ' !== ',
+    'greater than or equal': ' >= ',
+    'less than or equal': ' <= ',
+    'double pipe': ' || ',
+    'double ampersand': ' && ',
+    'spread operator': '...',
+    'optional chain': '?.',
+    'nullish coalescing': ' ?? ',
+    'plus equals': ' += ',
+    'minus equals': ' -= ',
+    'times equals': ' *= ',
+    'divide equals': ' /= ',
+    'open bracket': '[',
+    'close bracket': ']',
+    'open brace': '{',
+    'close brace': '}',
+    'open paren': '(',
+    'close paren': ')',
+    'open angle': '<',
+    'close angle': '>',
+    'new line': '\n',
+    'tab': '\t',
+    'semicolon': ';',
+    'colon': ':',
+    'double colon': '::',
+    'dot': '.',
+    'comma': ',',
+    'hash': '#',
+    'at sign': '@',
+    'dollar sign': '$',
+    'underscore': '_',
+    'backtick': '`',
+    'double quote': '"',
+    'single quote': "'",
+    'console log': 'console.log()',
+    'console error': 'console.error()',
+    'return statement': 'return ',
+    'const variable': 'const ',
+    'let variable': 'let ',
+    'var variable': 'var ',
+    'function definition': 'function ',
+    'async function': 'async function ',
+    'if statement': 'if () {\n\n}',
+    'for loop': 'for (let i = 0; i < ; i++) {\n\n}',
+    'while loop': 'while () {\n\n}',
+    'try catch': 'try {\n\n} catch (e) {\n\n}',
+    'import from': "import  from ''",
+    'export default': 'export default ',
+    'class definition': 'class  {\n  constructor() {\n\n  }\n}',
+    'lambda': ' => ',
+    'list comprehension': '[x for x in ]',
+    'print statement': 'print()',
+    'def function': 'def ():\n    ',
+    'self dot': 'self.',
+  };
 
-    // Inject CSS
-    const style = document.createElement('style');
-    style.textContent = getVoiceCSS();
-    document.head.appendChild(style);
+  const PROG_LANGS = [
+    'python', 'javascript', 'typescript', 'java', 'c', 'cpp', 'c#', 'csharp',
+    'go', 'golang', 'rust', 'ruby', 'php', 'swift', 'kotlin', 'scala', 'r',
+    'matlab', 'julia', 'haskell', 'erlang', 'elixir', 'clojure', 'lisp',
+    'prolog', 'fortran', 'cobol', 'pascal', 'delphi', 'ada', 'groovy',
+    'lua', 'perl', 'bash', 'shell', 'powershell', 'sql', 'mysql', 'postgresql',
+    'mongodb', 'graphql', 'html', 'css', 'scss', 'sass', 'xml', 'json', 'yaml',
+    'toml', 'markdown', 'dart', 'flutter', 'react', 'vue', 'angular', 'svelte',
+    'assembly', 'asm', 'vhdl', 'verilog', 'solidity', 'webassembly', 'wasm',
+    'brainfuck', 'forth', 'scheme', 'racket', 'ocaml', 'fsharp', 'nim', 'zig',
+    'crystal', 'd', 'hack', 'apex', 'vba', 'autohotkey', 'tcl', 'rexx',
+    'abap', 'pl/sql', 't-sql', 'nosql', 'redis', 'docker', 'kubernetes',
+    'terraform', 'ansible', 'puppet', 'chef', 'nginx', 'apache',
+  ];
 
-    // Create the floating voice panel
-    const panel = document.createElement('div');
-    panel.id = 'cbVoicePanel';
-    panel.className = 'cbv-panel cbv-hidden';
-    panel.innerHTML = getPanelHTML();
-    document.body.appendChild(panel);
+  function injectStyles() {
+    if (document.getElementById('cbv-styles')) return;
+    const s = document.createElement('style');
+    s.id = 'cbv-styles';
+    s.textContent = `
+#cbVoiceBar { position: fixed; bottom: 0; left: 280px; right: 0; height: 56px; background: linear-gradient(180deg, rgba(2,5,14,0.96) 0%, rgba(4,8,20,0.99) 100%); backdrop-filter: blur(48px) saturate(200%); border-top: none; display: flex; align-items: center; padding: 0 20px; gap: 10px; z-index: 50; transition: left 0.4s cubic-bezier(0.4,0,0.2,1); overflow: hidden; }
+body:has(.sidebar.collapsed) #cbVoiceBar { left: 60px; }
+#cbVoiceBar::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent 0%, rgba(0,255,224,0.8) 20%, rgba(168,85,247,0.8) 50%, rgba(0,255,224,0.8) 80%, transparent 100%); background-size: 200% 100%; animation: cbBarScan 4s linear infinite; filter: blur(0.3px); }
+#cbVoiceBar::after { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,255,224,0.008) 3px, rgba(0,255,224,0.008) 4px); pointer-events: none; }
+@keyframes cbBarScan { 0%{background-position:0%} 100%{background-position:200%} }
+#cbMicBtn { width: 40px; height: 40px; border-radius: 50%; border: 1.5px solid rgba(0,255,224,0.4); background: radial-gradient(circle at 40% 35%, rgba(0,255,224,0.18), rgba(0,255,224,0.04) 70%); color: #00ffe0; font-size: 16px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.25s; flex-shrink: 0; position: relative; box-shadow: 0 0 12px rgba(0,255,224,0.15), inset 0 1px 0 rgba(0,255,224,0.15); }
+#cbMicBtn:hover { border-color: #00ffe0; box-shadow: 0 0 24px rgba(0,255,224,0.5), 0 0 48px rgba(0,255,224,0.15), inset 0 0 12px rgba(0,255,224,0.1); background: radial-gradient(circle at 40% 35%, rgba(0,255,224,0.28), rgba(0,255,224,0.08) 70%); }
+#cbMicBtn.active { border-color: #ff6b2b; background: radial-gradient(circle at 40% 35%, rgba(255,107,43,0.25), rgba(255,107,43,0.06) 70%); color: #ff6b2b; animation: cbMicPulse 1s ease infinite; box-shadow: 0 0 24px rgba(255,107,43,0.5), 0 0 48px rgba(255,107,43,0.15); }
+@keyframes cbMicPulse { 0%,100%{transform:scale(1);box-shadow:0 0 24px rgba(255,107,43,0.5)} 50%{transform:scale(1.08);box-shadow:0 0 36px rgba(255,107,43,0.7)} }
+#cbMicBtn.wake::after { content: ''; position: absolute; inset: -7px; border-radius: 50%; border: 1.5px solid rgba(0,255,224,0.4); animation: cbWakeRing 1.5s ease infinite; }
+@keyframes cbWakeRing { 0%{transform:scale(1);opacity:0.9} 100%{transform:scale(1.6);opacity:0} }
+#cbWaveform { display: flex; align-items: center; gap: 2.5px; height: 36px; flex-shrink: 0; padding: 0 4px; }
+.cbWave { width: 2.5px; border-radius: 2px; background: linear-gradient(180deg, #00ffe0 0%, rgba(168,85,247,0.6) 100%); transition: height 0.08s ease; opacity: 0.5; min-height: 3px; }
+#cbVoiceBar.listening .cbWave { animation: cbWaveAnim 0.6s ease infinite; opacity: 0.9; }
+#cbVoiceBar.speaking .cbWave { animation: cbWaveSpeak 0.8s ease infinite; opacity: 0.8; }
+@keyframes cbWaveAnim { 0%,100% { height: 3px; opacity: 0.3; } 50% { height: 30px; opacity: 1; } }
+@keyframes cbWaveSpeak { 0%,100% { height: 5px; opacity: 0.4; } 50% { height: 22px; opacity: 0.9; } }
+.cbWave:nth-child(1){animation-delay:0s} .cbWave:nth-child(2){animation-delay:0.07s} .cbWave:nth-child(3){animation-delay:0.14s} .cbWave:nth-child(4){animation-delay:0.21s} .cbWave:nth-child(5){animation-delay:0.28s} .cbWave:nth-child(6){animation-delay:0.35s} .cbWave:nth-child(7){animation-delay:0.42s} .cbWave:nth-child(8){animation-delay:0.35s} .cbWave:nth-child(9){animation-delay:0.28s} .cbWave:nth-child(10){animation-delay:0.21s} .cbWave:nth-child(11){animation-delay:0.14s} .cbWave:nth-child(12){animation-delay:0.07s}
+#cbTranscript { flex: 1; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: rgba(226,244,255,0.4); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; padding: 0 4px; letter-spacing: 0.03em; }
+#cbTranscript .interim { color: rgba(0,255,224,0.5); font-style: italic; }
+#cbTranscript .final { color: rgba(226,244,255,0.85); }
+#cbTranscript .cmd { color: #a855f7; font-weight: 600; }
+#cbStatus { font-family: 'Orbitron', monospace; font-size: 7.5px; font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase; padding: 4px 12px; border-radius: 20px; flex-shrink: 0; transition: all 0.3s; }
+#cbStatus.idle { color: rgba(226,244,255,0.25); border: 1px solid rgba(226,244,255,0.07); background: rgba(255,255,255,0.02); }
+#cbStatus.listening { color: #ff6b2b; border: 1px solid rgba(255,107,43,0.4); background: rgba(255,107,43,0.08); animation: cbBlink 1s ease infinite; box-shadow: 0 0 12px rgba(255,107,43,0.2); }
+#cbStatus.speaking { color: #00ffe0; border: 1px solid rgba(0,255,224,0.4); background: rgba(0,255,224,0.08); box-shadow: 0 0 12px rgba(0,255,224,0.2); }
+#cbStatus.processing { color: #a855f7; border: 1px solid rgba(168,85,247,0.4); background: rgba(168,85,247,0.08); box-shadow: 0 0 12px rgba(168,85,247,0.2); }
+@keyframes cbBlink { 0%,100%{opacity:1} 50%{opacity:0.5} }
+.cbCtrl { width: 32px; height: 32px; border-radius: 8px; border: 1px solid rgba(0,255,224,0.1); background: rgba(0,255,224,0.03); color: rgba(226,244,255,0.3); font-size: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; flex-shrink: 0; }
+.cbCtrl:hover { border-color: rgba(0,255,224,0.4); color: #00ffe0; background: rgba(0,255,224,0.08); box-shadow: 0 0 12px rgba(0,255,224,0.15); }
+.cbCtrl.active { color: #00ffe0; border-color: rgba(0,255,224,0.5); background: rgba(0,255,224,0.1); }
+#cbLangSel { appearance: none; -webkit-appearance: none; background: rgba(0,255,224,0.03); border: 1px solid rgba(0,255,224,0.12); color: rgba(0,255,224,0.7); padding: 5px 12px; font-family: 'Orbitron', monospace; font-size: 8px; font-weight: 700; letter-spacing: 1px; border-radius: 8px; cursor: pointer; outline: none; flex-shrink: 0; transition: all 0.2s; height: 32px; min-width: 160px; max-width: 200px; }
+#cbLangSel:hover { border-color: rgba(0,255,224,0.4); background: rgba(0,255,224,0.07); box-shadow: 0 0 12px rgba(0,255,224,0.15); }
+#cbLangSel option { background: #060d1a; color: #e2f4ff; }
+#cbUploadBtn { width: 32px; height: 32px; border-radius: 8px; border: 1px solid rgba(168,85,247,0.2); background: rgba(168,85,247,0.04); color: rgba(168,85,247,0.6); font-size: 13px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; flex-shrink: 0; position: relative; }
+#cbUploadBtn:hover { border-color: #a855f7; background: rgba(168,85,247,0.1); box-shadow: 0 0 14px rgba(168,85,247,0.3); color: #a855f7; }
+#cbUploadBtn.has-file { border-color: #4ade80; color: #4ade80; background: rgba(74,222,128,0.08); }
+#cbFileInput { display: none; }
+#cbFileBadge { display: none; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; border: 1px solid rgba(74,222,128,0.3); background: rgba(74,222,128,0.06); font-family: 'IBM Plex Mono', monospace; font-size: 9px; color: #4ade80; max-width: 120px; flex-shrink: 0; }
+#cbFileBadge.visible { display: flex; }
+#cbFileBadge .cb-fname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#cbFileBadge .cb-fclose { cursor: pointer; opacity: 0.6; flex-shrink: 0; }
+#cbFileBadge .cb-fclose:hover { opacity: 1; color: #ff6b2b; }
+#cbAutoSpeak { display: flex; align-items: center; gap: 6px; font-family: 'Orbitron', monospace; font-size: 7px; font-weight: 600; letter-spacing: 1.5px; color: rgba(226,244,255,0.25); cursor: pointer; flex-shrink: 0; text-transform: uppercase; transition: color 0.2s; padding: 0 4px; }
+#cbAutoSpeak.on { color: rgba(0,255,224,0.8); }
+#cbAutoSpeak .cb-toggle { width: 28px; height: 14px; border-radius: 7px; border: 1px solid rgba(0,255,224,0.15); background: rgba(0,0,0,0.4); position: relative; transition: all 0.3s; }
+#cbAutoSpeak.on .cb-toggle { background: rgba(0,255,224,0.15); border-color: rgba(0,255,224,0.5); box-shadow: 0 0 8px rgba(0,255,224,0.2); }
+#cbAutoSpeak .cb-knob { width: 9px; height: 9px; border-radius: 50%; background: rgba(226,244,255,0.25); position: absolute; top: 1.5px; left: 1.5px; transition: all 0.3s; }
+#cbAutoSpeak.on .cb-knob { background: #00ffe0; transform: translateX(13px); box-shadow: 0 0 8px #00ffe0; }
+#cbLabBtn { font-size: 8px; font-family: 'Orbitron', monospace; font-weight: 700; letter-spacing: 1.5px; padding: 0 12px; height: 32px; border-radius: 8px; border: 1px solid rgba(168,85,247,0.25); background: rgba(168,85,247,0.06); color: rgba(168,85,247,0.7); cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 5px; flex-shrink: 0; white-space: nowrap; }
+#cbLabBtn:hover { border-color: rgba(168,85,247,0.6); background: rgba(168,85,247,0.12); color: #a855f7; box-shadow: 0 0 16px rgba(168,85,247,0.25); }
+.cb-divider { width: 1px; height: 24px; background: rgba(0,255,224,0.08); flex-shrink: 0; margin: 0 2px; }
+#cbVolSlider { -webkit-appearance: none; appearance: none; width: 60px; height: 2px; border-radius: 1px; background: rgba(0,255,224,0.15); outline: none; flex-shrink: 0; cursor: pointer; }
+#cbVolSlider::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; border-radius: 50%; background: #00ffe0; box-shadow: 0 0 6px #00ffe0; cursor: pointer; }
+#cbVoicePanel { position: fixed; bottom: 60px; left: 280px; width: 380px; background: rgba(4,8,16,0.98); backdrop-filter: blur(40px) saturate(200%); border: 1px solid rgba(0,255,224,0.15); border-radius: 4px 4px 0 0; z-index: 100; box-shadow: 0 -8px 40px rgba(0,0,0,0.6), 0 0 30px rgba(0,255,224,0.05); transition: transform 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.3s; transform-origin: bottom left; display: flex; flex-direction: column; max-height: 520px; }
+#cbVoicePanel.hidden { transform: translateY(20px) scale(0.97); opacity: 0; pointer-events: none; }
+body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
+#cbPanelHeader { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid rgba(0,255,224,0.08); flex-shrink: 0; }
+.cbPanelTitle { font-family: 'Orbitron', monospace; font-size: 9px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: #00ffe0; display: flex; align-items: center; gap: 8px; }
+.cbPanelDot { width: 5px; height: 5px; border-radius: 50%; background: #00ffe0; box-shadow: 0 0 6px #00ffe0; animation: cbBlink 1.4s ease infinite; }
+#cbPanelClose { background: none; border: none; color: rgba(226,244,255,0.3); cursor: pointer; font-size: 14px; transition: color 0.15s; }
+#cbPanelClose:hover { color: #ff6b2b; }
+#cbPanelTabs { display: flex; border-bottom: 1px solid rgba(0,255,224,0.08); flex-shrink: 0; }
+.cbPTab { flex: 1; padding: 8px; text-align: center; font-family: 'Orbitron', monospace; font-size: 7px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: rgba(226,244,255,0.3); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; }
+.cbPTab.active { color: #00ffe0; border-color: #00ffe0; }
+.cbPTab:hover:not(.active) { color: rgba(226,244,255,0.6); }
+#cbPanelBody { flex: 1; overflow-y: auto; padding: 14px; }
+#cbPanelBody::-webkit-scrollbar { width: 2px; }
+#cbPanelBody::-webkit-scrollbar-thumb { background: rgba(0,255,224,0.2); }
+.cbPanelSection { display: none; }
+.cbPanelSection.active { display: block; }
+.cbCmdGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 12px; }
+.cbCmd { padding: 8px 10px; border-radius: 2px; border: 1px solid rgba(0,255,224,0.1); background: rgba(0,255,224,0.03); font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: rgba(226,244,255,0.5); cursor: pointer; transition: all 0.15s; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.cbCmd:hover { border-color: rgba(0,255,224,0.3); color: #00ffe0; background: rgba(0,255,224,0.06); }
+.cbCmd .cbCmdIcon { font-size: 14px; }
+.cbCmd .cbCmdLabel { font-size: 8px; font-family: 'Orbitron',monospace; letter-spacing: 1px; }
+.cbSymLabel { font-family: 'Orbitron', monospace; font-size: 7px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: rgba(226,244,255,0.3); margin: 10px 0 6px; }
+.cbSymRow { display: flex; justify-content: space-between; align-items: center; padding: 5px 8px; border-radius: 2px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; transition: background 0.12s; margin-bottom: 2px; }
+.cbSymRow:hover { background: rgba(0,255,224,0.04); }
+.cbSymPhrase { color: rgba(226,244,255,0.5); }
+.cbSymResult { color: #00ffe0; background: rgba(0,255,224,0.06); padding: 1px 6px; border-radius: 2px; font-size: 11px; }
+.cbSettingRow { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(0,255,224,0.05); }
+.cbSettingRow:last-child { border-bottom: none; }
+.cbSettingLabel { font-family: 'Orbitron', monospace; font-size: 8px; font-weight: 600; letter-spacing: 1px; color: rgba(226,244,255,0.4); text-transform: uppercase; }
+.cbSettingCtrl input[type=range] { -webkit-appearance: none; width: 90px; height: 2px; border-radius: 1px; background: rgba(0,255,224,0.15); outline: none; cursor: pointer; }
+.cbSettingCtrl input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; border-radius: 50%; background: #00ffe0; box-shadow: 0 0 6px #00ffe0; cursor: pointer; }
+.cbHistEntry { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid rgba(0,255,224,0.05); font-family: 'IBM Plex Mono', monospace; font-size: 10px; }
+.cbHistEntry:last-child { border-bottom: none; }
+.cbHistRole { font-family: 'Orbitron', monospace; font-size: 7px; font-weight: 700; letter-spacing: 1px; color: #a855f7; flex-shrink: 0; margin-top: 1px; }
+.cbHistText { color: rgba(226,244,255,0.6); line-height: 1.5; word-break: break-word; }
+#cbImgPreview { display: none; max-width: 100%; max-height: 120px; border: 1px solid rgba(74,222,128,0.2); border-radius: 2px; margin-top: 8px; object-fit: contain; }
+#cbImgPreview.visible { display: block; }
+#cbWakeIndicator { position: fixed; top: 70px; right: 20px; background: rgba(0,255,224,0.08); border: 1px solid rgba(0,255,224,0.2); padding: 6px 12px; border-radius: 2px; font-family: 'Orbitron', monospace; font-size: 8px; font-weight: 700; letter-spacing: 2px; color: #00ffe0; display: none; z-index: 9000; animation: cbFadeIn 0.3s ease; }
+@keyframes cbFadeIn { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:none} }
+#cbDropOverlay { display: none; position: fixed; inset: 0; z-index: 9999; background: rgba(0,255,224,0.04); border: 3px dashed rgba(0,255,224,0.4); align-items: center; justify-content: center; flex-direction: column; gap: 12px; font-family: 'Orbitron', monospace; font-size: 14px; font-weight: 700; letter-spacing: 4px; color: #00ffe0; text-shadow: 0 0 20px #00ffe0; backdrop-filter: blur(4px); }
+#cbDropOverlay.active { display: flex; }
+#cbDropOverlay .cbDropIcon { font-size: 48px; filter: drop-shadow(0 0 20px #00ffe0); animation: cbFloat 2s ease infinite; }
+@keyframes cbFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+`;
+    document.head.appendChild(s);
+  }
 
-    // Create the always-visible voice bar (replaces the simple cluster)
+  function buildUI() {
+    const dropOverlay = document.createElement('div');
+    dropOverlay.id = 'cbDropOverlay';
+    dropOverlay.innerHTML = `<div class="cbDropIcon">📁</div><div>DROP FILE TO ANALYZE</div><div style="font-size:9px;letter-spacing:2px;opacity:0.6;margin-top:-4px">CODE · IMAGE · SCREENSHOT · DOCUMENT</div>`;
+    document.body.appendChild(dropOverlay);
+
+    const wakeInd = document.createElement('div');
+    wakeInd.id = 'cbWakeIndicator';
+    wakeInd.textContent = '● WAKE WORD ACTIVE';
+    document.body.appendChild(wakeInd);
+
     const bar = document.createElement('div');
     bar.id = 'cbVoiceBar';
-    bar.className = 'cbv-bar';
-    bar.innerHTML = getBarHTML();
+    bar.innerHTML = `
+    <button id="cbMicBtn" title="Start/Stop voice input">🎤</button>
+    <div id="cbWaveform">
+      ${Array(14).fill('<div class="cbWave" style="height:3px"></div>').join('')}
+    </div>
+    <div id="cbTranscript"><span style="opacity:0.25;font-family:Orbitron,monospace;font-size:8px;letter-spacing:2px">SAY "HEY BUDDY" TO ACTIVATE · NEURAL VOICE ENGINE</span></div>
+    <div id="cbFileBadge">
+      <span>📎</span>
+      <span class="cb-fname" id="cbFName"></span>
+      <span class="cb-fclose" onclick="CBVoice.clearFile()">✕</span>
+    </div>
+    <div class="cb-divider"></div>
+    <div id="cbStatus" class="idle">IDLE</div>
+    <div class="cb-divider"></div>
+    <button class="cbCtrl" id="cbPauseBtn" onclick="CBVoice.pause()" title="Pause speech">⏸</button>
+    <button class="cbCtrl" id="cbStopBtn" onclick="CBVoice.stop()" title="Stop speech">⏹</button>
+    <div class="cb-divider"></div>
+    <button id="cbUploadBtn" title="Upload file for AI analysis" onclick="document.getElementById('cbFileInput').click()">📎</button>
+    <input type="file" id="cbFileInput" accept="image/*,.pdf,.txt,.py,.js,.ts,.java,.cpp,.c,.cs,.go,.rs,.rb,.php,.swift,.kt,.html,.css,.json,.xml,.yaml,.md,.sql,.sh,.r,.m">
+    <select id="cbLangSel" onchange="if(typeof onLangChange==='function')onLangChange(this)">
+      <optgroup label="── English ──">
+        <option value="en-US">🇺🇸 EN — English</option>
+      </optgroup>
+      <optgroup label="── Indic ──">
+        <option value="ta-IN">🇮🇳 TA — Tamil · தமிழ்</option>
+        <option value="ta-en">🇮🇳 TA+EN — Tanglish</option>
+        <option value="hi-IN">🇮🇳 HI — हिंदी</option>
+        <option value="te-IN">🇮🇳 TE — Telugu · తెలుగు</option>
+        <option value="kn-IN">🇮🇳 KN — Kannada · ಕನ್ನಡ</option>
+        <option value="ml-IN">🇮🇳 ML — Malayalam · മലയാളം</option>
+        <option value="bn-IN">🇮🇳 BN — Bengali · বাংলা</option>
+        <option value="mr-IN">🇮🇳 MR — Marathi · मराठी</option>
+      </optgroup>
+      <optgroup label="── World ──">
+        <option value="fr-FR">🇫🇷 FR — Français</option>
+        <option value="de-DE">🇩🇪 DE — Deutsch</option>
+        <option value="es-ES">🇪🇸 ES — Español</option>
+        <option value="ja-JP">🇯🇵 JA — 日本語</option>
+        <option value="zh-CN">🇨🇳 ZH — 中文</option>
+        <option value="ko-KR">🇰🇷 KO — 한국어</option>
+        <option value="ar-SA">🇸🇦 AR — العربية</option>
+        <option value="ru-RU">🇷🇺 RU — Русский</option>
+        <option value="pt-BR">🇧🇷 PT — Português</option>
+      </optgroup>
+    </select>
+    <div id="cbAutoSpeak" onclick="CBVoice.toggleAutoSpeak()" title="Auto-speak AI responses">
+      <div class="cb-toggle"><div class="cb-knob"></div></div>
+      <span>AUTO</span>
+    </div>
+    <button id="cbLabBtn" onclick="CBVoice.togglePanel()" title="Voice Lab Panel">⚡ LAB</button>
+  `;
     document.body.appendChild(bar);
 
-    // Create the speaking overlay (floating waveform when AI talks)
-    const speakOv = document.createElement('div');
-    speakOv.id = 'cbSpeakOverlay';
-    speakOv.className = 'cbv-speak-overlay cbv-hidden';
-    speakOv.innerHTML = getSpeakOverlayHTML();
-    document.body.appendChild(speakOv);
-
-    // Cache refs
-    UI = {
-      panel: panel,
-      bar: bar,
-      speakOverlay: speakOv,
-      waveCanvas: panel.querySelector('#cbvWaveCanvas'),
-      specCanvas: panel.querySelector('#cbvSpecCanvas'),
-      transcript: panel.querySelector('#cbvTranscript'),
-      confidence: panel.querySelector('#cbvConfidence'),
-      confidenceFill: panel.querySelector('#cbvConfidenceFill'),
-      status: panel.querySelector('#cbvStatus'),
-      langSelect: panel.querySelector('#cbvLang'),
-      autoSendToggle: panel.querySelector('#cbvAutoSend'),
-      wakeToggle: panel.querySelector('#cbvWakeToggle'),
-      codeDictToggle: panel.querySelector('#cbvCodeDict'),
-      historyList: panel.querySelector('#cbvHistoryList'),
-      ttsPersonality: panel.querySelector('#cbvTTSPersonality'),
-      ttsProgress: panel.querySelector('#cbvTTSProgress'),
-      ttsFill: panel.querySelector('#cbvTTSFill'),
-      barMicBtn: bar.querySelector('#cbvBarMic'),
-      barSpeakBtn: bar.querySelector('#cbvBarSpeak'),
-      barPanelBtn: bar.querySelector('#cbvBarPanel'),
-      barWake: bar.querySelector('#cbvBarWake'),
-      barLangLabel: bar.querySelector('#cbvBarLang'),
-    };
-
-    bindEvents();
-    startAudioContext();
-    log('VOICE ENGINE INITIALIZED');
-  }
-
-  // ═══════════════════════════════════════════
-  // FEATURE 2: VOICE BAR HTML
-  // ═══════════════════════════════════════════
-  function getBarHTML() {
-    return `
-      <div class="cbv-bar-inner">
-        <div class="cbv-bar-waveform" id="cbvBarWave">
-          <canvas id="cbvMiniWave" width="80" height="28"></canvas>
+    const panel = document.createElement('div');
+    panel.id = 'cbVoicePanel';
+    panel.className = 'hidden';
+    panel.innerHTML = `
+    <div id="cbPanelHeader">
+      <div class="cbPanelTitle">
+        <div class="cbPanelDot"></div>
+        NEURAL VOICE LAB
+      </div>
+      <button id="cbPanelClose" onclick="CBVoice.togglePanel()">✕</button>
+    </div>
+    <div id="cbPanelTabs">
+      <div class="cbPTab active" onclick="switchPTab('commands',this)">COMMANDS</div>
+      <div class="cbPTab" onclick="switchPTab('symbols',this)">SYMBOLS</div>
+      <div class="cbPTab" onclick="switchPTab('history',this)">HISTORY</div>
+      <div class="cbPTab" onclick="switchPTab('settings',this)">SETTINGS</div>
+    </div>
+    <div id="cbPanelBody">
+      <div class="cbPanelSection active" id="cbTab-commands">
+        <div class="cbCmdGrid">
+          <div class="cbCmd" onclick="triggerRun()"><div class="cbCmdIcon">▶</div><div class="cbCmdLabel">RUN CODE</div></div>
+          <div class="cbCmd" onclick="triggerDebug()"><div class="cbCmdIcon">🐛</div><div class="cbCmdLabel">DEBUG</div></div>
+          <div class="cbCmd" onclick="triggerExplain()"><div class="cbCmdIcon">💡</div><div class="cbCmdLabel">EXPLAIN</div></div>
+          <div class="cbCmd" onclick="triggerOptimize()"><div class="cbCmdIcon">⚡</div><div class="cbCmdLabel">OPTIMIZE</div></div>
+          <div class="cbCmd" onclick="triggerComplexity()"><div class="cbCmdIcon">📊</div><div class="cbCmdLabel">COMPLEXITY</div></div>
+          <div class="cbCmd" onclick="triggerTest()"><div class="cbCmdIcon">🧪</div><div class="cbCmdLabel">WRITE TESTS</div></div>
+          <div class="cbCmd" onclick="triggerDocument()"><div class="cbCmdIcon">📝</div><div class="cbCmdLabel">DOCUMENT</div></div>
+          <div class="cbCmd" onclick="triggerConvert()"><div class="cbCmdIcon">🔄</div><div class="cbCmdLabel">CONVERT LANG</div></div>
+          <div class="cbCmd" onclick="analyzeUploadedFile()"><div class="cbCmdIcon">📁</div><div class="cbCmdLabel">ANALYZE FILE</div></div>
+          <div class="cbCmd" onclick="CBVoice.startListening()"><div class="cbCmdIcon">🎤</div><div class="cbCmdLabel">SPEAK QUERY</div></div>
         </div>
-        <div class="cbv-bar-controls">
-          <button class="cbv-bar-btn" id="cbvBarMic" title="Voice Input (V)" onclick="CBVoice.toggleListening()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="9" y="2" width="6" height="11" rx="3"/>
-              <path d="M5 10a7 7 0 0 0 14 0M12 19v3M8 22h8"/>
-            </svg>
-          </button>
-          <button class="cbv-bar-btn cbv-bar-btn--speak" id="cbvBarSpeak" title="Read Last Response (R)" onclick="CBVoice.speakLast()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-              <path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/>
-            </svg>
-          </button>
-          <div class="cbv-bar-sep"></div>
-          <button class="cbv-bar-btn cbv-bar-btn--sm" id="cbvBarPause" title="Pause/Resume" onclick="CBVoice.togglePause()">⏸</button>
-          <button class="cbv-bar-btn cbv-bar-btn--sm" id="cbvBarStop" title="Stop Speaking" onclick="CBVoice.stopSpeaking()">⏹</button>
-          <div class="cbv-bar-sep"></div>
-          <div class="cbv-bar-lang-wrap">
-            <span class="cbv-bar-lang-label" id="cbvBarLang">EN</span>
+        <div class="cbSymLabel">VOICE COMMAND REFERENCE</div>
+        <div class="cbSymRow"><span class="cbSymPhrase">"Hey Buddy"</span><span class="cbSymResult">Wake Up</span></div>
+        <div class="cbSymRow"><span class="cbSymPhrase">"Run code"</span><span class="cbSymResult">Execute</span></div>
+        <div class="cbSymRow"><span class="cbSymPhrase">"Debug this"</span><span class="cbSymResult">Find bugs</span></div>
+        <div class="cbSymRow"><span class="cbSymPhrase">"Explain code"</span><span class="cbSymResult">Narrate</span></div>
+        <div class="cbSymRow"><span class="cbSymPhrase">"Write tests"</span><span class="cbSymResult">Unit tests</span></div>
+        <div class="cbSymRow"><span class="cbSymPhrase">"Optimize"</span><span class="cbSymResult">Refactor</span></div>
+        <div class="cbSymRow"><span class="cbSymPhrase">"Stop speaking"</span><span class="cbSymResult">Silence TTS</span></div>
+      </div>
+      <div class="cbPanelSection" id="cbTab-symbols">
+        <div class="cbSymLabel">SAY THIS → GET CODE</div>
+        ${Object.entries(CODE_SYMBOLS).slice(0, 20).map(([k, v]) => `
+          <div class="cbSymRow">
+            <span class="cbSymPhrase">"${k}"</span>
+            <span class="cbSymResult">${v.replace(/\n/g, '↵').replace(/\t/g, '→')}</span>
           </div>
-          <div class="cbv-wake-indicator" id="cbvBarWake" title="Wake Word Status">
-            <span class="cbv-wake-dot"></span>
+        `).join('')}
+        <div style="margin-top:8px;text-align:center;font-family:Orbitron,monospace;font-size:7px;letter-spacing:2px;color:rgba(226,244,255,0.2)">+ ${Object.keys(CODE_SYMBOLS).length - 20} MORE SYMBOLS</div>
+      </div>
+      <div class="cbPanelSection" id="cbTab-history">
+        <div id="cbHistoryList" style="font-family:IBM Plex Mono,monospace;font-size:10px;color:rgba(226,244,255,0.3)">No voice interactions yet.</div>
+        <img id="cbImgPreview" />
+      </div>
+      <div class="cbPanelSection" id="cbTab-settings">
+        <div class="cbSettingRow">
+          <div class="cbSettingLabel">SPEECH RATE</div>
+          <div class="cbSettingCtrl"><input type="range" min="0.5" max="2" step="0.05" value="0.95" id="cbRateSlider" oninput="CBVoice.setRate(+this.value)"></div>
+        </div>
+        <div class="cbSettingRow">
+          <div class="cbSettingLabel">PITCH</div>
+          <div class="cbSettingCtrl"><input type="range" min="0.5" max="2" step="0.05" value="1.05" id="cbPitchSlider" oninput="CBVoice.setPitch(+this.value)"></div>
+        </div>
+        <div class="cbSettingRow">
+          <div class="cbSettingLabel">VOLUME</div>
+          <div class="cbSettingCtrl"><input type="range" min="0" max="1" step="0.05" value="0.85" id="cbVolSlider2" oninput="CBVoice.setVolume(+this.value)"></div>
+        </div>
+        <div class="cbSettingRow">
+          <div class="cbSettingLabel">CODE CONTEXT</div>
+          <div class="cbSettingCtrl">
+            <div id="cbCodeCtxToggle" onclick="toggleCodeContext()" style="cursor:pointer;font-family:Orbitron,monospace;font-size:8px;font-weight:700;letter-spacing:1px;color:#00ffe0;">ON</div>
           </div>
-          <div class="cbv-bar-sep"></div>
-          <button class="cbv-bar-btn cbv-bar-btn--panel" id="cbvBarPanel" title="Open Voice Lab" onclick="CBVoice.togglePanel()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/>
-            </svg>
-          </button>
         </div>
-      </div>`;
-  }
-
-  // ═══════════════════════════════════════════
-  // FEATURE 3: FULL VOICE LAB PANEL HTML
-  // ═══════════════════════════════════════════
-  function getPanelHTML() {
-    return `
-      <div class="cbv-panel-header">
-        <div class="cbv-panel-title">
-          <span class="cbv-panel-dot"></span>
-          NEURAL VOICE LAB
+        <div class="cbSettingRow">
+          <div class="cbSettingLabel">LANGUAGE</div>
+          <div class="cbSettingCtrl">
+            <select id="cbLangSel2" onchange="CBVoice.setLang(this.value)" style="background:rgba(0,255,224,0.04);border:1px solid rgba(0,255,224,0.15);color:#00ffe0;padding:4px 8px;font-family:Orbitron,monospace;font-size:8px;border-radius:2px;outline:none;cursor:pointer;">
+              <optgroup label="── English ──">
+                <option value="en-US">🇺🇸 English</option>
+              </optgroup>
+              <optgroup label="── Indic ──">
+                <option value="ta-IN">🇮🇳 Tamil — தமிழ்</option>
+                <option value="ta-en">🇮🇳 Tanglish — தமிழ் + EN</option>
+                <option value="hi-IN">🇮🇳 Hindi — हिंदी</option>
+                <option value="te-IN">🇮🇳 Telugu — తెలుగు</option>
+                <option value="kn-IN">🇮🇳 Kannada — ಕನ್ನಡ</option>
+                <option value="ml-IN">🇮🇳 Malayalam — മലയാളം</option>
+                <option value="bn-IN">🇮🇳 Bengali — বাংলা</option>
+                <option value="mr-IN">🇮🇳 Marathi — मराठी</option>
+              </optgroup>
+              <optgroup label="── World ──">
+                <option value="fr-FR">🇫🇷 Français</option>
+                <option value="de-DE">🇩🇪 Deutsch</option>
+                <option value="es-ES">🇪🇸 Español</option>
+                <option value="ja-JP">🇯🇵 日本語</option>
+                <option value="zh-CN">🇨🇳 中文</option>
+                <option value="ko-KR">🇰🇷 한국어</option>
+                <option value="ar-SA">🇸🇦 العربية</option>
+                <option value="ru-RU">🇷🇺 Русский</option>
+                <option value="pt-BR">🇧🇷 Português</option>
+              </optgroup>
+            </select>
+          </div>
         </div>
-        <div class="cbv-panel-controls">
-          <button class="cbv-ph-btn" onclick="CBVoice.togglePanel()">✕</button>
+        <div style="margin-top:12px;padding:10px;border:1px solid rgba(0,255,224,0.08);border-radius:2px;background:rgba(0,255,224,0.02);">
+          <div style="font-family:Orbitron,monospace;font-size:7px;font-weight:700;letter-spacing:2px;color:rgba(226,244,255,0.3);margin-bottom:6px;">TEST VOICE</div>
+          <button onclick="CBVoice.testVoice()" style="width:100%;padding:7px;background:rgba(0,255,224,0.06);border:1px solid rgba(0,255,224,0.2);color:#00ffe0;font-family:Orbitron,monospace;font-size:8px;font-weight:700;letter-spacing:2px;cursor:pointer;border-radius:2px;transition:all 0.2s;" onmouseover="this.style.background='rgba(0,255,224,0.12)'" onmouseout="this.style.background='rgba(0,255,224,0.06)'">▶ SPEAK TEST PHRASE</button>
         </div>
       </div>
-
-      <div class="cbv-tabs">
-        <div class="cbv-tab active" data-tab="record" onclick="CBVoice._switchTab('record',this)">RECORD</div>
-        <div class="cbv-tab" data-tab="speak" onclick="CBVoice._switchTab('speak',this)">SPEAK</div>
-        <div class="cbv-tab" data-tab="cmds" onclick="CBVoice._switchTab('cmds',this)">COMMANDS</div>
-        <div class="cbv-tab" data-tab="history" onclick="CBVoice._switchTab('history',this)">HISTORY</div>
-        <div class="cbv-tab" data-tab="settings" onclick="CBVoice._switchTab('settings',this)">SETTINGS</div>
-      </div>
-
-      <!-- ── RECORD TAB ── -->
-      <div class="cbv-tabpanel active" id="cbvTab-record">
-        <!-- WAVEFORM VISUALIZER -->
-        <div class="cbv-visualizer-wrap">
-          <canvas id="cbvWaveCanvas" class="cbv-wave-canvas" width="360" height="80"></canvas>
-          <canvas id="cbvSpecCanvas" class="cbv-spec-canvas" width="360" height="40"></canvas>
-          <div class="cbv-vis-overlay">
-            <div class="cbv-vis-label" id="cbvStatus">STANDBY</div>
-          </div>
-        </div>
-
-        <!-- TRANSCRIPT DISPLAY -->
-        <div class="cbv-transcript-wrap">
-          <div class="cbv-tr-label">LIVE TRANSCRIPT</div>
-          <div class="cbv-transcript" id="cbvTranscript">Waiting for voice input…</div>
-        </div>
-
-        <!-- CONFIDENCE METER -->
-        <div class="cbv-confidence-wrap">
-          <div class="cbv-conf-label">
-            <span>CONFIDENCE</span>
-            <span id="cbvConfidence">0%</span>
-          </div>
-          <div class="cbv-conf-track">
-            <div class="cbv-conf-fill" id="cbvConfidenceFill" style="width:0%"></div>
-          </div>
-        </div>
-
-        <!-- RECORD CONTROLS -->
-        <div class="cbv-rec-controls">
-          <button class="cbv-big-mic" id="cbvBigMic" onclick="CBVoice.toggleListening()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <rect x="9" y="2" width="6" height="11" rx="3"/>
-              <path d="M5 10a7 7 0 0 0 14 0M12 19v3M8 22h8"/>
-            </svg>
-            <span id="cbvBigMicLabel">PRESS TO SPEAK</span>
-          </button>
-          <div class="cbv-rec-sub">
-            <button class="cbv-sub-btn" onclick="CBVoice._sendTranscript()">SEND NOW</button>
-            <button class="cbv-sub-btn" onclick="CBVoice._clearTranscript()">CLEAR</button>
-          </div>
-        </div>
-
-        <!-- LANG SELECT -->
-        <div class="cbv-lang-grid">
-          ${CFG.SUPPORTED_LANGS.map(l => `
-            <div class="cbv-lang-chip ${l.code === 'en-US' ? 'active' : ''}"
-                 data-lang="${l.code}"
-                 onclick="CBVoice.setLang('${l.code}',this)">
-              ${l.label}<span>${l.name}</span>
-            </div>`).join('')}
-        </div>
-
-        <!-- AUTO SEND + CODE DICT TOGGLES -->
-        <div class="cbv-toggle-row">
-          <div class="cbv-toggle-item">
-            <div class="cbv-toggle-info">
-              <div class="cbv-toggle-name">AUTO-SEND</div>
-              <div class="cbv-toggle-desc">Send automatically after silence</div>
-            </div>
-            <div class="cbv-switch active" id="cbvAutoSend" onclick="CBVoice._toggleAutoSend(this)">
-              <div class="cbv-switch-knob"></div>
-            </div>
-          </div>
-          <div class="cbv-toggle-item">
-            <div class="cbv-toggle-info">
-              <div class="cbv-toggle-name">CODE DICTATION</div>
-              <div class="cbv-toggle-desc">Pronounce symbols while reading</div>
-            </div>
-            <div class="cbv-switch" id="cbvCodeDict" onclick="CBVoice._toggleCodeDict(this)">
-              <div class="cbv-switch-knob"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ── SPEAK TAB ── -->
-      <div class="cbv-tabpanel" id="cbvTab-speak">
-        <div class="cbv-speak-section">
-          <div class="cbv-sec-title">TTS PERSONALITY</div>
-          <div class="cbv-personality-grid">
-            <div class="cbv-persona active" data-persona="mentor" onclick="CBVoice.setPersonality('mentor',this)">
-              <div class="cbv-persona-icon">🎓</div>
-              <div class="cbv-persona-name">MENTOR</div>
-              <div class="cbv-persona-desc">Warm & supportive</div>
-            </div>
-            <div class="cbv-persona" data-persona="strict" onclick="CBVoice.setPersonality('strict',this)">
-              <div class="cbv-persona-icon">⚡</div>
-              <div class="cbv-persona-name">STRICT</div>
-              <div class="cbv-persona-desc">Deep & authoritative</div>
-            </div>
-            <div class="cbv-persona" data-persona="excited" onclick="CBVoice.setPersonality('excited',this)">
-              <div class="cbv-persona-icon">🚀</div>
-              <div class="cbv-persona-name">EXCITED</div>
-              <div class="cbv-persona-desc">Fast & energetic</div>
-            </div>
-            <div class="cbv-persona" data-persona="calm" onclick="CBVoice.setPersonality('calm',this)">
-              <div class="cbv-persona-icon">🌊</div>
-              <div class="cbv-persona-name">CALM</div>
-              <div class="cbv-persona-desc">Slow & meditative</div>
-            </div>
-          </div>
-
-          <div class="cbv-tts-progress-wrap">
-            <div class="cbv-conf-label"><span>SPEAKING PROGRESS</span><span id="cbvTTSPct">0%</span></div>
-            <div class="cbv-conf-track">
-              <div class="cbv-conf-fill" id="cbvTTSFill" style="width:0%; background: linear-gradient(90deg,var(--nova),var(--plasma))"></div>
-            </div>
-          </div>
-
-          <div class="cbv-speak-controls">
-            <button class="cbv-speak-btn" onclick="CBVoice.speakLast()">▶ READ LAST</button>
-            <button class="cbv-speak-btn" onclick="CBVoice.togglePause()">⏸ PAUSE</button>
-            <button class="cbv-speak-btn cbv-speak-btn--stop" onclick="CBVoice.stopSpeaking()">⏹ STOP</button>
-          </div>
-
-          <div class="cbv-custom-speak">
-            <div class="cbv-sec-title">SPEAK CUSTOM TEXT</div>
-            <textarea class="cbv-custom-input" id="cbvCustomSpeak" placeholder="Type text to speak…" rows="3"></textarea>
-            <button class="cbv-speak-btn" onclick="CBVoice.speakCustom()">▶ SPEAK TEXT</button>
-          </div>
-
-          <div class="cbv-toggle-item" style="margin-top:12px">
-            <div class="cbv-toggle-info">
-              <div class="cbv-toggle-name">AUTO-READ RESPONSES</div>
-              <div class="cbv-toggle-desc">Read AI answers automatically</div>
-            </div>
-            <div class="cbv-switch" id="cbvAutoRead" onclick="CBVoice._toggleAutoRead(this)">
-              <div class="cbv-switch-knob"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ── COMMANDS TAB ── -->
-      <div class="cbv-tabpanel" id="cbvTab-cmds">
-        <div class="cbv-sec-title">VOICE COMMANDS</div>
-        <div class="cbv-cmd-list">
-          ${Object.keys(CFG.VOICE_COMMANDS).map(cmd => `
-            <div class="cbv-cmd-row" onclick="CBVoice._runCommand('${cmd}')">
-              <div class="cbv-cmd-text">"${cmd}"</div>
-              <div class="cbv-cmd-run">▶</div>
-            </div>`).join('')}
-        </div>
-        <div class="cbv-sec-title" style="margin-top:16px">HOTKEYS</div>
-        <div class="cbv-hotkey-list">
-          <div class="cbv-hk"><kbd>V</kbd><span>Toggle voice recording</span></div>
-          <div class="cbv-hk"><kbd>R</kbd><span>Read last AI response</span></div>
-          <div class="cbv-hk"><kbd>Space</kbd><span>Stop speaking (when panel open)</span></div>
-          <div class="cbv-hk"><kbd>Esc</kbd><span>Cancel & clear transcript</span></div>
-        </div>
-      </div>
-
-      <!-- ── HISTORY TAB ── -->
-      <div class="cbv-tabpanel" id="cbvTab-history">
-        <div class="cbv-sec-title">VOICE SESSION HISTORY</div>
-        <div class="cbv-history-list" id="cbvHistoryList">
-          <div class="cbv-hist-empty">No voice interactions yet.</div>
-        </div>
-      </div>
-
-      <!-- ── SETTINGS TAB ── -->
-      <div class="cbv-tabpanel" id="cbvTab-settings">
-        <div class="cbv-sec-title">WAKE WORD</div>
-        <div class="cbv-toggle-item">
-          <div class="cbv-toggle-info">
-            <div class="cbv-toggle-name">ALWAYS-ON LISTENER</div>
-            <div class="cbv-toggle-desc">"Hey CodeBuddy" to start recording</div>
-          </div>
-          <div class="cbv-switch" id="cbvWakeToggle" onclick="CBVoice.toggleWakeWord(this)">
-            <div class="cbv-switch-knob"></div>
-          </div>
-        </div>
-        <div class="cbv-wake-status" id="cbvWakeStatus">Wake word detection is OFF</div>
-
-        <div class="cbv-sec-title" style="margin-top:16px">TTS ENGINE</div>
-        <div class="cbv-toggle-item">
-          <div class="cbv-toggle-info">
-            <div class="cbv-toggle-name">FILTER CODE FROM SPEECH</div>
-            <div class="cbv-toggle-desc">Skip raw code blocks, read explanations only</div>
-          </div>
-          <div class="cbv-switch active" id="cbvCodeFilter" onclick="CBVoice._toggleSwitch(this, 'codeFilter')">
-            <div class="cbv-switch-knob"></div>
-          </div>
-        </div>
-        <div class="cbv-toggle-item">
-          <div class="cbv-toggle-info">
-            <div class="cbv-toggle-name">SMART PUNCTUATION</div>
-            <div class="cbv-toggle-desc">Auto-inject . , ; based on speech pauses</div>
-          </div>
-          <div class="cbv-switch active" id="cbvSmartPunct" onclick="CBVoice._toggleSwitch(this, 'smartPunct')">
-            <div class="cbv-switch-knob"></div>
-          </div>
-        </div>
-        <div class="cbv-toggle-item">
-          <div class="cbv-toggle-info">
-            <div class="cbv-toggle-name">CONTINUOUS LISTEN</div>
-            <div class="cbv-toggle-desc">Don't stop listening between messages</div>
-          </div>
-          <div class="cbv-switch" id="cbvContinuous" onclick="CBVoice._toggleSwitch(this, 'continuous')">
-            <div class="cbv-switch-knob"></div>
-          </div>
-        </div>
-
-        <div class="cbv-sec-title" style="margin-top:16px">VOICE SHORTCUTS KEY</div>
-        <div class="cbv-shortcut-key">
-          <div class="cbv-sk-item"><span class="cbv-sk-badge">🔴</span> Recording</div>
-          <div class="cbv-sk-item"><span class="cbv-sk-badge">🔵</span> Confident (auto-send)</div>
-          <div class="cbv-sk-item"><span class="cbv-sk-badge">🟡</span> Low confidence (manual)</div>
-          <div class="cbv-sk-item"><span class="cbv-sk-badge">🟢</span> Sent successfully</div>
-        </div>
-      </div>`;
-  }
-
-  // ═══════════════════════════════════════════
-  // FEATURE 4: SPEAKING OVERLAY
-  // ═══════════════════════════════════════════
-  function getSpeakOverlayHTML() {
-    return `
-      <div class="cbv-so-inner">
-        <canvas id="cbvSpeakWave" width="280" height="56"></canvas>
-        <div class="cbv-so-label" id="cbvSoLabel">AI SPEAKING…</div>
-        <div class="cbv-so-controls">
-          <button onclick="CBVoice.togglePause()">⏸</button>
-          <button onclick="CBVoice.stopSpeaking()">⏹</button>
-        </div>
-      </div>`;
-  }
-
-  // ═══════════════════════════════════════════
-  // CSS
-  // ═══════════════════════════════════════════
-  function getVoiceCSS() {
-    return `
-/* ═══ CODEBUDDY VOICE ENGINE CSS ═══ */
-:root {
-  --cbv-plasma: #00ffe0;
-  --cbv-nova: #a855f7;
-  --cbv-fire: #ff6b2b;
-  --cbv-gold: #fbbf24;
-  --cbv-deep: #060d1a;
-  --cbv-border: rgba(0,255,224,0.18);
-  --cbv-surface: rgba(0,255,224,0.04);
-  --cbv-glow: rgba(0,255,224,0.2);
-  --cbv-text: #e2f4ff;
-  --cbv-text2: rgba(226,244,255,0.45);
-  --cbv-text3: rgba(226,244,255,0.2);
-  --cbv-mono: 'IBM Plex Mono', monospace;
-  --cbv-display: 'Orbitron', monospace;
-}
-body.light {
-  --cbv-plasma: #0891b2;
-  --cbv-nova: #6d28d9;
-  --cbv-deep: #e8f4f8;
-  --cbv-border: rgba(8,145,178,0.25);
-  --cbv-surface: rgba(8,145,178,0.05);
-  --cbv-glow: rgba(8,145,178,0.15);
-  --cbv-text: #0c2a3a;
-  --cbv-text2: rgba(12,42,58,0.6);
-  --cbv-text3: rgba(12,42,58,0.3);
-}
-
-/* ── VOICE BAR ── */
-.cbv-bar {
-  position: fixed;
-  bottom: 0; left: 280px; right: 0;
-  height: 52px;
-  background: rgba(4,8,16,0.92);
-  backdrop-filter: blur(32px) saturate(200%);
-  border-top: 1px solid var(--cbv-border);
-  z-index: 50;
-  transition: left 0.4s cubic-bezier(0.4,0,0.2,1);
-  box-shadow: 0 -4px 30px rgba(0,255,224,0.04);
-}
-body.light .cbv-bar { background: rgba(228,243,249,0.95); }
-.sidebar.collapsed ~ .cbv-bar, .sidebar.collapsed + .main ~ .cbv-bar { left: 60px; }
-.cbv-bar-inner { display: flex; align-items: center; height: 100%; padding: 0 18px; gap: 10px; }
-.cbv-bar-waveform { flex: 1; max-width: 100px; height: 28px; position: relative; }
-.cbv-bar-controls { display: flex; align-items: center; gap: 6px; }
-.cbv-bar-btn {
-  width: 36px; height: 36px; border-radius: 2px;
-  border: 1px solid var(--cbv-border);
-  background: var(--cbv-surface);
-  color: var(--cbv-text2);
-  display: flex; align-items: center; justify-content: center;
-  cursor: none; transition: all 0.15s; flex-shrink: 0;
-}
-.cbv-bar-btn svg { width: 16px; height: 16px; }
-.cbv-bar-btn:hover { border-color: var(--cbv-plasma); color: var(--cbv-plasma); box-shadow: 0 0 12px var(--cbv-glow); }
-.cbv-bar-btn.cbv-active { background: rgba(0,255,224,0.12); color: var(--cbv-plasma); border-color: var(--cbv-plasma); box-shadow: 0 0 16px var(--cbv-glow); }
-.cbv-bar-btn.cbv-recording { background: rgba(255,107,43,0.12); color: var(--cbv-fire); border-color: rgba(255,107,43,0.4); animation: cbvRecPulse 1s ease infinite; }
-@keyframes cbvRecPulse { 0%,100%{opacity:1;box-shadow:0 0 8px rgba(255,107,43,0.3)} 50%{opacity:0.7;box-shadow:0 0 20px rgba(255,107,43,0.6)} }
-.cbv-bar-btn--sm { width: 28px; height: 28px; font-size: 11px; }
-.cbv-bar-btn--speak:hover { color: var(--cbv-nova); border-color: var(--cbv-nova); box-shadow: 0 0 12px rgba(168,85,247,0.25); }
-.cbv-bar-btn--panel { border-color: rgba(168,85,247,0.3); color: var(--cbv-nova); }
-.cbv-bar-btn--panel:hover { border-color: var(--cbv-nova); box-shadow: 0 0 14px rgba(168,85,247,0.3); }
-.cbv-bar-sep { width: 1px; height: 22px; background: var(--cbv-border); margin: 0 2px; }
-.cbv-bar-lang-wrap { padding: 0 8px; }
-.cbv-bar-lang-label { font-family: var(--cbv-display); font-size: 9px; font-weight: 700; letter-spacing: 2px; color: var(--cbv-plasma); }
-.cbv-wake-indicator { display: flex; align-items: center; padding: 0 6px; }
-.cbv-wake-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--cbv-text3); transition: all 0.3s; }
-.cbv-wake-indicator.active .cbv-wake-dot { background: #4ade80; box-shadow: 0 0 8px rgba(74,222,128,0.6); animation: cbvWakeBlink 2s ease infinite; }
-@keyframes cbvWakeBlink { 0%,100%{opacity:1} 50%{opacity:0.4} }
-
-/* ── VOICE PANEL ── */
-.cbv-panel {
-  position: fixed;
-  bottom: 64px; right: 20px;
-  width: 400px;
-  max-height: calc(100vh - 90px);
-  background: rgba(4,8,18,0.97);
-  backdrop-filter: blur(48px) saturate(220%);
-  border: 1px solid var(--cbv-border);
-  border-radius: 3px;
-  z-index: 300;
-  display: flex; flex-direction: column;
-  overflow: hidden;
-  box-shadow: 0 -8px 60px rgba(0,0,0,0.8), 0 0 40px var(--cbv-glow), 0 0 0 1px rgba(0,255,224,0.02);
-  transition: opacity 0.25s, transform 0.25s;
-}
-body.light .cbv-panel { background: rgba(228,243,249,0.97); }
-.cbv-panel.cbv-hidden { opacity: 0; transform: translateY(16px) scale(0.97); pointer-events: none; }
-/* corner accents */
-.cbv-panel::before, .cbv-panel::after { content: ''; position: absolute; width: 14px; height: 14px; border-color: var(--cbv-plasma); border-style: solid; opacity: 0.5; z-index: 1; pointer-events: none; }
-.cbv-panel::before { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
-.cbv-panel::after  { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
-
-.cbv-panel-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--cbv-border);
-  background: rgba(0,255,224,0.02);
-  flex-shrink: 0;
-}
-.cbv-panel-title {
-  display: flex; align-items: center; gap: 8px;
-  font-family: var(--cbv-display); font-size: 10px; font-weight: 700;
-  letter-spacing: 3px; color: var(--cbv-plasma); text-transform: uppercase;
-}
-.cbv-panel-dot {
-  width: 6px; height: 6px; border-radius: 50%;
-  background: var(--cbv-plasma); box-shadow: 0 0 8px var(--cbv-plasma);
-  animation: cbvWakeBlink 1.6s ease infinite;
-}
-.cbv-panel-controls { display: flex; gap: 6px; }
-.cbv-ph-btn { background: none; border: none; color: var(--cbv-text3); cursor: none; font-size: 13px; padding: 2px 6px; border-radius: 2px; transition: color 0.15s; }
-.cbv-ph-btn:hover { color: var(--cbv-fire); }
-
-/* ── TABS ── */
-.cbv-tabs { display: flex; border-bottom: 1px solid var(--cbv-border); flex-shrink: 0; }
-.cbv-tab {
-  flex: 1; padding: 9px 4px; text-align: center;
-  font-family: var(--cbv-display); font-size: 8px; font-weight: 700;
-  letter-spacing: 1.5px; text-transform: uppercase;
-  color: var(--cbv-text3); cursor: none;
-  border-bottom: 2px solid transparent; transition: all 0.15s;
-}
-.cbv-tab.active { color: var(--cbv-plasma); border-color: var(--cbv-plasma); }
-.cbv-tab:hover:not(.active) { color: var(--cbv-text2); }
-
-/* ── TAB PANELS ── */
-.cbv-tabpanel { display: none; overflow-y: auto; max-height: 60vh; padding: 14px; animation: cbvFadeUp 0.2s ease; }
-.cbv-tabpanel.active { display: block; }
-.cbv-tabpanel::-webkit-scrollbar { width: 2px; }
-.cbv-tabpanel::-webkit-scrollbar-thumb { background: var(--cbv-border); }
-@keyframes cbvFadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
-
-/* ── VISUALIZER ── */
-.cbv-visualizer-wrap {
-  position: relative; border: 1px solid var(--cbv-border);
-  border-radius: 2px; overflow: hidden;
-  background: rgba(2,4,8,0.8);
-  margin-bottom: 12px;
-}
-.cbv-wave-canvas { display: block; width: 100%; }
-.cbv-spec-canvas { display: block; width: 100%; }
-.cbv-vis-overlay {
-  position: absolute; top: 8px; right: 10px;
-  display: flex; align-items: center; gap: 6px;
-}
-.cbv-vis-label {
-  font-family: var(--cbv-display); font-size: 8px; font-weight: 700;
-  letter-spacing: 2.5px; color: var(--cbv-plasma); text-transform: uppercase;
-  text-shadow: 0 0 10px var(--cbv-plasma);
-}
-
-/* ── TRANSCRIPT ── */
-.cbv-transcript-wrap { margin-bottom: 12px; }
-.cbv-tr-label { font-family: var(--cbv-display); font-size: 8px; letter-spacing: 2px; color: var(--cbv-text3); margin-bottom: 5px; text-transform: uppercase; }
-.cbv-transcript {
-  min-height: 44px; padding: 10px 12px;
-  border: 1px solid var(--cbv-border);
-  background: var(--cbv-surface);
-  border-radius: 2px;
-  font-family: var(--cbv-mono); font-size: 12px; color: var(--cbv-text);
-  line-height: 1.6; letter-spacing: 0.3px;
-  transition: border-color 0.2s;
-}
-.cbv-transcript.active { border-color: var(--cbv-plasma); box-shadow: 0 0 12px var(--cbv-glow); }
-
-/* ── CONFIDENCE ── */
-.cbv-confidence-wrap { margin-bottom: 14px; }
-.cbv-conf-label { display: flex; justify-content: space-between; font-family: var(--cbv-display); font-size: 8px; color: var(--cbv-text3); margin-bottom: 5px; letter-spacing: 1px; }
-.cbv-conf-track { height: 3px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden; }
-.cbv-conf-fill { height: 100%; border-radius: 2px; transition: width 0.3s ease, background 0.3s; background: linear-gradient(90deg, var(--cbv-fire), var(--cbv-gold)); }
-.cbv-conf-fill.high { background: linear-gradient(90deg, var(--cbv-plasma), #00bfa5); box-shadow: 0 0 6px var(--cbv-glow); }
-
-/* ── RECORD CONTROLS ── */
-.cbv-rec-controls { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 14px; }
-.cbv-big-mic {
-  width: 80px; height: 80px; border-radius: 50%;
-  border: 2px solid var(--cbv-border);
-  background: var(--cbv-surface);
-  color: var(--cbv-text2); cursor: none;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
-  transition: all 0.2s;
-  box-shadow: 0 0 20px rgba(0,255,224,0.05);
-}
-.cbv-big-mic svg { width: 28px; height: 28px; }
-.cbv-big-mic span { font-family: var(--cbv-display); font-size: 7px; font-weight: 700; letter-spacing: 1.5px; color: var(--cbv-text3); text-transform: uppercase; }
-.cbv-big-mic:hover { border-color: var(--cbv-plasma); color: var(--cbv-plasma); box-shadow: 0 0 30px var(--cbv-glow); }
-.cbv-big-mic.recording { border-color: var(--cbv-fire); color: var(--cbv-fire); background: rgba(255,107,43,0.08); animation: cbvMicPulse 1s ease infinite; }
-.cbv-big-mic.recording span { color: var(--cbv-fire); }
-@keyframes cbvMicPulse {
-  0%,100% { box-shadow: 0 0 20px rgba(255,107,43,0.2); transform: scale(1); }
-  50%      { box-shadow: 0 0 40px rgba(255,107,43,0.5); transform: scale(1.04); }
-}
-.cbv-rec-sub { display: flex; gap: 8px; }
-.cbv-sub-btn {
-  padding: 7px 16px; border-radius: 2px;
-  border: 1px solid var(--cbv-border); background: var(--cbv-surface);
-  font-family: var(--cbv-display); font-size: 8px; font-weight: 700;
-  letter-spacing: 2px; color: var(--cbv-text2); cursor: none;
-  text-transform: uppercase; transition: all 0.15s;
-}
-.cbv-sub-btn:hover { border-color: var(--cbv-plasma); color: var(--cbv-plasma); background: rgba(0,255,224,0.06); }
-
-/* ── LANG GRID ── */
-.cbv-lang-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
-.cbv-lang-chip {
-  padding: 5px 10px; border-radius: 2px;
-  border: 1px solid var(--cbv-border); background: var(--cbv-surface);
-  font-family: var(--cbv-display); font-size: 9px; font-weight: 700;
-  letter-spacing: 1px; color: var(--cbv-text3); cursor: none;
-  transition: all 0.15s; display: flex; gap: 5px; align-items: center;
-}
-.cbv-lang-chip span { font-size: 7px; font-weight: 400; color: var(--cbv-text3); }
-.cbv-lang-chip.active, .cbv-lang-chip:hover { border-color: var(--cbv-plasma); color: var(--cbv-plasma); background: rgba(0,255,224,0.06); }
-.cbv-lang-chip.active span { color: var(--cbv-text2); }
-
-/* ── TOGGLES ── */
-.cbv-toggle-row { display: flex; flex-direction: column; gap: 10px; }
-.cbv-toggle-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
-.cbv-toggle-name { font-family: var(--cbv-display); font-size: 9px; font-weight: 700; letter-spacing: 1.5px; color: var(--cbv-text); text-transform: uppercase; }
-.cbv-toggle-desc { font-family: var(--cbv-mono); font-size: 9.5px; color: var(--cbv-text3); margin-top: 2px; }
-.cbv-switch { width: 40px; height: 22px; border-radius: 11px; border: 1px solid var(--cbv-border); background: rgba(255,255,255,0.04); cursor: none; position: relative; transition: all 0.25s; flex-shrink: 0; }
-.cbv-switch.active { background: rgba(0,255,224,0.12); border-color: var(--cbv-plasma); box-shadow: 0 0 8px var(--cbv-glow); }
-.cbv-switch-knob { position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: var(--cbv-text3); transition: all 0.25s; }
-.cbv-switch.active .cbv-switch-knob { left: 21px; background: var(--cbv-plasma); box-shadow: 0 0 6px var(--cbv-plasma); }
-
-/* ── SPEAK TAB ── */
-.cbv-speak-section { display: flex; flex-direction: column; gap: 14px; }
-.cbv-sec-title { font-family: var(--cbv-display); font-size: 8px; font-weight: 700; letter-spacing: 3px; color: var(--cbv-text3); text-transform: uppercase; margin-bottom: 8px; }
-.cbv-personality-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.cbv-persona {
-  padding: 12px 10px; border-radius: 2px;
-  border: 1px solid var(--cbv-border); background: var(--cbv-surface);
-  cursor: none; text-align: center; transition: all 0.15s;
-}
-.cbv-persona.active, .cbv-persona:hover { border-color: var(--cbv-nova); background: rgba(168,85,247,0.06); box-shadow: 0 0 12px rgba(168,85,247,0.15); }
-.cbv-persona-icon { font-size: 20px; margin-bottom: 4px; }
-.cbv-persona-name { font-family: var(--cbv-display); font-size: 9px; font-weight: 700; letter-spacing: 2px; color: var(--cbv-text); text-transform: uppercase; }
-.cbv-persona-desc { font-family: var(--cbv-mono); font-size: 9px; color: var(--cbv-text3); margin-top: 3px; }
-.cbv-speak-controls { display: flex; gap: 8px; flex-wrap: wrap; }
-.cbv-speak-btn {
-  padding: 8px 14px; border-radius: 2px; cursor: none;
-  border: 1px solid var(--cbv-border); background: var(--cbv-surface);
-  font-family: var(--cbv-display); font-size: 8px; font-weight: 700;
-  letter-spacing: 2px; color: var(--cbv-text2); text-transform: uppercase;
-  transition: all 0.15s;
-}
-.cbv-speak-btn:hover { border-color: var(--cbv-nova); color: var(--cbv-nova); background: rgba(168,85,247,0.06); }
-.cbv-speak-btn--stop:hover { border-color: var(--cbv-fire); color: var(--cbv-fire); }
-.cbv-tts-progress-wrap { margin: 4px 0; }
-.cbv-custom-input {
-  width: 100%; padding: 10px 12px; border: 1px solid var(--cbv-border);
-  background: var(--cbv-surface); border-radius: 2px;
-  color: var(--cbv-text); font-family: var(--cbv-mono); font-size: 12px;
-  resize: none; outline: none; transition: border-color 0.2s;
-}
-.cbv-custom-input:focus { border-color: var(--cbv-nova); }
-
-/* ── COMMANDS TAB ── */
-.cbv-cmd-list { display: flex; flex-direction: column; gap: 3px; }
-.cbv-cmd-row {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 8px 10px; border-radius: 2px;
-  border: 1px solid transparent; cursor: none; transition: all 0.12s;
-}
-.cbv-cmd-row:hover { background: var(--cbv-surface); border-color: var(--cbv-border); }
-.cbv-cmd-text { font-family: var(--cbv-mono); font-size: 11px; color: var(--cbv-text2); }
-.cbv-cmd-run { font-size: 10px; color: var(--cbv-text3); transition: color 0.15s; }
-.cbv-cmd-row:hover .cbv-cmd-run { color: var(--cbv-plasma); }
-.cbv-hotkey-list { display: flex; flex-direction: column; gap: 6px; }
-.cbv-hk { display: flex; align-items: center; gap: 10px; font-family: var(--cbv-mono); font-size: 11px; color: var(--cbv-text2); }
-kbd { padding: 3px 8px; border: 1px solid var(--cbv-border); border-radius: 2px; font-family: var(--cbv-mono); font-size: 9px; color: var(--cbv-plasma); background: var(--cbv-surface); }
-
-/* ── HISTORY TAB ── */
-.cbv-history-list { display: flex; flex-direction: column; gap: 6px; }
-.cbv-hist-empty { font-family: var(--cbv-mono); font-size: 11px; color: var(--cbv-text3); text-align: center; padding: 20px; }
-.cbv-hist-item {
-  padding: 10px 12px; border-radius: 2px;
-  border: 1px solid var(--cbv-border); background: var(--cbv-surface);
-  cursor: none; transition: all 0.15s;
-}
-.cbv-hist-item:hover { border-color: var(--cbv-plasma); }
-.cbv-hist-meta { display: flex; justify-content: space-between; margin-bottom: 5px; }
-.cbv-hist-role { font-family: var(--cbv-display); font-size: 8px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
-.cbv-hist-role.voice { color: var(--cbv-plasma); }
-.cbv-hist-role.ai { color: var(--cbv-nova); }
-.cbv-hist-time { font-family: var(--cbv-display); font-size: 8px; color: var(--cbv-text3); letter-spacing: 1px; }
-.cbv-hist-text { font-family: var(--cbv-mono); font-size: 11px; color: var(--cbv-text2); line-height: 1.5; }
-.cbv-hist-replay { font-family: var(--cbv-display); font-size: 8px; color: var(--cbv-nova); letter-spacing: 1px; cursor: none; margin-top: 5px; opacity: 0; transition: opacity 0.15s; }
-.cbv-hist-item:hover .cbv-hist-replay { opacity: 1; }
-
-/* ── SETTINGS TAB ── */
-.cbv-wake-status { font-family: var(--cbv-mono); font-size: 10px; color: var(--cbv-text3); padding: 6px 0; }
-.cbv-shortcut-key { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
-.cbv-sk-item { font-family: var(--cbv-mono); font-size: 10px; color: var(--cbv-text2); display: flex; align-items: center; gap: 6px; }
-.cbv-sk-badge { font-size: 12px; }
-
-/* ── SPEAKING OVERLAY ── */
-.cbv-speak-overlay {
-  position: fixed; bottom: 64px; left: 50%; transform: translateX(-50%);
-  background: rgba(4,8,18,0.96);
-  border: 1px solid rgba(168,85,247,0.3);
-  border-radius: 3px; padding: 12px 20px;
-  z-index: 200; transition: opacity 0.25s;
-  box-shadow: 0 0 30px rgba(168,85,247,0.2);
-  display: flex; flex-direction: column; align-items: center; gap: 6px;
-}
-body.light .cbv-speak-overlay { background: rgba(228,243,249,0.97); }
-.cbv-speak-overlay.cbv-hidden { opacity: 0; pointer-events: none; }
-.cbv-so-inner { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.cbv-so-label { font-family: var(--cbv-display); font-size: 8px; font-weight: 700; letter-spacing: 3px; color: var(--cbv-nova); text-transform: uppercase; }
-.cbv-so-controls { display: flex; gap: 8px; }
-.cbv-so-controls button { background: none; border: 1px solid rgba(168,85,247,0.25); color: var(--cbv-nova); padding: 4px 10px; border-radius: 2px; font-size: 12px; cursor: none; transition: all 0.15s; }
-.cbv-so-controls button:hover { border-color: var(--cbv-nova); box-shadow: 0 0 8px rgba(168,85,247,0.3); }
-
-/* ── INPUT AREA ADJUSTMENT ── */
-.input-zone { padding-bottom: 62px !important; }
-`;
-  }
-
-  // ═══════════════════════════════════════════
-  // FEATURE 5: AUDIO CONTEXT + ANALYSER
-  // ═══════════════════════════════════════════
-  async function startAudioContext() {
-    try {
-      S.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      S.analyser = S.audioCtx.createAnalyser();
-      S.analyser.fftSize = 256;
-      S.analyser.smoothingTimeConstant = 0.8;
-    } catch (e) {
-      log('AudioContext not available');
-    }
-  }
-
-  async function connectMicToAnalyser() {
-    if (!S.audioCtx || !S.analyser) return;
-    try {
-      S.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const src = S.audioCtx.createMediaStreamSource(S.mediaStream);
-      src.connect(S.analyser);
-      startVisualizer();
-    } catch (e) {
-      log('Mic access denied');
-    }
-  }
-
-  function disconnectMic() {
-    if (S.mediaStream) {
-      S.mediaStream.getTracks().forEach(t => t.stop());
-      S.mediaStream = null;
-    }
-    stopVisualizer();
-  }
-
-  // ═══════════════════════════════════════════
-  // FEATURE 6: DUAL VISUALIZER (WAVEFORM + SPECTRUM)
-  // ═══════════════════════════════════════════
-  function startVisualizer() {
-    if (!UI.waveCanvas || !S.analyser) return;
-    const wCtx = UI.waveCanvas.getContext('2d');
-    const sCtx = UI.specCanvas?.getContext('2d');
-    const miniCtx = document.getElementById('cbvMiniWave')?.getContext('2d');
-    const speakCtx = document.getElementById('cbvSpeakWave')?.getContext('2d');
-    const bufLen = S.analyser.frequencyBinCount;
-    const timeData = new Uint8Array(bufLen);
-    const freqData = new Uint8Array(bufLen);
-
-    function draw() {
-      S.animFrame = requestAnimationFrame(draw);
-      S.analyser.getByteTimeDomainData(timeData);
-      S.analyser.getByteFrequencyData(freqData);
-
-      const W = UI.waveCanvas.width, H = UI.waveCanvas.height;
-
-      // ─ Main waveform ─
-      wCtx.clearRect(0, 0, W, H);
-      wCtx.strokeStyle = S.isListening ? 'rgba(0,255,224,0.8)' : 'rgba(0,255,224,0.3)';
-      wCtx.lineWidth = 1.5;
-      wCtx.beginPath();
-      const slice = W / bufLen;
-      let x = 0;
-      for (let i = 0; i < bufLen; i++) {
-        const v = timeData[i] / 128.0;
-        const y = (v * H) / 2;
-        i === 0 ? wCtx.moveTo(x, y) : wCtx.lineTo(x, y);
-        x += slice;
-      }
-      wCtx.stroke();
-
-      // ─ Spectrum ─
-      if (sCtx) {
-        const SW = UI.specCanvas.width, SH = UI.specCanvas.height;
-        sCtx.clearRect(0, 0, SW, SH);
-        const bw = SW / CFG.SPECTRUM_BARS;
-        for (let i = 0; i < CFG.SPECTRUM_BARS; i++) {
-          const val = freqData[i * 2] / 255;
-          const h = val * SH;
-          const hue = 165 + val * 80;
-          sCtx.fillStyle = `hsla(${hue}, 100%, ${50 + val * 30}%, ${0.5 + val * 0.5})`;
-          sCtx.fillRect(i * bw + 1, SH - h, bw - 2, h);
-        }
-      }
-
-      // ─ Mini bar waveform ─
-      if (miniCtx) {
-        const MW = 80, MH = 28;
-        miniCtx.clearRect(0, 0, MW, MH);
-        const mbw = MW / 16;
-        for (let i = 0; i < 16; i++) {
-          const v = (timeData[i * 4] / 128.0 - 1) * MH * 0.4;
-          miniCtx.fillStyle = S.isListening ? 'rgba(0,255,224,0.7)' : 'rgba(0,255,224,0.2)';
-          const h = Math.max(2, Math.abs(v));
-          miniCtx.fillRect(i * mbw + 1, MH / 2 - h / 2, mbw - 2, h);
-        }
-      }
-
-      // ─ Speaking overlay waveform ─
-      if (speakCtx && S.isSpeaking) {
-        const PW = 280, PH = 56;
-        speakCtx.clearRect(0, 0, PW, PH);
-        speakCtx.strokeStyle = 'rgba(168,85,247,0.8)';
-        speakCtx.lineWidth = 2;
-        speakCtx.beginPath();
-        // Synthesize wave when speaking
-        for (let i = 0; i < PW; i++) {
-          const t = Date.now() / 400;
-          const y = PH / 2 + Math.sin(i * 0.05 + t) * (PH * 0.3) * Math.sin(i * 0.02 + t * 0.7);
-          i === 0 ? speakCtx.moveTo(i, y) : speakCtx.lineTo(i, y);
-        }
-        speakCtx.stroke();
-      }
-    }
-    draw();
-  }
-
-  function stopVisualizer() {
-    if (S.animFrame) cancelAnimationFrame(S.animFrame);
-  }
-
-  // ═══════════════════════════════════════════
-  // FEATURE 7: CORE SPEECH RECOGNITION
-  // ═══════════════════════════════════════════
-  function toggleListening() {
-    if (S.isListening) {
-      stopListening();
-    } else {
-      startListening();
-    }
-  }
-
-  function startListening() {
-    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRec) {
-      alert('Speech recognition is not available in your browser. Use Chrome or Edge.');
-      return;
-    }
-
-    S.recognition = new SpeechRec();
-    S.recognition.lang = S.currentLang;
-    S.recognition.interimResults = true;
-    S.recognition.maxAlternatives = 3;
-    S.recognition.continuous = S.settings?.continuous || false;
-
-    S.isListening = true;
-    updateRecordingUI(true);
-    connectMicToAnalyser();
-    setStatus('LISTENING…');
-
-    let finalTranscript = '';
-
-    S.recognition.onresult = (e) => {
-      clearSilenceTimer();
-
-      let interim = '';
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const result = e.results[i];
-        if (result.isFinal) {
-          const text = result[0].transcript;
-          finalTranscript += (S.settings?.smartPunct ? injectPunctuation(text, true) : text) + ' ';
-          const conf = result[0].confidence;
-          updateConfidence(conf);
-          log(`Final: "${text}" (${(conf * 100).toFixed(0)}%)`);
-        } else {
-          interim = result[0].transcript;
-        }
-      }
-
-      const display = finalTranscript + interim;
-      S.lastTranscript = display.trim();
-      setTranscript(display.trim());
-
-      // Silence-based auto-send
-      if (finalTranscript.trim() && S.autoSend) {
-        setSilenceTimer();
-      }
-
-      // FEATURE 8: VOICE COMMAND DETECTION
-      const lower = display.toLowerCase().trim();
-      if (checkVoiceCommand(lower)) {
-        finalTranscript = '';
-        S.lastTranscript = '';
-        setTranscript('Command executed.');
-        return;
-      }
-    };
-
-    S.recognition.onerror = (e) => {
-      log('Recognition error: ' + e.error);
-      stopListening();
-    };
-
-    S.recognition.onend = () => {
-      if (S.isListening && S.settings?.continuous) {
-        S.recognition.start(); // restart for continuous mode
-      } else {
-        stopListening();
-      }
-    };
-
-    S.recognition.start();
-  }
-
-  function stopListening() {
-    S.isListening = false;
-    clearSilenceTimer();
-    if (S.recognition) {
-      try { S.recognition.stop(); } catch (e) {}
-      S.recognition = null;
-    }
-    disconnectMic();
-    updateRecordingUI(false);
-    setStatus('STANDBY');
-  }
-
-  // ═══════════════════════════════════════════
-  // FEATURE 9: SILENCE-BASED AUTO-SEND
-  // ═══════════════════════════════════════════
-  function setSilenceTimer() {
-    clearSilenceTimer();
-    S.silenceTimer = setTimeout(() => {
-      if (S.lastTranscript.trim() && S.autoSend) {
-        setStatus('AUTO-SENDING…');
-        _sendTranscript();
-      }
-    }, CFG.SILENCE_TIMEOUT_MS);
-  }
-
-  function clearSilenceTimer() {
-    if (S.silenceTimer) {
-      clearTimeout(S.silenceTimer);
-      S.silenceTimer = null;
-    }
-  }
-
-  // ═══════════════════════════════════════════
-  // FEATURE 10: VOICE COMMAND ROUTING
-  // ═══════════════════════════════════════════
-  function checkVoiceCommand(text) {
-    for (const [cmd, fn] of Object.entries(CFG.VOICE_COMMANDS)) {
-      if (text.includes(cmd)) {
-        fn();
-        log(`Voice command: "${cmd}"`);
-        addToHistory('voice_cmd', `Command: ${cmd}`);
-        setStatus(`CMD: ${cmd.toUpperCase()}`);
-        setTimeout(() => setStatus('STANDBY'), 2000);
-        return true;
-      }
-    }
-    return false;
-  }
-
-  // ═══════════════════════════════════════════
-  // FEATURE 11: SMART PUNCTUATION INJECTION
-  // ═══════════════════════════════════════════
-  function injectPunctuation(text, isFinal) {
-    // Add period if sentence ends without punctuation
-    let t = text.trim();
-    if (!t) return t;
-
-    // Capitalize first letter
-    t = t.charAt(0).toUpperCase() + t.slice(1);
-
-    // Remove duplicate spaces
-    t = t.replace(/\s+/g, ' ');
-
-    // Add period at end if no punctuation and looks like sentence
-    if (isFinal && !/[.!?;,]$/.test(t) && t.split(' ').length > 2) {
-      t += '.';
-    }
-
-    // "new line" -> \n
-    t = t.replace(/\bnew line\b/gi, '\n');
-    t = t.replace(/\bcomma\b/gi, ',');
-    t = t.replace(/\bperiod\b/gi, '.');
-    t = t.replace(/\bquestion mark\b/gi, '?');
-    t = t.replace(/\bexclamation\b/gi, '!');
-    t = t.replace(/\bcolon\b/gi, ':');
-    t = t.replace(/\bopen paren\b/gi, '(');
-    t = t.replace(/\bclose paren\b/gi, ')');
-    t = t.replace(/\bopen bracket\b/gi, '[');
-    t = t.replace(/\bclose bracket\b/gi, ']');
-    t = t.replace(/\bopen brace\b/gi, '{');
-    t = t.replace(/\bclose brace\b/gi, '}');
-
-    return t;
-  }
-
-  // ═══════════════════════════════════════════
-  // FEATURE 12: EMOTION-ADAPTIVE TTS
-  // ═══════════════════════════════════════════
-  function detectTone(text) {
-    // Detect the emotional tone of the AI response to adapt voice
-    const lower = text.toLowerCase();
-    if (/error|bug|wrong|incorrect|fail|problem|issue/.test(lower)) return 'strict';
-    if (/congratulation|excellent|perfect|great job|well done|amazing/.test(lower)) return 'excited';
-    if (/take your time|don't worry|step by step|let's explore|imagine/.test(lower)) return 'calm';
-    return S.ttsPersonality; // default
-  }
-
-  function speakText(rawText, forcePersonality) {
-    if (!rawText) return;
-    window.speechSynthesis.cancel();
-
-    // FEATURE: Filter code blocks from speech
-    let text = rawText;
-    if (S.settings?.codeFilter !== false) {
-      text = filterCodeForSpeech(rawText);
-    }
-    if (!text.trim()) {
-      text = 'Code response ready. Use the run button to execute.';
-    }
-
-    const persona = forcePersonality || detectTone(text);
-    const voiceCfg = CFG.TTS_VOICES[persona] || CFG.TTS_VOICES.mentor;
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.lang = S.currentLang;
-    utter.pitch = voiceCfg.pitch;
-    utter.rate = voiceCfg.rate;
-    utter.volume = voiceCfg.volume;
-
-    // Pick best available voice
-    const voices = window.speechSynthesis.getVoices();
-    const langVoices = voices.filter(v => v.lang.startsWith(S.currentLang.split('-')[0]));
-    if (langVoices.length) utter.voice = langVoices[0];
-
-    S.isSpeaking = true;
-    showSpeakOverlay(text);
-
-    // Track TTS progress
-    let wordCount = text.split(' ').length;
-    let wordIndex = 0;
-    utter.onboundary = (e) => {
-      if (e.name === 'word') {
-        wordIndex++;
-        const pct = Math.round((wordIndex / wordCount) * 100);
-        updateTTSProgress(pct);
-      }
-    };
-
-    utter.onend = () => {
-      S.isSpeaking = false;
-      hideSpeakOverlay();
-      updateTTSProgress(100);
-      setTimeout(() => updateTTSProgress(0), 1000);
-    };
-
-    utter.onerror = () => {
-      S.isSpeaking = false;
-      hideSpeakOverlay();
-    };
-
-    window.speechSynthesis.speak(utter);
-    addToHistory('ai', text.slice(0, 100) + (text.length > 100 ? '…' : ''));
-  }
-
-  // FEATURE: Smart code filtering for TTS
-  function filterCodeForSpeech(text) {
-    // Remove code blocks
-    let filtered = text.replace(/```[\s\S]*?```/g, '');
-    // Remove inline code
-    filtered = filtered.replace(/`[^`]+`/g, (match) => {
-      // Keep short inline code if it looks like a word
-      const inner = match.replace(/`/g, '');
-      return inner.length < 20 && !/[{}();]/.test(inner) ? inner : '';
+    </div>
+  `;
+    document.body.appendChild(panel);
+
+    document.getElementById('cbFileInput').addEventListener('change', handleFileSelect);
+    document.getElementById('cbLangSel').addEventListener('change', e => CBVoice.setLang(e.target.value));
+    document.getElementById('cbMicBtn').addEventListener('click', () => {
+      if (STATE.isListening) CBVoice.stopListening();
+      else CBVoice.startListening();
     });
-    // Remove markdown symbols
-    filtered = filtered.replace(/[*#_~]/g, '');
-    // Remove URLs
-    filtered = filtered.replace(/https?:\/\/\S+/g, 'the linked URL');
-    // Clean extra whitespace
-    filtered = filtered.replace(/\n{3,}/g, '\n\n').trim();
-    return filtered;
+    setupDragDrop();
   }
 
-  // ═══════════════════════════════════════════
-  // FEATURE 13: WAKE WORD LISTENER
-  // ═══════════════════════════════════════════
-  function startWakeWordListener() {
-    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRec || S.isWakeListening) return;
+  function switchPTab(name, el) {
+    document.querySelectorAll('.cbPTab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.cbPanelSection').forEach(s => s.classList.remove('active'));
+    el.classList.add('active');
+    const sec = document.getElementById('cbTab-' + name);
+    if (sec) sec.classList.add('active');
+  }
 
-    S.wakeRecognition = new SpeechRec();
-    S.wakeRecognition.lang = 'en-US';
-    S.wakeRecognition.interimResults = true;
-    S.wakeRecognition.continuous = true;
-    S.isWakeListening = true;
+  function initRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) { setStatus('NO BROWSER SUPPORT', 'idle'); return null; }
+    const r = new SpeechRecognition();
+    r.continuous = true;
+    r.interimResults = true;
+    r.lang = STATE.currentLang;
+    r.maxAlternatives = 3;
 
-    S.wakeRecognition.onresult = (e) => {
+    r.onstart = () => {
+      STATE.isListening = true;
+      setStatus('LISTENING', 'listening');
+      document.getElementById('cbMicBtn').classList.add('active');
+      document.getElementById('cbVoiceBar').classList.add('listening');
+      setTranscript(LANGS[STATE.currentLang]?.listening || 'Listening...', 'interim');
+    };
+
+    r.onresult = (e) => {
+      let interim = '', final = '';
       for (let i = e.resultIndex; i < e.results.length; i++) {
-        const t = e.results[i][0].transcript.toLowerCase();
-        if (t.includes(CFG.WAKE_WORD)) {
-          log('Wake word detected!');
-          setWakeStatus(true);
-          if (!S.isListening) {
-            startListening();
-          }
-        }
+        const t = e.results[i][0].transcript;
+        if (e.results[i].isFinal) final += t;
+        else interim += t;
+      }
+      if (interim) setTranscript(interim, 'interim');
+      if (final) {
+        const processed = processTranscript(final.trim());
+        setTranscript(processed, 'final');
+        STATE.transcript = processed;
+        handleVoiceInput(processed);
       }
     };
 
-    S.wakeRecognition.onend = () => {
-      // Auto-restart wake word listener
-      if (S.wakeEnabled) {
-        setTimeout(() => startWakeWordListener(), 500);
+    r.onerror = (e) => {
+      if (e.error !== 'no-speech') {
+        setStatus('ERROR', 'idle');
+        setTranscript('Recognition error: ' + e.error, 'final');
+      }
+      STATE.isListening = false;
+      document.getElementById('cbMicBtn').classList.remove('active');
+      document.getElementById('cbVoiceBar').classList.remove('listening');
+    };
+
+    r.onend = () => {
+      STATE.isListening = false;
+      document.getElementById('cbMicBtn').classList.remove('active');
+      document.getElementById('cbVoiceBar').classList.remove('listening');
+      setStatus('IDLE', 'idle');
+      if (STATE.wakeWordActive && STATE.recognition) {
+        setTimeout(() => { try { STATE.recognition.start(); } catch (e) { } }, 300);
       }
     };
 
-    S.wakeRecognition.onerror = () => {
-      S.isWakeListening = false;
-      setTimeout(() => { if (S.wakeEnabled) startWakeWordListener(); }, 2000);
-    };
+    return r;
+  }
 
-    try {
-      S.wakeRecognition.start();
-      log('Wake word listener started');
-    } catch (e) {
-      S.isWakeListening = false;
+  function processTranscript(text) {
+    if (!STATE.codeContext) return text;
+    let result = text.toLowerCase();
+    for (const [phrase, symbol] of Object.entries(CODE_SYMBOLS)) {
+      const regex = new RegExp('\\b' + phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'gi');
+      result = result.replace(regex, symbol);
     }
+    return result;
   }
 
-  function stopWakeWordListener() {
-    S.wakeEnabled = false;
-    S.isWakeListening = false;
-    if (S.wakeRecognition) {
-      try { S.wakeRecognition.stop(); } catch (e) {}
-      S.wakeRecognition = null;
+  function handleVoiceInput(text) {
+    const lower = text.toLowerCase().trim();
+    if (lower.includes('hey buddy') || lower.includes('ஹே பட்டி') || lower.includes('हे बडी')) {
+      activateWakeWord(); return;
     }
-    setWakeStatus(false);
-    log('Wake word listener stopped');
-  }
-
-  // ═══════════════════════════════════════════
-  // UI HELPERS
-  // ═══════════════════════════════════════════
-  function setStatus(text) {
-    if (UI.status) UI.status.textContent = text;
-  }
-
-  function setTranscript(text) {
-    if (UI.transcript) {
-      UI.transcript.textContent = text || 'Waiting for voice input…';
-      UI.transcript.classList.toggle('active', !!text && S.isListening);
+    const cmds = LANGS[STATE.currentLang]?.commands || {};
+    for (const [phrase, action] of Object.entries(cmds)) {
+      if (lower.includes(phrase.toLowerCase())) { action(); return; }
     }
-    // Also inject into main message textarea
-    const msgArea = document.getElementById('message');
-    if (msgArea && text) {
-      msgArea.value = text;
-      msgArea.dispatchEvent(new Event('input'));
+    const enCmds = LANGS['en-US'].commands;
+    for (const [phrase, action] of Object.entries(enCmds)) {
+      if (lower.includes(phrase.toLowerCase())) { action(); return; }
     }
-  }
-
-  function updateConfidence(conf) {
-    const pct = Math.round(conf * 100);
-    if (UI.confidence) UI.confidence.textContent = pct + '%';
-    if (UI.confidenceFill) {
-      UI.confidenceFill.style.width = pct + '%';
-      UI.confidenceFill.classList.toggle('high', pct >= 60);
+    const detectedLang = PROG_LANGS.find(l => lower.includes(l));
+    let query = text;
+    if (lower.startsWith('explain') || lower.startsWith('what is') || lower.startsWith('how to')) {
+      query = text + (detectedLang ? ` in ${detectedLang}` : ' in the context of programming');
     }
+    sendVoiceQuery(query);
   }
 
-  function updateRecordingUI(recording) {
-    const bigMic = document.getElementById('cbvBigMic');
-    const bigLabel = document.getElementById('cbvBigMicLabel');
-    if (bigMic) bigMic.classList.toggle('recording', recording);
-    if (bigLabel) bigLabel.textContent = recording ? 'LISTENING…' : 'PRESS TO SPEAK';
-    if (UI.barMicBtn) UI.barMicBtn.classList.toggle('cbv-recording', recording);
+  function sendVoiceQuery(text) {
+    const msgEl = document.getElementById('message');
+    const sendBtn = document.getElementById('sendBtn');
+    if (!msgEl || !sendBtn) return;
+    setStatus('PROCESSING', 'processing');
+    msgEl.value = text;
+    if (msgEl.oninput) msgEl.oninput.call(msgEl);
+    setTimeout(() => {
+      sendBtn.click();
+      setStatus('IDLE', 'idle');
+    }, 200);
   }
 
-  function updateTTSProgress(pct) {
-    const fill = document.getElementById('cbvTTSFill');
-    const pctEl = document.getElementById('cbvTTSPct');
-    if (fill) fill.style.width = pct + '%';
-    if (pctEl) pctEl.textContent = pct + '%';
-  }
+  let _currentAudio = null;
 
-  function showSpeakOverlay(text) {
-    if (UI.speakOverlay) {
-      UI.speakOverlay.classList.remove('cbv-hidden');
-      const label = document.getElementById('cbvSoLabel');
-      if (label) label.textContent = 'AI SPEAKING: ' + text.slice(0, 40) + '…';
-    }
-  }
-
-  function hideSpeakOverlay() {
-    if (UI.speakOverlay) UI.speakOverlay.classList.add('cbv-hidden');
-  }
-
-  function setWakeStatus(active) {
-    if (UI.barWake) UI.barWake.classList.toggle('active', active);
-    const statusEl = document.getElementById('cbvWakeStatus');
-    if (statusEl) {
-      statusEl.textContent = active
-        ? '✓ Wake word detected — starting recording'
-        : (S.wakeEnabled ? '◌ Listening for "Hey CodeBuddy"…' : 'Wake word detection is OFF');
-    }
-  }
-
-  function addToHistory(role, text) {
-    S.voiceHistory.push({ role, text, ts: new Date() });
-    if (S.voiceHistory.length > 50) S.voiceHistory.shift();
-    renderHistory();
-  }
-
-  function renderHistory() {
-    const list = document.getElementById('cbvHistoryList');
-    if (!list) return;
-    if (!S.voiceHistory.length) {
-      list.innerHTML = '<div class="cbv-hist-empty">No voice interactions yet.</div>';
-      return;
-    }
-    list.innerHTML = S.voiceHistory.slice().reverse().map((h, i) => `
-      <div class="cbv-hist-item">
-        <div class="cbv-hist-meta">
-          <span class="cbv-hist-role ${h.role === 'voice' || h.role === 'voice_cmd' ? 'voice' : 'ai'}">
-            ${h.role === 'voice' ? '🎤 YOU' : h.role === 'voice_cmd' ? '⚡ CMD' : '🤖 AI'}
-          </span>
-          <span class="cbv-hist-time">${h.ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-        </div>
-        <div class="cbv-hist-text">${h.text}</div>
-        ${h.role !== 'voice_cmd' ? `<div class="cbv-hist-replay" onclick="CBVoice.replayHistory(${S.voiceHistory.length - 1 - i})">▶ REPLAY SPEECH</div>` : ''}
-      </div>`).join('');
-  }
-
-  // ═══════════════════════════════════════════
-  // INTERNAL ACTIONS
-  // ═══════════════════════════════════════════
-  function _sendTranscript() {
-    const text = S.lastTranscript.trim();
-    if (!text) return;
-    addToHistory('voice', text);
-    stopListening();
-    // Trigger main chat send
-    if (typeof sendMessage === 'function') {
-      sendMessage();
-    } else {
-      document.getElementById('sendBtn')?.click();
-    }
-    S.lastTranscript = '';
-  }
-
-  function _clearTranscript() {
-    S.lastTranscript = '';
-    setTranscript('');
-    const msgArea = document.getElementById('message');
-    if (msgArea) { msgArea.value = ''; msgArea.dispatchEvent(new Event('input')); }
-  }
-
-  function _copyLastResponse() {
-    const lastBot = [...document.querySelectorAll('.msg-row.bot .bubble-content')].pop();
-    if (lastBot) {
-      navigator.clipboard.writeText(lastBot.innerText || '');
-      setStatus('COPIED!');
-      setTimeout(() => setStatus('STANDBY'), 2000);
-    }
-  }
-
-  function _clearScreen() {
-    const chatBox = document.getElementById('chatBox');
-    if (chatBox) chatBox.innerHTML = '';
-  }
-
-  function _setMode(mode) {
-    const sel = document.getElementById('mode');
-    if (sel) {
-      sel.value = mode;
-      sel.dispatchEvent(new Event('change'));
-      setStatus('MODE: ' + mode.toUpperCase());
-      setTimeout(() => setStatus('STANDBY'), 2000);
-    }
-  }
-
-  function _runCommand(cmd) {
-    const fn = CFG.VOICE_COMMANDS[cmd];
-    if (fn) fn();
-  }
-
-  // ═══════════════════════════════════════════
-  // SETTINGS STATE
-  // ═══════════════════════════════════════════
-  S.settings = {
-    codeFilter: true,
-    smartPunct: true,
-    continuous: false,
-    autoRead: false,
+  // Maps UI lang code → backend /tts lang param
+  // ta-en (Tanglish) sends 'ta-en' so backend uses Tamil voice for whole response
+  const LANG_TO_TTS = {
+    'en-US': 'en-US', 'ta-IN': 'ta-IN', 'ta-en': 'ta-en',
+    'hi-IN': 'hi-IN', 'te-IN': 'te-IN', 'kn-IN': 'kn-IN',
+    'ml-IN': 'ml-IN', 'bn-IN': 'bn-IN', 'mr-IN': 'mr-IN',
+    'pa-IN': 'pa-IN', 'gu-IN': 'gu-IN',
+    'fr-FR': 'fr-FR', 'de-DE': 'de-DE', 'es-ES': 'es-ES',
+    'ja-JP': 'ja-JP', 'ko-KR': 'ko-KR', 'ar-SA': 'ar-SA',
+    'zh-CN': 'zh-CN', 'ru-RU': 'ru-RU', 'pt-BR': 'pt-BR',
   };
 
-  function _toggleAutoSend(el) {
-    S.autoSend = !el.classList.contains('active');
-    el.classList.toggle('active');
+  // Maps UI lang → browser Web Speech API lang code (for fallback when gTTS fails)
+  // ta-en (Tanglish) must use Tamil voice in browser too
+  const LANG_TO_BROWSER = {
+    'ta-en': 'ta-IN',
+    'ta-IN': 'ta-IN', 'hi-IN': 'hi-IN', 'te-IN': 'te-IN',
+    'kn-IN': 'kn-IN', 'ml-IN': 'ml-IN', 'bn-IN': 'bn-IN',
+    'mr-IN': 'mr-IN', 'pa-IN': 'pa-IN', 'gu-IN': 'gu-IN',
+    'fr-FR': 'fr-FR', 'de-DE': 'de-DE', 'es-ES': 'es-ES',
+    'ja-JP': 'ja-JP', 'ko-KR': 'ko-KR', 'ar-SA': 'ar-SA',
+    'zh-CN': 'zh-CN', 'ru-RU': 'ru-RU', 'pt-BR': 'pt-BR',
+    'en-US': 'en-US',
+  };
+
+  // ── _speakViaGTTS: internal helper — sends text+lang to gTTS backend ────────
+  // Called by speak() for normal path AND by auto-translate callback.
+  function _speakViaGTTS(text, activeLang) {
+    const ttsLang = LANG_TO_TTS[activeLang] || activeLang;
+    const browserLang = LANG_TO_BROWSER[activeLang] || activeLang;
+
+    setStatus('SPEAKING', 'speaking');
+    animateWaveformSpeak(true);
+    STATE.isSpeaking = true;
+    addHistory('TTS', '[' + activeLang + '] ' + text.slice(0, 80) + '...');
+
+    const isTanglish = (activeLang === 'ta-en');
+    const effectiveRate = isTanglish ? Math.min(STATE.rate, 0.85) : Math.min(Math.max(STATE.rate, 0.5), 2.0);
+
+    fetch('/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text, lang: ttsLang })
+    })
+    .then(res => {
+      if (!res.ok) return res.json().catch(() => ({})).then(err => { throw new Error(err.error || 'TTS error ' + res.status); });
+      return res.blob();
+    })
+    .then(blob => {
+      const url = URL.createObjectURL(blob);
+      if (_currentAudio) { _currentAudio.pause(); _currentAudio = null; }
+      _currentAudio = new Audio(url);
+      _currentAudio.volume = STATE.volume;
+      _currentAudio.playbackRate = effectiveRate;
+      _currentAudio.onended = () => {
+        STATE.isSpeaking = false; setStatus('IDLE', 'idle');
+        animateWaveformSpeak(false); URL.revokeObjectURL(url); _currentAudio = null;
+      };
+      _currentAudio.onerror = () => {
+        STATE.isSpeaking = false; setStatus('IDLE', 'idle');
+        animateWaveformSpeak(false); _currentAudio = null;
+      };
+      _currentAudio.play();
+    })
+    .catch(err => {
+      console.warn('CBVoice: gTTS failed (' + err.message + ') -> browser TTS fallback');
+      speakBrowser(text, browserLang);
+    });
   }
 
-  function _toggleCodeDict(el) {
-    S.codeDictation = !el.classList.contains('active');
-    el.classList.toggle('active');
-  }
+    function speak(text, forceLang) {
+    if (!text) return;
 
-  function _toggleAutoRead(el) {
-    S.settings.autoRead = !el.classList.contains('active');
-    el.classList.toggle('active');
-  }
+    if (_currentAudio) {
+      _currentAudio.pause();
+      _currentAudio = null;
+    }
+    if (STATE.synth) STATE.synth.cancel();
 
-  function _toggleSwitch(el, key) {
-    S.settings[key] = !el.classList.contains('active');
-    el.classList.toggle('active');
-  }
+    const activeLang = forceLang || STATE.currentLang;
 
-  // ═══════════════════════════════════════════
-  // EVENTS
-  // ═══════════════════════════════════════════
-  function bindEvents() {
-    // Keyboard shortcuts
-    document.addEventListener('keydown', (e) => {
-      // Skip if typing in textarea/input
-      if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
-        if (e.key === 'Escape' && S.isListening) {
-          stopListening();
-          _clearTranscript();
-        }
-        return;
+    let clean = text
+      .replace(/```[\s\S]*?```/g, ' code block. ')
+      .replace(/`[^`]+`/g, ' code ')
+      .replace(/#{1,6}\s/g, '')
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/\*([^*]+)\*/g, '$1')
+      .replace(/[<>]/g, '')
+      .replace(/https?:\/\/\S+/g, 'link')
+      .replace(/\s{2,}/g, ' ')
+      .trim()
+      .slice(0, 1000);
+
+    if (!clean) return;
+
+    // ── Indic language guard ─────────────────────────────────────────────────
+    // The backend now uses WORD-LEVEL engine splitting:
+    //   - Native script words (Tamil/Hindi/Telugu/etc) → native gTTS engine (correct accent)
+    //   - Embedded English tech words ("Python", "function", "loop") → English gTTS (natural)
+    //
+    // So we ALWAYS send text to the backend — no need to block playback.
+    // If AI responded entirely in English despite native-lang instruction, we show a soft hint
+    // but still play it back using the English gTTS segments (audible, just not in target lang).
+    const NATIVE_SCRIPT = {
+      'ta-IN': /[\u0B80-\u0BFF]/,
+      'te-IN': /[\u0C00-\u0C7F]/,
+      'kn-IN': /[\u0C80-\u0CFF]/,
+      'ml-IN': /[\u0D00-\u0D7F]/,
+      'bn-IN': /[\u0980-\u09FF]/,
+      'mr-IN': /[\u0900-\u097F]/,
+      'hi-IN': /[\u0900-\u097F]/,
+    };
+    const nativePattern = NATIVE_SCRIPT[activeLang];
+    if (nativePattern && !nativePattern.test(clean)) {
+      // AI replied in English despite non-English language being selected.
+      // Auto-translate via /translate endpoint, then speak the translation.
+      setTranscript('\u23f3 Translating response to ' + activeLang + '...', 'cmd');
+      setStatus('PROCESSING', 'processing');
+      fetch('/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: clean, lang: activeLang })
+      })
+      .then(r => r.json())
+      .then(data => {
+        const translated = (data.translated || clean).trim();
+        setTranscript('\ud83c\udf10 Translated \u2192 ' + activeLang, 'cmd');
+        _speakViaGTTS(translated, activeLang);
+      })
+      .catch(() => {
+        setTranscript('\u26a0 Translation failed \u2014 reading English', 'cmd');
+        _speakViaGTTS(clean, 'en-US');
+      });
+      return; // async: wait for translation
+    }
+    if (!clean) return;
+
+    _speakViaGTTS(clean, activeLang);
+  }
+    function speakBrowser(clean, lang) {
+    if (!STATE.synth) return;
+
+    // lang is already the correct BCP-47 code (ta-IN, hi-IN etc.)
+    // passed by speak() via LANG_TO_BROWSER — never 'ta-en' here
+    const utter = new SpeechSynthesisUtterance(clean);
+    utter.rate   = STATE.rate;
+    utter.pitch  = STATE.pitch;
+    utter.volume = STATE.volume;
+
+    // Try to find a matching voice — search multiple ways
+    const voice = getBestVoice(lang);
+    if (voice) {
+      utter.voice = voice;
+      utter.lang  = voice.lang;
+    } else {
+      // Set the lang tag even without a named voice —
+      // Chrome/Android may still use the right TTS engine
+      utter.lang = lang;
+      console.warn('CBVoice: No native voice found for', lang,
+        '— setting lang tag and letting browser decide. Install the language pack in device settings for best results.');
+    }
+
+    utter.onstart = () => { STATE.isSpeaking = true; setStatus('SPEAKING', 'speaking'); animateWaveformSpeak(true); };
+    utter.onend   = () => { STATE.isSpeaking = false; setStatus('IDLE', 'idle'); animateWaveformSpeak(false); };
+    utter.onerror = (e) => {
+      STATE.isSpeaking = false;
+      setStatus('IDLE', 'idle');
+      animateWaveformSpeak(false);
+      if (e.error !== 'canceled' && e.error !== 'interrupted') {
+        const langName = lang.split('-')[0].toUpperCase();
+        setTranscript(
+          '⚠ No ' + langName + ' voice on this device. Go to Settings → Accessibility → TTS and install ' + langName + ' language pack.',
+          'cmd'
+        );
+        console.warn('CBVoice browser TTS error for', lang, ':', e.error);
       }
+    };
+    STATE.currentUtterance = utter;
+    STATE.synth.speak(utter);
+  }
+  function detectLanguage(text) {
+    if (/[\u0B80-\u0BFF]/.test(text)) return 'ta-IN';
+    if (/[\u0900-\u097F]/.test(text)) return 'hi-IN';
+    if (/[\u0C00-\u0C7F]/.test(text)) return 'te-IN';
+    if (/[\u0C80-\u0CFF]/.test(text)) return 'kn-IN';
+    if (/[\u0D00-\u0D7F]/.test(text)) return 'ml-IN';
+    if (/[\u0980-\u09FF]/.test(text)) return 'bn-IN';
+    return 'en-US';
+  }
 
-      if (e.key === 'v' || e.key === 'V') {
-        e.preventDefault();
-        toggleListening();
-      } else if (e.key === 'r' || e.key === 'R') {
-        e.preventDefault();
-        speakLast();
-      } else if (e.key === ' ' && S.isSpeaking) {
-        e.preventDefault();
-        togglePause();
-      } else if (e.key === 'Escape') {
-        stopSpeaking();
-        stopListening();
+  function getBestVoice(lang) {
+    const latest = STATE.synth ? STATE.synth.getVoices() : [];
+    if (latest.length) STATE.voices = latest;
+    const voices = STATE.voices;
+    if (!voices.length) return null;
+
+    // Tanglish should look for Tamil voice
+    const searchLang = (lang === 'ta-en') ? 'ta-IN' : lang;
+    const base = searchLang.split('-')[0].toLowerCase();
+
+    // 1. Exact match + local service (highest quality on-device)
+    let v = voices.find(x => x.lang === searchLang && x.localService);
+    // 2. Exact match any
+    if (!v) v = voices.find(x => x.lang === searchLang);
+    // 3. Same language family (ta-IN, ta-LK both have base 'ta')
+    if (!v) v = voices.find(x => x.lang.toLowerCase().startsWith(base + '-'));
+    // 4. Base lang code prefix
+    if (!v) v = voices.find(x => x.lang.toLowerCase().startsWith(base));
+    // 5. Voice name contains language keyword (covers "Google Tamil", "Lekha", etc.)
+    const VOICE_NAMES = {
+      'ta': ['tamil', 'தமிழ்', 'lekha'],
+      'hi': ['hindi', 'हिन्दी', 'hemant', 'kalpana', 'ravi', 'heera'],
+      'te': ['telugu', 'తెలుగు', 'chitra'],
+      'kn': ['kannada', 'ಕನ್ನಡ', 'samantha'],
+      'ml': ['malayalam', 'മലയാളം'],
+      'bn': ['bengali', 'বাংলা'],
+      'mr': ['marathi', 'मराठी'],
+      'pa': ['punjabi', 'ਪੰਜਾਬੀ'],
+      'gu': ['gujarati', 'ગુજરાતી'],
+      'fr': ['french', 'français', 'amelie', 'thomas', 'aurelie'],
+      'de': ['german', 'deutsch', 'anna', 'markus', 'stefan'],
+      'es': ['spanish', 'español', 'monica', 'jorge', 'paulina'],
+      'ja': ['japanese', '日本語', 'kyoko', 'otoya'],
+      'zh': ['chinese', '中文', '普通话', 'tingting', 'sin-ji', 'mei-jia'],
+      'ko': ['korean', '한국어', 'yuna', 'sin-ji'],
+      'ar': ['arabic', 'عربي', 'maged', 'tarik'],
+      'ru': ['russian', 'русский', 'milena', 'yuri'],
+      'pt': ['portuguese', 'português', 'luciana', 'joana'],
+      'en': ['english', 'samantha', 'alex', 'daniel', 'karen'],
+    };
+    const keywords = VOICE_NAMES[base] || [];
+    if (!v && keywords.length) {
+      v = voices.find(x => keywords.some(kw => x.name.toLowerCase().includes(kw)));
+    }
+    return v || null;
+  }
+  function waitForVoices() {
+    return new Promise(resolve => {
+      const voices = STATE.synth.getVoices();
+      if (voices.length > 0) { STATE.voices = voices; resolve(voices); return; }
+      const handler = () => {
+        STATE.voices = STATE.synth.getVoices();
+        resolve(STATE.voices);
+      };
+      STATE.synth.addEventListener('voiceschanged', handler, { once: true });
+      setTimeout(() => { STATE.voices = STATE.synth.getVoices(); resolve(STATE.voices); }, 2000);
+    });
+  }
+
+  function handleFileSelect(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    processFile(file);
+  }
+
+  function processFile(file) {
+    STATE.uploadedFile = file;
+    STATE.uploadedFileType = file.type;
+
+    const badge = document.getElementById('cbFileBadge');
+    const fname = document.getElementById('cbFName');
+    const uploadBtn = document.getElementById('cbUploadBtn');
+    const imgPreview = document.getElementById('cbImgPreview');
+
+    fname.textContent = file.name.length > 14 ? file.name.slice(0, 12) + '…' : file.name;
+    badge.classList.add('visible');
+    uploadBtn.classList.add('has-file');
+
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        imgPreview.src = ev.target.result;
+        imgPreview.classList.add('visible');
+        speak(`Image loaded: ${file.name}. Click Analyze File or say "analyze this" to process it.`);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      imgPreview.classList.remove('visible');
+      imgPreview.src = '';
+      speak(`File loaded: ${file.name}. Ready for analysis.`);
+    }
+    setTranscript(`📎 ${file.name} loaded — say "analyze this" or click Analyze File`, 'cmd');
+    addHistory('FILE', file.name + ' (' + formatBytes(file.size) + ')');
+  }
+
+  function analyzeUploadedFile() {
+    if (!STATE.uploadedFile) {
+      speak('Please upload a file first.');
+      return;
+    }
+    const file = STATE.uploadedFile;
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        sendVoiceQuery(`I uploaded an image called "${file.name}". Please help me analyze code or errors shown in this screenshot. Ask me to describe what you see.`);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const content = ev.target.result.slice(0, 4000);
+        const ext = file.name.split('.').pop().toLowerCase();
+        const query = `Please analyze this ${ext.toUpperCase()} file named "${file.name}":\n\n\`\`\`${ext}\n${content}\n\`\`\`\n\nExplain what this code does, identify any bugs, and suggest improvements.`;
+        sendVoiceQuery(query);
+      };
+      reader.readAsText(file);
+    }
+  }
+
+  function formatBytes(bytes) {
+    if (bytes < 1024) return bytes + 'B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + 'KB';
+    return (bytes / 1048576).toFixed(1) + 'MB';
+  }
+
+  function setupDragDrop() {
+    const overlay = document.getElementById('cbDropOverlay');
+    let dragCounter = 0;
+    document.addEventListener('dragenter', e => { e.preventDefault(); dragCounter++; overlay.classList.add('active'); });
+    document.addEventListener('dragleave', e => { dragCounter--; if (dragCounter === 0) overlay.classList.remove('active'); });
+    document.addEventListener('dragover', e => { e.preventDefault(); });
+    document.addEventListener('drop', e => {
+      e.preventDefault(); dragCounter = 0; overlay.classList.remove('active');
+      const file = e.dataTransfer?.files[0];
+      if (file) processFile(file);
+    });
+  }
+
+  function activateWakeWord() {
+    STATE.wakeWordActive = true;
+    const indicator = document.getElementById('cbWakeIndicator');
+    const micBtn = document.getElementById('cbMicBtn');
+    indicator.style.display = 'block';
+    micBtn.classList.add('wake');
+    speak('CodeBuddy activated. What would you like to code?');
+    setTranscript('🎯 Wake word detected — I\'m listening!', 'cmd');
+    setTimeout(() => {
+      STATE.wakeWordActive = false;
+      indicator.style.display = 'none';
+      micBtn.classList.remove('wake');
+    }, 30000);
+  }
+
+  function triggerRun() {
+    const runBtn = document.querySelector('.run-btn.run-active') || document.querySelector('.run-btn');
+    if (runBtn) { runBtn.click(); speak('Running your code.'); }
+    else speak('No code block found to run. Please ask CodeBuddy to write some code first.');
+  }
+
+  function triggerDebug() {
+    const lastCode = window.lastCodeBlock || '';
+    if (lastCode) {
+      sendVoiceQuery(`Debug this code and explain every bug and fix:\n\`\`\`\n${lastCode}\n\`\`\``);
+    } else {
+      sendVoiceQuery('Please debug the last code we discussed and explain any issues found.');
+    }
+    speak('Analyzing code for bugs.');
+  }
+
+  function triggerExplain() {
+    const lastCode = window.lastCodeBlock || '';
+    if (lastCode) {
+      sendVoiceQuery(`Explain this code line by line in simple terms:\n\`\`\`\n${lastCode}\n\`\`\``);
+    } else {
+      sendVoiceQuery('Please explain the last code block in simple terms, line by line.');
+    }
+    speak('Generating explanation.');
+  }
+
+  function triggerOptimize() {
+    const lastCode = window.lastCodeBlock || '';
+    if (lastCode) {
+      sendVoiceQuery(`Optimize this code for maximum performance and readability:\n\`\`\`\n${lastCode}\n\`\`\``);
+    } else {
+      sendVoiceQuery('Please optimize the last code block for performance and clean code principles.');
+    }
+    speak('Optimizing code.');
+  }
+
+  function triggerComplexity() {
+    const lastCode = window.lastCodeBlock || '';
+    if (lastCode) {
+      sendVoiceQuery(`Analyze the Big O time and space complexity of this code with full explanation:\n\`\`\`\n${lastCode}\n\`\`\``);
+    } else {
+      sendVoiceQuery('Analyze the time and space complexity of the last code block.');
+    }
+    speak('Calculating complexity.');
+  }
+
+  function triggerTest() {
+    const lastCode = window.lastCodeBlock || '';
+    if (lastCode) {
+      sendVoiceQuery(`Write comprehensive unit tests for this code covering edge cases:\n\`\`\`\n${lastCode}\n\`\`\``);
+    } else {
+      sendVoiceQuery('Write comprehensive unit tests for the last code block.');
+    }
+    speak('Writing unit tests.');
+  }
+
+  function triggerDocument() {
+    const lastCode = window.lastCodeBlock || '';
+    if (lastCode) {
+      sendVoiceQuery(`Add professional documentation, docstrings, and JSDoc comments to this code:\n\`\`\`\n${lastCode}\n\`\`\``);
+    } else {
+      sendVoiceQuery('Add professional documentation and comments to the last code block.');
+    }
+    speak('Generating documentation.');
+  }
+
+  function triggerConvert() {
+    speak('Which programming language would you like to convert this code to?');
+    setTranscript('Say the target language name...', 'interim');
+    setTimeout(() => CBVoice.startListening(), 1500);
+  }
+
+  function clearConversation() {
+    if (confirm('Clear chat history?')) {
+      const chatBox = document.getElementById('chatBox');
+      if (chatBox) chatBox.innerHTML = '';
+      speak('Conversation cleared.');
+    }
+  }
+
+  function newSession() {
+    if (typeof newChat === 'function') newChat();
+    speak('Starting new session.');
+  }
+
+  function toggleCodeContext() {
+    STATE.codeContext = !STATE.codeContext;
+    const el = document.getElementById('cbCodeCtxToggle');
+    if (el) el.textContent = STATE.codeContext ? 'ON' : 'OFF';
+    speak('Code context ' + (STATE.codeContext ? 'enabled' : 'disabled'));
+  }
+
+  function setStatus(text, type) {
+    const el = document.getElementById('cbStatus');
+    if (!el) return;
+    el.textContent = text;
+    el.className = type || 'idle';
+  }
+
+  function setTranscript(text, type) {
+    const el = document.getElementById('cbTranscript');
+    if (!el) return;
+    el.innerHTML = `<span class="${type || 'final'}">${text}</span>`;
+  }
+
+  function animateWaveformSpeak(active) {
+    const bar = document.getElementById('cbVoiceBar');
+    const waves = document.querySelectorAll('.cbWave');
+    if (bar) bar.classList.toggle('speaking', active);
+    waves.forEach((w) => {
+      if (active) {
+        const h = Math.random() * 24 + 4;
+        w.style.height = h + 'px';
+        w.style.opacity = '0.85';
+      } else {
+        w.style.height = '3px';
+        w.style.opacity = '0.5';
       }
     });
+    if (active && STATE.isSpeaking) {
+      setTimeout(() => animateWaveformSpeak(true), 100);
+    }
+  }
 
-    // Patch the main sendMessage to auto-read responses when enabled
-    const origSend = window.sendMessage;
-    if (typeof origSend === 'function') {
-      window.sendMessage = async function (...args) {
-        const result = await origSend.apply(this, args);
-        // After AI response, auto-read if enabled
-        if (S.settings.autoRead) {
-          setTimeout(() => speakLast(), 500);
-        }
-        return result;
+  function addHistory(role, text) {
+    const list = document.getElementById('cbHistoryList');
+    if (!list) return;
+    if (list.textContent === 'No voice interactions yet.') list.innerHTML = '';
+    const entry = document.createElement('div');
+    entry.className = 'cbHistEntry';
+    const roleEl = document.createElement('div');
+    roleEl.className = 'cbHistRole';
+    roleEl.textContent = role;
+    const textEl = document.createElement('div');
+    textEl.className = 'cbHistText';
+    textEl.textContent = text;
+    entry.appendChild(roleEl);
+    entry.appendChild(textEl);
+    list.insertBefore(entry, list.firstChild);
+    while (list.children.length > 20) list.removeChild(list.lastChild);
+  }
+
+  function hookAutoSpeak() {
+    // hookAutoSpeak is intentionally disabled.
+    // Auto-speak is handled directly in index.html after streaming completes
+    // (speakText(full) is called once when the full response is ready).
+    // Using a MutationObserver here caused two bugs:
+    //   1. Timer reset on every streaming token → 2+ minute delay before audio
+    //   2. Double-trigger (observer + speakText) → audio restarts from beginning
+    // Solution: index.html calls speakText(full) → CBVoice.speak() → gTTS once, correctly.
+  }
+
+  window.CBVoice = {
+    get autoSpeak() { return STATE.autoSpeak; },
+    startListening() {
+      if (!STATE.recognition) {
+        STATE.recognition = initRecognition();
+      }
+      if (!STATE.recognition) { speak(LANGS[STATE.currentLang]?.noSupport || 'Not supported.'); return; }
+      STATE.recognition.lang = STATE.currentLang;
+      try { STATE.recognition.start(); }
+      catch (e) { console.warn('Recognition start error:', e); }
+      addHistory('MIC', 'Started listening in ' + (LANGS[STATE.currentLang]?.name || STATE.currentLang));
+    },
+    stopListening() {
+      if (STATE.recognition) try { STATE.recognition.stop(); } catch (e) { }
+      STATE.isListening = false;
+      document.getElementById('cbMicBtn')?.classList.remove('active');
+      document.getElementById('cbVoiceBar')?.classList.remove('listening');
+      setStatus('IDLE', 'idle');
+    },
+    speak(text, lang) { speak(text, lang); },
+    stop() {
+      if (_currentAudio) { _currentAudio.pause(); _currentAudio = null; }
+      STATE.synth?.cancel();
+      STATE.isSpeaking = false;
+      animateWaveformSpeak(false);
+      setStatus('IDLE', 'idle');
+    },
+    pause() {
+      STATE.synth?.pause();
+      STATE.isPaused = true;
+      setStatus('PAUSED', 'idle');
+    },
+    resume() {
+      STATE.synth?.resume();
+      STATE.isPaused = false;
+      setStatus('SPEAKING', 'speaking');
+    },
+    togglePanel() {
+      STATE.isOpen = !STATE.isOpen;
+      document.getElementById('cbVoicePanel')?.classList.toggle('hidden', !STATE.isOpen);
+    },
+    toggleAutoSpeak() {
+      STATE.autoSpeak = !STATE.autoSpeak;
+      const el = document.getElementById('cbAutoSpeak');
+      if (el) el.classList.toggle('on', STATE.autoSpeak);
+      speak('Auto speak ' + (STATE.autoSpeak ? 'enabled' : 'disabled'));
+    },
+    setLang(lang) {
+      if (!LANG_TO_TTS[lang] && !LANGS[lang]) return;
+      STATE.currentLang = lang;
+      // Sync all language selectors
+      ['cbLangSel', 'cbLangSel2', 'voiceLang'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = lang;
+      });
+      // Recognition uses Tamil for Tanglish (user speaks Tamil, AI replies in Tanglish)
+      const recogLang = (lang === 'ta-en') ? 'ta-IN' : lang;
+      if (STATE.recognition) STATE.recognition.lang = recogLang;
+      // Speak greeting in the new language
+      const greeting = LANGS[lang] ? LANGS[lang].greet : 'Language changed.';
+      speak(greeting, lang);
+      addHistory('LANG', (LANGS[lang] ? LANGS[lang].name : lang) + ' selected');
+      // Show hint in transcript
+      const hints = {
+        'ta-IN': '🇮🇳 Tamil mode — text and voice fully in Tamil',
+        'ta-en': '🇮🇳 Tanglish mode — text in English letters, voice in Tamil',
+        'hi-IN': '🇮🇳 Hindi mode — text and voice in Hindi',
+        'te-IN': '🇮🇳 Telugu mode — text and voice in Telugu',
+        'kn-IN': '🇮🇳 Kannada mode — text and voice in Kannada',
+        'ml-IN': '🇮🇳 Malayalam mode — text and voice in Malayalam',
+        'en-US': '🇺🇸 English mode',
       };
-    }
-  }
+      setTranscript(hints[lang] || ('🌐 ' + (LANGS[lang] ? LANGS[lang].name : lang) + ' mode active'), 'cmd');
+    },
+    setRate(v) { STATE.rate = v; },
+    setPitch(v) { STATE.pitch = v; },
+    setVolume(v) { STATE.volume = v; },
+    clearFile() {
+      STATE.uploadedFile = null;
+      STATE.uploadedFileType = null;
+      document.getElementById('cbFileBadge')?.classList.remove('visible');
+      document.getElementById('cbUploadBtn')?.classList.remove('has-file');
+      document.getElementById('cbImgPreview')?.classList.remove('visible');
+      document.getElementById('cbFileInput').value = '';
+    },
+    testVoice() {
+      const msgs = {
+        'en-US': 'CodeBuddy Neural Voice is working. Ready to help with Python, JavaScript, and any programming language.',
+        'ta-IN': 'கோட்பட்டி தயார். Python, JavaScript மற்றும் எந்த programming language-லும் உதவ முடியும்.',
+        'ta-en': 'Dei CodeBuddy ready bro! Python yaandral enna, function yaandral enna, ellame solluven. Type pannu, autocomplete varum!',
+        'hi-IN': 'CodeBuddy Neural Voice sahi kaam kar raha hai. Python, JavaScript aur kisi bhi programming language mein help kar sakta hoon.',
+        'te-IN': 'కోడ్‌బడ్డీ సిద్ధంగా ఉంది. Python, JavaScript మరియు ఏ programming language లోనైనా సహాయపడగలను.',
+        'kn-IN': 'ಕೋಡ್‌ಬಡ್ಡಿ ಸಿದ್ಧವಾಗಿದೆ. Python, JavaScript ಮತ್ತು ಯಾವುದೇ programming language ನಲ್ಲಿ ಸಹಾಯ ಮಾಡಬಲ್ಲೆ.',
+        'ml-IN': 'കോഡ്ബഡ്ഡി തയ്യാർ. Python, JavaScript, ഏത് programming language ലും സഹായിക്കാം.',
+        'bn-IN': 'কোডবাডি প্রস্তুত। Python, JavaScript এবং যেকোনো programming language এ সাহায্য করতে পারি।',
+        'mr-IN': 'कोडबडी तयार आहे. Python, JavaScript आणि कोणत्याही programming language मध्ये मदत करू शकतो.',
+      };
+      const lang = STATE.currentLang;
+      speak(msgs[lang] || msgs['en-US'], lang);
+    },
+    analyzeFile() { analyzeUploadedFile(); },
 
-  // ═══════════════════════════════════════════
-  // TAB SWITCHING
-  // ═══════════════════════════════════════════
-  function _switchTab(name, el) {
-    UI.panel.querySelectorAll('.cbv-tab').forEach(t => t.classList.remove('active'));
-    UI.panel.querySelectorAll('.cbv-tabpanel').forEach(p => p.classList.remove('active'));
-    el.classList.add('active');
-    document.getElementById(`cbvTab-${name}`)?.classList.add('active');
-  }
+    // CHANGE 5: Memory UI — show stored memory as voice readout
+    showMemory() {
+      fetch('/get_memory')
+        .then(r => r.json())
+        .then(data => {
+          const mem = data.memory || {};
+          const keys = Object.keys(mem);
+          if (!keys.length) {
+            speak("No memory stored yet. I'll learn your preferences as we code together.");
+            return;
+          }
+          const summary = keys.map(k => `${k}: ${mem[k]}`).join('. ');
+          speak('Here is what I remember about you: ' + summary);
+          setTranscript('🧠 Memory: ' + summary, 'cmd');
+        })
+        .catch(() => speak('Could not load memory.'));
+    },
 
-  // ═══════════════════════════════════════════
-  // PUBLIC API
-  // ═══════════════════════════════════════════
-  function togglePanel() {
-    if (!S.uiMounted) mountUI();
-    UI.panel.classList.toggle('cbv-hidden');
-  }
+    // CHANGE 9: Share streak as SVG card
+    shareStreak() {
+      const username = document.querySelector('[data-username]')?.dataset?.username
+                    || document.title.replace('CodeBuddy - ', '') || 'coder';
+      const url = `/streak_card/${username}.svg`;
+      window.open(url, '_blank');
+      speak(`Opening your streak card for ${username}. Share it on social media!`);
+    },
 
-  function setLang(code, chipEl) {
-    S.currentLang = code;
-    if (S.recognition) S.recognition.lang = code;
-    // Update bar label
-    const lang = CFG.SUPPORTED_LANGS.find(l => l.code === code);
-    if (UI.barLangLabel) UI.barLangLabel.textContent = lang?.label || 'EN';
-    // Update chips
-    UI.panel.querySelectorAll('.cbv-lang-chip').forEach(c => c.classList.remove('active'));
-    if (chipEl) chipEl.classList.add('active');
-  }
+    // CHANGE 7: Install PWA
+    installPWA() {
+      if (STATE._deferredInstall) {
+        STATE._deferredInstall.prompt();
+        STATE._deferredInstall.userChoice.then(choice => {
+          if (choice.outcome === 'accepted') speak('CodeBuddy installed! You can now use it offline.');
+          STATE._deferredInstall = null;
+        });
+      } else {
+        speak('Open this page in Chrome and tap the install button in the address bar.');
+      }
+    },
+  };
 
-  function setPersonality(persona, el) {
-    S.ttsPersonality = persona;
-    UI.panel.querySelectorAll('.cbv-persona').forEach(p => p.classList.remove('active'));
-    if (el) el.classList.add('active');
-  }
-
-  function speakLast() {
-    // Find last AI message
-    const bots = document.querySelectorAll('.msg-row.bot .bubble-content');
-    if (!bots.length) return;
-    const last = bots[bots.length - 1];
-    speakText(last.innerText || last.textContent);
-  }
-
-  function speakCustom() {
-    const input = document.getElementById('cbvCustomSpeak');
-    if (input?.value.trim()) speakText(input.value.trim());
-  }
-
-  function replayHistory(index) {
-    const item = S.voiceHistory[index];
-    if (item && (item.role === 'ai')) {
-      speakText(item.text);
-    }
-  }
-
-  function stopSpeaking() {
-    window.speechSynthesis.cancel();
-    S.isSpeaking = false;
-    hideSpeakOverlay();
-    updateTTSProgress(0);
-  }
-
-  function pauseSpeaking() {
-    if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
-      window.speechSynthesis.pause();
-    }
-  }
-
-  function resumeSpeaking() {
-    if (window.speechSynthesis.paused) {
-      window.speechSynthesis.resume();
-    }
-  }
-
-  function togglePause() {
-    if (window.speechSynthesis.paused) resumeSpeaking();
-    else pauseSpeaking();
-  }
-
-  function toggleWakeWord(el) {
-    if (S.wakeEnabled) {
-      S.wakeEnabled = false;
-      el.classList.remove('active');
-      stopWakeWordListener();
-      const ws = document.getElementById('cbvWakeStatus');
-      if (ws) ws.textContent = 'Wake word detection is OFF';
-    } else {
-      S.wakeEnabled = true;
-      el.classList.add('active');
-      startWakeWordListener();
-      const ws = document.getElementById('cbvWakeStatus');
-      if (ws) ws.textContent = '◌ Listening for "Hey CodeBuddy"…';
-    }
-  }
-
-  // ═══════════════════════════════════════════
-  // UTILITY
-  // ═══════════════════════════════════════════
-  function log(msg) {
-    console.log(`[CBVoice] ${msg}`);
-  }
-
-  // ═══════════════════════════════════════════
-  // AUTO-INIT
-  // ═══════════════════════════════════════════
   function init() {
-    mountUI();
-
-    // Replace the existing simple voice cluster in topbar
-    const existingCluster = document.querySelector('.voice-cluster');
-    if (existingCluster) {
-      existingCluster.style.display = 'none'; // Hide old simple buttons
+    if (STATE.initialized) return;
+    STATE.initialized = true;
+    injectStyles();
+    buildUI();
+    waitForVoices().then(voices => {
+      STATE.voices = voices;
+    });
+    hookAutoSpeak();
+    STATE.recognition = initRecognition();
+    const mainLang = document.getElementById('voiceLang');
+    if (mainLang) {
+      mainLang.addEventListener('change', e => CBVoice.setLang(e.target.value));
     }
 
-    // Also intercept the old speakText, startVoice etc
-    window.speakText = speakText;
-    window.startVoice = toggleListening;
-    window.pauseSpeech = pauseSpeaking;
-    window.resumeSpeech = resumeSpeaking;
-    window.stopSpeech = stopSpeaking;
+    // CHANGE 7: Register service worker for PWA
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js')
+        .then(() => console.log('[CBVoice] SW registered'))
+        .catch(e => console.warn('[CBVoice] SW registration failed:', e));
+    }
 
-    log('Ready. Press V to start recording, R to read last response.');
+    // CHANGE 7: Capture install prompt for later
+    window.addEventListener('beforeinstallprompt', e => {
+      e.preventDefault();
+      STATE._deferredInstall = e;
+      // Show a subtle install hint in transcript
+      setTimeout(() => {
+        setTranscript('📱 Install CodeBuddy as app — say "install app" or click ⊕', 'cmd');
+      }, 3000);
+    });
+
+    // CHANGE 9: Load leaderboard rank into state
+    fetch('/api/leaderboard')
+      .then(r => r.json())
+      .then(data => {
+        STATE._leaderboard = data.leaderboard || [];
+      })
+      .catch(() => {});
+
+    setTimeout(() => {
+      setTranscript('⚡ CodeBuddy Neural Voice Engine v4.0 ready — Click 🎤 or say "Hey Buddy"', 'cmd');
+    }, 800);
   }
 
-  // Wait for DOM ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
-    setTimeout(init, 100);
+    init();
   }
 
-  // PUBLIC
-  return {
-    toggleListening,
-    startListening,
-    stopListening,
-    speakText,
-    speakLast,
-    speakCustom,
-    stopSpeaking,
-    pauseSpeaking,
-    resumeSpeaking,
-    togglePause,
-    togglePanel,
-    toggleWakeWord,
-    setLang,
-    setPersonality,
-    replayHistory,
-    _switchTab,
-    _sendTranscript,
-    _clearTranscript,
-    _toggleAutoSend,
-    _toggleCodeDict,
-    _toggleAutoRead,
-    _toggleSwitch,
-    _runCommand,
-  };
+  window.switchPTab = switchPTab;
+  window.triggerRun = triggerRun;
+  window.triggerDebug = triggerDebug;
+  window.triggerExplain = triggerExplain;
+  window.triggerOptimize = triggerOptimize;
+  window.triggerComplexity = triggerComplexity;
+  window.triggerTest = triggerTest;
+  window.triggerDocument = triggerDocument;
+  window.triggerConvert = triggerConvert;
+  window.toggleCodeContext = toggleCodeContext;
+  window.analyzeUploadedFile = analyzeUploadedFile;
+  window.activateWakeWord = activateWakeWord;
+  window.clearConversation = clearConversation;
+  window.newSession = newSession;
+  window.sendVoiceQuery = sendVoiceQuery;
+  window.speak = speak;
 
-})();
+})(); // end IIFE
