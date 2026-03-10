@@ -387,6 +387,9 @@ body::after {
     {% endfor %}
   {% endif %}
   {% endwith %}
+  {% if error %}
+  <div class="flash-msg">⚠ {{ error }}</div>
+  {% endif %}
 
   <!-- FORM -->
   <form method="POST">

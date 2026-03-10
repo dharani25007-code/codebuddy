@@ -1,16 +1,15 @@
 """CodeBuddy – AI-powered programming assistant backend.
    ╔══════════════════════════════════════════════════════════╗
-   ║  UPGRADED v4.0 — All 10 Zero-Cost Improvements Applied  ║
-   ║  1. DeepSeek-R1 AI model (beats GPT-4, free)            ║
-   ║  2. Better TTS with device voice selection              ║
-   ║  3. 10 Indic + world languages added                    ║
-   ║  4. SQLite WAL mode + indexes (3x faster)               ║
-   ║  5. Persistent user memory system                       ║
-   ║  6. Piston API sandboxed code execution (50+ langs)     ║
-   ║  7. PWA manifest + service worker support               ║
-   ║  8. SQL injection fix + security hardening              ║
-   ║  9. Public leaderboard + SVG streak cards               ║
-   ║  10. Redis-backed rate limiting (falls back to memory)  ║
+   ║  v5.0 — 6 WORLD-FIRST FEATURES ADDED                   ║
+   ║  Previous v4.0 features (1-10) preserved intact        ║
+   ║                                                          ║
+   ║  NEW — WORLD FIRST:                                     ║
+   ║  11. Thought Replay Debugger (AI reasoning visible)     ║
+   ║  12. Voice-to-Voice Coding Loop (speak → fix → speak)  ║
+   ║  13. Live Code Battle (AI-judged real-time duel)        ║
+   ║  14. Code Karma System (help = community currency)      ║
+   ║  15. Replay My Learning (shareable journey timeline)    ║
+   ║  16. Blind Code Review (anonymous, bias-free feedback)  ║
    ╚══════════════════════════════════════════════════════════╝
 """
 import json
@@ -83,11 +82,15 @@ def rate_limit(max_calls=20, window=60):
                 results = pipe.execute()
                 count = results[2]
                 if count > max_calls:
-                    return jsonify({"error": "Rate limit exceeded. Please wait."}), 429
+                    retry_after = int(window)
+                    return jsonify({"error": "Rate limit exceeded. Please wait.", "retry_after": retry_after}), 429
             else:
                 calls = [t for t in _rate_store[key] if now - t < window]
                 if len(calls) >= max_calls:
-                    return jsonify({"error": "Rate limit exceeded. Please wait."}), 429
+                    # Calculate seconds until oldest call expires
+                    oldest = min(calls)
+                    retry_after = max(1, int(window - (now - oldest)) + 1)
+                    return jsonify({"error": "Rate limit exceeded. Please wait.", "retry_after": retry_after}), 429
                 calls.append(now)
                 _rate_store[key] = calls
             return f(*args, **kwargs)
@@ -317,28 +320,78 @@ def extract_and_save_memory(user_id, message):
 # ================= HELPERS =================
 
 def is_programming_related(text):
-    """Lightweight check + AI classifier for programming relevance."""
+    """Check if message is programming-related, supporting all Indian languages.
+
+    Uses two layers:
+    1. Fast keyword check — catches common programming terms in English AND
+       transliterated forms used in Indian languages (Tamil, Hindi, Telugu etc.)
+    2. AI classifier — for ambiguous cases, with multilingual system prompt
+    """
+    # Layer 1: Fast keyword check (English tech terms + common Indic transliterations)
+    PROG_KEYWORDS = {
+        # Core English terms always present even in native-language questions
+        "python", "java", "javascript", "js", "html", "css", "sql", "code", "coding",
+        "program", "programming", "function", "variable", "loop", "array", "class",
+        "object", "method", "debug", "error", "bug", "api", "database", "server",
+        "framework", "library", "algorithm", "data structure", "web", "app", "software",
+        "developer", "git", "linux", "terminal", "compiler", "runtime", "syntax",
+        "react", "node", "django", "flask", "spring", "typescript", "kotlin", "swift",
+        "c++", "c#", "ruby", "golang", "rust", "php", "bash", "script", "import",
+        "print", "return", "integer", "string", "boolean", "float", "null", "undefined",
+        "http", "json", "xml", "rest", "graphql", "docker", "kubernetes", "aws",
+        # Tanglish / Tamil transliteration tech words
+        "koodu", "kodu", "code pannrom", "code panna", "program pannrom",
+        "function ezhudu", "function ezhuthu", "loop podrom", "debug pannrom",
+        # Hindi transliteration
+        "code karo", "code kaise", "program karo", "coding karo", "function kya",
+        "loop kya", "variable kya", "error kaise", "kaise likhte",
+        # Telugu transliteration
+        "code rayyandi", "program rayyandi", "function enti", "loop enti",
+        # Kannada transliteration
+        "code bareyiri", "program bareyiri",
+        # Malayalam transliteration
+        "code ezhuthuka", "program ezhuthuka",
+    }
+    import re as _re
+    text_lower = text.lower()
+    # Word-boundary check for short keywords to avoid false positives
+    # e.g. "api" in "saapiduvom", "app" in "happy", "string" is fine (long enough)
+    SHORT_KW = {"js", "api", "app", "web", "bug", "git", "php", "sql", "css"}
+    for kw in PROG_KEYWORDS:
+        if kw in SHORT_KW:
+            if _re.search(r'\b' + _re.escape(kw) + r'\b', text_lower):
+                return True
+        else:
+            if kw in text_lower:
+                return True
+
+    # Layer 2: Code character check
     code_chars = set("{}[]()=><;:/\\")
     if len(text.split()) < 6 and any(c in text for c in code_chars):
         return True
+
+    # Layer 3: AI classifier — explicitly multilingual prompt
     try:
         headers = {
             "Authorization": f"Bearer {OPENROUTER_API_KEY}",
             "Content-Type": "application/json"
         }
         payload = {
-            "model": "meta-llama/llama-3.1-8b-instruct",
+            "model": MODELS["classifier"],
             "max_tokens": 5,
             "temperature": 0,
             "messages": [
                 {
                     "role": "system",
                     "content": (
-                        "You are a classifier. Decide if the user's message is related to "
-                        "programming, software development, computer science, coding, algorithms, "
-                        "data structures, web development, databases, DevOps, machine learning, "
-                        "AI, cybersecurity, or any technical computing topic.\n"
-                        "Reply with ONLY the single word: YES or NO"
+                        "You are a multilingual classifier. The user's message may be in "
+                        "English, Tamil, Hindi, Telugu, Kannada, Malayalam, Bengali, Marathi, "
+                        "Gujarati, or Tanglish (Tamil+English mix). "
+                        "Decide if the message is related to: programming, software development, "
+                        "computer science, coding, algorithms, data structures, web development, "
+                        "databases, DevOps, machine learning, AI, or any technical computing topic.\n"
+                        "IMPORTANT: Questions asked in any Indian language about these topics "
+                        "are still programming-related. Reply ONLY: YES or NO"
                     )
                 },
                 {"role": "user", "content": text[:300]}
@@ -374,7 +427,7 @@ def generate_chat_title(user_message):
             "Content-Type": "application/json"
         }
         payload = {
-            "model": "meta-llama/llama-3.1-8b-instruct",
+            "model": MODELS["title"],
             "max_tokens": 20,
             "messages": [
                 {"role": "system", "content": "Generate a concise 3-5 word title for this programming question. Only output the title, nothing else. No quotes."},
@@ -394,50 +447,67 @@ def generate_chat_title(user_message):
 
 # Free models on OpenRouter, ranked by coding quality
 MODELS = {
-    "code":       "deepseek/deepseek-r1:free",              # DeepSeek R1 free tier
-    "fast":       "google/gemini-2.0-flash-001",            # Gemini Flash (stable)
-    "fast_free":  "google/gemini-2.0-flash-exp:free",       # Gemini Flash free fallback
-    "classifier": "meta-llama/llama-3.1-8b-instruct:free",  # Lightweight classifier
-    "title":      "meta-llama/llama-3.1-8b-instruct:free",  # Title generation
+    # ── PRIMARY MODELS (all :free — zero cost on OpenRouter) ─────────────────
+    # Best coding model as of March 2026 — 480B MoE, 262K context, tools
+    "code":       "qwen/qwen3-coder:free",
+    # Best multilingual / fast — Llama 3.3 70B, 128K context, confirmed free
+    "fast":       "meta-llama/llama-3.3-70b-instruct:free",
+    # Lightweight classifier — small & fast, free
+    "classifier": "meta-llama/llama-3.2-3b-instruct:free",
+    # Title generation — tiny, near-instant, free
+    "title":      "meta-llama/llama-3.2-3b-instruct:free",
 }
+
+# ── ORDERED FALLBACK CHAIN (all :free, different providers) ─────────────────
+# When ANY model returns 429/404/503, these are tried in order.
+# Multiple providers = if one is rate-limited, another will work.
+FREE_FALLBACKS = [
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "qwen/qwen3-coder:free",
+    "mistralai/mistral-small-3.1-24b-instruct:free",
+    "google/gemma-3-27b-it:free",
+    "openai/gpt-oss-20b:free",
+    "openrouter/free",  # last resort: OpenRouter auto-picks any working free model
+]
 
 def get_model_for_mode(mode, lang_code="en-US"):
     """Pick the best free model based on task type and language.
+    All models are :free — zero cost on OpenRouter.
 
-    For non-English Indian languages, always use Gemini Flash:
-    - Gemini has been trained on far more multilingual data for Indian scripts.
-    - DeepSeek-R1 often ignores Telugu/Kannada/Malayalam/Bengali instructions
-      and responds in English regardless of what the system prompt says.
-    - Gemini Flash correctly produces Telugu, Kannada, Malayalam, Bengali,
-      Tamil, Hindi, Marathi, Gujarati text when instructed to.
+    - Indic languages: Llama 3.3 70B has the best multilingual Indic support.
+    - Coding tasks: Qwen3-Coder 480B is the strongest free coding model (March 2026).
+    - Fast/explain/interview: Llama 3.3 70B — fast and accurate.
     """
-    # All non-English Indic languages get Gemini for best script compliance
+    # All non-English Indic languages → Llama 3.3 70B (best free multilingual)
     indic_langs = {"ta-IN", "ta-en", "hi-IN", "te-IN", "kn-IN",
                    "ml-IN", "bn-IN", "mr-IN", "pa-IN", "gu-IN"}
     if lang_code in indic_langs:
-        return MODELS["fast"]  # Gemini Flash — best multilingual support for Indian scripts
+        return MODELS["fast"]  # Llama 3.3 70B — best free multilingual
 
     fast_modes = {"explain", "interview", "roadmap"}
     if mode in fast_modes:
         return MODELS["fast"]
-    return MODELS["code"]  # DeepSeek-R1 for English coding tasks
+    return MODELS["code"]  # Qwen3-Coder — best free coding model
 
 # ================= SYSTEM PROMPTS =================
 
 # Injected into every system prompt — universal respectful tone rule
 _RESPECTFUL_TONE = """
 
-IMPORTANT — HOW TO ADDRESS THE USER:
-- Always be warm, respectful, and encouraging
-- NEVER use rude/aggressive words to address the user in ANY language
-- English: use "you", never dismissive language
-- Tamil/Tanglish: use "bro", "da", "machaa" — NEVER "dei" or "ey" (rude)
-- Hindi: use "aap" or "bhai" — NEVER "ey" or "oye" in a rude way
-- Telugu: use "meeru" or "bro" — NEVER "ey" or dismissive terms
-- Kannada: use "neevu" or "bro" — respectful tone always
-- Malayalam: use "ningal" or "bro" — respectful always
-- Bengali/Marathi/Gujarati: always respectful, never dismissive
-- Treat every user like a respected friend you are genuinely helping"""
+IMPORTANT — HOW TO ADDRESS THE USER (MANDATORY FOR ALL LANGUAGES):
+- Always be warm, RESPECTFUL, and professional — like a knowledgeable teacher
+- NEVER use casual street slang or overly familiar address words
+- English: use "you" — polite and professional always
+- Tamil/Tanglish: use "neenga", "ungalukku" (formal Tamil pronouns) — NEVER casual "da", "bro", "machaa", "nanbaa", "dei", "ey"
+- Hindi: use "aap" — NEVER casual "yaar", "bhai", "oye", "arre"
+- Telugu: use "meeru", "mee" — NEVER casual "ey", "ra", or dismissive terms
+- Kannada: use "neevu", "nimma" — NEVER casual "ey", "ri" dismissively
+- Malayalam: use "ningal", "ningalude" — NEVER casual "eda", "dei"
+- Bengali: use "apni" — NEVER casual "ei", "oi"
+- Marathi: use "tumhi" — NEVER rude "are", "aga"
+- Gujarati: use "aap" — NEVER dismissive address
+- Punjabi: use "tussi" — NEVER rude "oi", "hey"
+- Treat every user like a valued student or professional you deeply respect"""
 
 SYSTEM_PROMPTS = {
     "general": """You are CodeBuddy, a friendly programming helper.
@@ -777,7 +847,17 @@ def dashboard():
         (current_user.id,)
     ).fetchall()
     conn.close()
-    return render_template("index.html", chats=chats, username=current_user.username)
+    # Show onboarding once per login session using a session flag.
+    # This works for ALL users (new and existing) — dismissed by clicking "GOT IT".
+    show_onboarding = not session.get("onboarding_dismissed", False)
+    return render_template("index.html", chats=chats, username=current_user.username, is_new_user=show_onboarding)
+
+@app.route("/onboarding/dismiss", methods=["POST"])
+@login_required
+def onboarding_dismiss():
+    """Mark onboarding as seen for this login session."""
+    session["onboarding_dismissed"] = True
+    return jsonify({"ok": True})
 
 # ================= CHANGE 7: PWA ROUTES =================
 
@@ -1075,7 +1155,7 @@ def public_chat(chat_id):
     conn = sqlite3.connect("codebuddy.db")
     conn.row_factory = sqlite3.Row
     messages = conn.execute(
-        "SELECT role, content FROM messages WHERE conversation_id=? ORDER BY id ASC",
+        "SELECT role, content, timestamp FROM messages WHERE conversation_id=? ORDER BY id ASC",
         (chat_id,)
     ).fetchall()
     convo = conn.execute("SELECT title FROM conversations WHERE id=?", (chat_id,)).fetchone()
@@ -1118,8 +1198,11 @@ def get_bookmarks():
 
 # ================= CHANGE 6: PISTON API CODE EXECUTION =================
 
-PISTON_API = "https://emkc.org/api/v2/piston/execute"
-PISTON_API_BACKUP = "https://judge0-ce.p.rapidapi.com/submissions"  # Judge0 backup (not used by default)
+PISTON_ENDPOINTS = [
+    "https://emkc.org/api/v2/piston/execute",
+    "https://api.piston.rs/api/v2/execute",
+]
+PISTON_API = PISTON_ENDPOINTS[0]  # backward-compat alias
 
 # Piston language aliases
 PISTON_LANGUAGES = {
@@ -1176,43 +1259,30 @@ def run_code():
     else:
         piston_lang, piston_ver = PISTON_LANGUAGES[language]
 
+    piston_payload = {
+        "language": piston_lang,
+        "version": piston_ver,
+        "files": [{"name": f"main.{language[:10]}", "content": code}],
+        "stdin": "",
+        "args": [],
+        "compile_timeout": 10000,
+        "run_timeout": 10000,
+    }
+    resp = None
+    last_err = "All Piston endpoints failed"
+    for _ep in PISTON_ENDPOINTS:
+        try:
+            _r = requests.post(_ep, json=piston_payload, timeout=20)
+            if _r.status_code == 200:
+                resp = _r
+                break
+            last_err = f"HTTP {_r.status_code} from {_ep}"
+        except requests.exceptions.RequestException as _e:
+            last_err = str(_e)
+            continue
+    if resp is None:
+        return jsonify({"output": f"⚠ Code execution unavailable: {last_err}", "exit_code": -1})
     try:
-        resp = requests.post(
-            PISTON_API,
-            json={
-                "language": piston_lang,
-                "version": piston_ver,
-                "files": [{"name": f"main.{language[:10]}", "content": code}],
-                "stdin": "",
-                "args": [],
-                "compile_timeout": 10000,
-                "run_timeout": 10000,
-            },
-            timeout=20
-        )
-
-        if resp.status_code == 401 or resp.status_code == 403:
-            # Piston API auth error — try alternative public endpoint
-            try:
-                resp2 = requests.post(
-                    "https://api.piston.rs/api/v2/execute",
-                    json={
-                        "language": piston_lang,
-                        "version": piston_ver,
-                        "files": [{"name": f"main.{language[:10]}", "content": code}],
-                        "stdin": "", "args": [],
-                        "compile_timeout": 10000, "run_timeout": 10000,
-                    },
-                    timeout=20
-                )
-                if resp2.status_code == 200:
-                    resp = resp2
-                else:
-                    return jsonify({"output": f"⚠ Code execution unavailable right now. Try again in a moment.", "exit_code": -1})
-            except Exception:
-                return jsonify({"output": "⚠ Code execution service is down. Try again later.", "exit_code": -1})
-        elif resp.status_code != 200:
-            return jsonify({"output": f"⚠ Execution service error ({resp.status_code}). Try again.", "exit_code": -1})
 
         result = resp.json()
         run = result.get("run", {})
@@ -1326,6 +1396,42 @@ def search_chats():
 
 # ================= CHANGE 1+3: MAIN CHAT (DeepSeek + all languages) =================
 
+
+_RUDE_REPLACEMENTS = [
+    # "Dei + anything" → remove entirely
+    (r'(?i)\bdei\s+bro[,! ]*',     ''),
+    (r'(?i)\bdei\s+da[,! ]*',      ''),
+    (r'(?i)\bdei\s+machaa[,! ]*',  ''),
+    (r'(?i)\bdei\s+nanbaa[,! ]*',  ''),
+    (r'(?i)\bdei[,!]?\s+',         ''),
+    # Casual sentence openers — too informal, strip them
+    (r'(?m)^Machaa[,!]?\s+',       ''),
+    (r'(?m)^machaa[,!]?\s+',       ''),
+    (r'(?m)^Bro[,!]\s+',           ''),
+    (r'(?m)^bro[,!]\s+',           ''),
+    (r'(?m)^Da[,!]\s+',            ''),
+    (r'(?m)^da[,!]\s+',            ''),
+    (r'(?m)^Nanbaa[,!]?\s+',       ''),
+    (r'(?m)^nanbaa[,!]?\s+',       ''),
+    # Tamil script rude words → respectful
+    (r'\bடேய்\b',                  'நண்பா'),
+    (r'\bடே\b',                    'நண்பா'),
+    # Hindi casual/rude
+    (r'(?i)\boye\b',               'Aap'),
+    (r'(?i)\barre\s+yaar\b',       ''),
+    # Telugu / Kannada dismissive "Ey"
+    (r'(?m)^[Ee]y[,!]?\s+',        ''),
+    (r'(?i)\bey[,!]?\s+',          ''),
+]
+
+def _filter_response(text: str) -> str:
+    """Replace rude address words with respectful equivalents."""
+    import re
+    for pattern, replacement in _RUDE_REPLACEMENTS:
+        text = re.sub(pattern, replacement, text)
+    return text
+
+
 @app.route("/chat", methods=["POST"])
 @login_required
 @rate_limit(max_calls=50, window=60)
@@ -1380,21 +1486,20 @@ def chat():
     elif lang_code == "ta-en":
         lang_instruction = (
             "\n\n🌐 TANGLISH MODE — MANDATORY WRITING STYLE:\n"
-            "Write like a friendly Chennai senior developer helping a friend. Warm and helpful tone.\n\n"
+            "Write in Tanglish (Tamil words in English/Roman letters mixed with English tech terms).\n"
+            "Use a RESPECTFUL, PROFESSIONAL tone — like a knowledgeable teacher or senior colleague.\n\n"
             "CRITICAL RULES:\n"
-            "✅ Write in ENGLISH LETTERS (Roman script) — NOT Tamil unicode script characters\n"
-            "✅ Tamil words in English letters: 'pannrom', 'paaru', 'irukku', 'aagum', 'sollu', 'theriyuma', 'da', 'bro', 'machaa'\n"
-            "✅ English tech words stay English: function, variable, loop, array, error, class, API, debug\n"
-            "✅ Every sentence must naturally mix both: 'Indha function-la list return pannrom — [0] use panna first element kedaikum'\n"
-            "✅ Friendly warm tone: 'Bro paaru', 'Simple-a solren da', 'intha bug-a fix pannrom machaa', 'easy-a irukku'\n"
-            "✅ Address user as: 'bro', 'da', 'machaa', 'nanbaa' — NEVER 'dei' or 'ey'\n"
-            "❌ BANNED WORDS to start a sentence: 'Dei', 'dei', 'Ey', 'ey' — these are RUDE\n"
-            "✅ CORRECT opening: 'Bro paaru,' / 'Da, indha...' / 'Machaa listen,'\n"
-            "❌ WRONG opening: 'Dei bro,' / 'Dei paaru' — DO NOT USE\n"
+            "✅ Write in ENGLISH LETTERS ONLY (Roman script) — NOT Tamil unicode characters\n"
+            "✅ Mix Tamil words naturally: 'pannrom', 'paaru', 'irukku', 'solren', 'theriyuma', 'aagum', 'paarunga'\n"
+            "✅ English tech words stay English: function, variable, loop, array, class, API, debug\n"
+            "✅ Every sentence mixes both: 'Indha function-la list return pannrom — [0] use panna first element kedaikum'\n"
+            "✅ RESPECTFUL address: use 'neenga', 'ungalukku', 'paarunga' — formal Tamil pronouns\n"
+            "✅ Respectful openings: 'Neenga kekkura question-ku solren', 'Ungalukku explain pannren', 'Indha concept paarunga'\n"
+            "❌ BANNED casual words: 'da', 'bro', 'machaa', 'nanbaa', 'dei', 'ey' — too casual/disrespectful\n"
             "❌ NO pure English paragraphs — Tamil words must appear in every sentence\n"
-            "❌ DO NOT use Tamil script (unicode) — only Roman/English letters\n"
-            "❌ DO NOT write: 'Here is the explanation' — write: 'Solren da, indha concept simple-a irukku'\n\n"
-            "VOICE NOTE: This text will be spoken aloud using TAMIL VOICE. Write so it sounds natural when a Tamil person reads it aloud."
+            "❌ NO Tamil script (unicode) — only Roman/English letters\n"
+            "❌ DO NOT start with 'Here is' — write: 'Solren, indha concept simple-a irukku'\n\n"
+            "VOICE: This text is spoken aloud with Tamil voice — write naturally for speech."
         )
     elif is_non_english:
         # Per-language native script examples to force correct script usage
@@ -1546,7 +1651,7 @@ def chat():
         "mr-IN": "⚠️ IMPORTANT: मराठी लिपीत मात्र उत्तर द्या. User ला 'तुम्ही' किंवा 'मित्रा' म्हणा — कधीही 'अरे' उद्धटपणे नाही. इंग्रजीत नाही. आत्ता उत्तर द्या: ",
         "gu-IN": "⚠️ IMPORTANT: ગુજરાતી લિપિમાં માત્ર જવાબ આપો. User ને 'આપ' અથવા 'મિત્ર' કહો — ક્યારેય 'અરે' અસભ્ય રીતે નહીં. અંગ્રેજીમાં નહીં. હવે જવાબ આપો: ",
         "pa-IN": "⚠️ IMPORTANT: ਪੰਜਾਬੀ ਲਿਪੀ ਵਿੱਚ ਹੀ ਜਵਾਬ ਦਿਓ। User ਨੂੰ 'ਤੁਸੀਂ' ਜਾਂ 'ਯਾਰ' ਕਹੋ — ਕਦੇ 'ਓਏ' ਬੇਅਦਬੀ ਨਾਲ ਨਹੀਂ। ਅੰਗਰੇਜ਼ੀ ਵਿੱਚ ਨਹੀਂ। ਹੁਣ ਜਵਾਬ ਦਿਓ: ",
-        "ta-en": "⚠️ IMPORTANT: Reply in Tanglish ONLY (Tamil words in English/Roman letters). Be friendly and warm — use 'bro/da/machaa', NEVER 'dei' or 'ey' (rude). Example: 'Bro, indha function-la loop irukku, simple-a paaru'. NO pure English. NO Tamil unicode. Answer: ",
+        "ta-en": "⚠️ IMPORTANT: Reply in Tanglish ONLY (Tamil words in Roman letters + English tech words). RESPECTFUL tone — say 'neenga'/'ungalukku'/'paarunga'. NEVER casual 'da/bro/machaa/dei/ey'. Example: 'Neenga kekkura question-ku solren — indha function-la loop irukku, paarunga'. NO pure English. NO Tamil unicode. Answer: ",
     }
     reminder_prefix = INDIC_REMINDER.get(lang_code)
     if reminder_prefix:
@@ -1568,11 +1673,8 @@ def chat():
     selected_model = get_model_for_mode(mode, lang_code)
 
     # Fallback order if primary model fails
-    MODEL_FALLBACKS = {
-        "deepseek/deepseek-r1:free":           ["google/gemini-2.0-flash-001", "meta-llama/llama-3.3-70b-instruct:free"],
-        "google/gemini-2.0-flash-001":         ["google/gemini-2.0-flash-exp:free", "deepseek/deepseek-r1:free"],
-        "google/gemini-2.0-flash-exp:free":    ["deepseek/deepseek-r1:free", "meta-llama/llama-3.3-70b-instruct:free"],
-    }
+    # Use global FREE_FALLBACKS list — all :free models across multiple providers
+    MODEL_FALLBACKS = {m: [f for f in FREE_FALLBACKS if f != m] for m in FREE_FALLBACKS}
 
     payload = {
         "model": selected_model,
@@ -1584,6 +1686,7 @@ def chat():
 
     def generate():
         full = ""
+        stream_buf = ""
         try:
             response = requests.post(
                 "https://openrouter.ai/api/v1/chat/completions",
@@ -1597,9 +1700,12 @@ def chat():
                 yield "⚠ API key invalid. Please check your OpenRouter API key."
                 return
             if response.status_code in (404, 429, 503):
-                # Try fallback models automatically
-                fallbacks = MODEL_FALLBACKS.get(payload["model"], [])
-                for fb_model in fallbacks:
+                # Try all free fallback models in order across different providers
+                tried = {payload["model"]}
+                for fb_model in FREE_FALLBACKS:
+                    if fb_model in tried:
+                        continue
+                    tried.add(fb_model)
                     app.logger.warning(f"Model {payload['model']} returned {response.status_code}, trying {fb_model}")
                     payload["model"] = fb_model
                     response = requests.post(
@@ -1607,10 +1713,14 @@ def chat():
                         headers=headers, json=payload, stream=True, timeout=(10, 90)
                     )
                     if response.status_code == 200:
+                        app.logger.info(f"Fallback succeeded with {fb_model}")
                         break
                 if response.status_code != 200:
                     code = response.status_code
-                    msg = "Rate limit reached — please wait." if code == 429 else f"API Error {code}. Please try again."
+                    if code == 429:
+                        msg = "⏳ RATE_LIMIT_429"  # special token frontend detects
+                    else:
+                        msg = f"API Error {code}. Please try again."
                     yield f"⚠ {msg}"
                     return
             if response.status_code != 200:
@@ -1627,8 +1737,11 @@ def chat():
                         try:
                             token = json.loads(data)["choices"][0]["delta"].get("content", "")
                             token = _filter_response(token)
+                            stream_buf += token
                             full += token
-                            yield token
+                            if any(c in stream_buf for c in '.!?,\n') or len(stream_buf) > 80:
+                                yield _filter_response(stream_buf)
+                                stream_buf = ""
                         except (json.JSONDecodeError, KeyError, IndexError):
                             pass
 
@@ -1644,6 +1757,8 @@ def chat():
         except Exception as e:
             yield f"\n\n⚠ Error: {str(e)}"
 
+        if stream_buf:
+            yield _filter_response(stream_buf)
         if full:
             full = _filter_response(full)   # final pass on complete response
             save_conn = sqlite3.connect("codebuddy.db")
@@ -1744,38 +1859,6 @@ def generate_roadmap():
 
 # Words that are rude/disrespectful when addressing a user, mapped to replacements
 # Applied to ALL streaming output before it reaches the user
-_RUDE_REPLACEMENTS = [
-    # "Dei bro" / "dei da" / "dei machaa" → just keep the friendly part
-    (r'(?i)\bdei\s+bro\b',    'Bro'),
-    (r'(?i)\bdei\s+da\b',     'Da'),
-    (r'(?i)\bdei\s+machaa\b', 'Machaa'),
-    (r'(?i)\bdei\s+nanbaa\b', 'Nanbaa'),
-    # Standalone "Dei" / "dei" at sentence start or anywhere
-    (r'^Dei[,!]?\s*',           ''),
-    (r'^dei[,!]?\s*',           ''),
-    (r'\bDei[,!]?\s+',         ''),
-    (r'\bdei[,!]?\s+',         ''),
-    # Tamil script rude words
-    (r'\bடேய்\b',              'நண்பா'),
-    (r'\bடே\b',                'நண்பா'),
-    # Hindi
-    (r'(?i)\boye\b',           'Bhai'),
-    (r'(?i)\bare\s+yaar\b',   'Haan yaar'),
-    # Telugu / Kannada dismissive "Ey"
-    (r'^Ey[,!]?\s*',            ''),
-    (r'^ey[,!]?\s*',            ''),
-    (r'\bEy[,!]?\s+',          ''),
-    (r'\bey[,!]?\s+',          ''),
-]
-
-def _filter_response(text: str) -> str:
-    """Replace rude address words with respectful equivalents."""
-    import re
-    for pattern, replacement in _RUDE_REPLACEMENTS:
-        text = re.sub(pattern, replacement, text)
-    return text
-
-
 # ================= TRANSLATION FALLBACK =================
 
 @app.route("/translate", methods=["POST"])
@@ -1802,7 +1885,7 @@ def translate_response():
         "ta-IN": "Tamil", "hi-IN": "Hindi", "te-IN": "Telugu",
         "kn-IN": "Kannada", "ml-IN": "Malayalam", "bn-IN": "Bengali",
         "mr-IN": "Marathi", "gu-IN": "Gujarati", "pa-IN": "Punjabi",
-        "ta-en": "Tanglish (Tamil words in Roman/English letters, friendly style like 'bro/machaa', never 'dei')",
+        "ta-en": "Tanglish (Tamil words in Roman/English letters, RESPECTFUL tone using 'neenga'/'ungalukku', NEVER casual 'da/bro/machaa/dei')",
     }
     target = LANG_NAMES_SHORT.get(lang_code, "the target language")
 
@@ -2007,7 +2090,7 @@ def tts():
                       English words like "Python", "function" → en gTTS.
 
     Tanglish (ta-en)→ Tamil gTTS for the entire text. Text is Roman-script Tamil
-                      (e.g. "dei enna panra bro") — Tamil TTS gives it the right
+                      (e.g. "indha function parunga") — Tamil TTS gives it the right
                       Tamil accent. Rate is slowed slightly for clarity.
 
     Telugu (te-IN)  → Word-level split, same as Tamil/Hindi.
@@ -2081,7 +2164,1441 @@ def tts():
         app.logger.error(f"TTS error lang={lang_code}: {exc}")
         return jsonify({"error": f"TTS failed: {str(exc)}"}), 502
 
+# ================= FEATURE 11-16: WORLD-FIRST ROUTES =================
+
+# ── FEATURE PAGE ──────────────────────────────────────────────────────
+
+@app.route("/features")
+@login_required
+def features_page():
+    """World-first feature hub page."""
+    return render_template("codebuddy_world_first.html", username=current_user.username)
+
+
+# ─────────────────────────────────────────────────────────────────────
+# FEATURE 11 — THOUGHT REPLAY DEBUGGER
+# Streams the AI's internal reasoning step-by-step as it debugs code.
+# Each reasoning step is yielded as a JSON line so the frontend can
+# animate them one-by-one onto a visual timeline.
+# ─────────────────────────────────────────────────────────────────────
+
+@app.route("/thought_replay", methods=["POST"])
+@login_required
+@rate_limit(max_calls=20, window=60)
+def thought_replay():
+    """Stream AI reasoning steps for a piece of broken code.
+
+    Yields newline-delimited JSON objects:
+      {"step": 1, "label": "READING CODE", "text": "...", "type": "thinking"}
+      {"step": 2, "label": "BUG FOUND",    "text": "...", "type": "error",  "code": "..."}
+      {"step": N, "label": "COMPLETE",     "text": "...", "type": "done"}
+    """
+    code = (request.json or {}).get("code", "").strip()
+    if not code:
+        return jsonify({"error": "No code provided"}), 400
+
+    system_prompt = """You are CodeBuddy's Thought Replay engine.
+Your job is to debug code by thinking out loud — step by step — like a senior engineer reviewing code.
+
+Output ONLY a JSON array of reasoning steps. Each step is an object with:
+  "label"  : short UPPERCASE title (e.g. "READING CODE", "BUG FOUND", "GENERATING FIX")
+  "text"   : one or two plain sentences describing this thought
+  "type"   : one of "thinking" | "error" | "done"
+  "code"   : (optional) relevant code snippet or diff for this step
+
+Rules:
+- 5 to 8 steps total
+- Last step must be type "done" with the fixed code in "code"
+- Be specific: name the exact line number and variable involved
+- No markdown, no prose outside the JSON array
+- Output ONLY the raw JSON array, nothing else"""
+
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": MODELS["fast"],
+        "max_tokens": 1200,
+        "temperature": 0.3,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"Debug this code:\n\n```\n{code[:2000]}\n```"},
+        ],
+    }
+
+    def generate():
+        try:
+            resp = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers, json=payload, timeout=30
+            )
+            if resp.status_code != 200:
+                yield json.dumps({"error": f"API error {resp.status_code}"}) + "\n"
+                return
+
+            raw = resp.json()["choices"][0]["message"]["content"].strip()
+            # Strip markdown fences if present
+            raw = re.sub(r"```json|```", "", raw).strip()
+            steps = json.loads(raw)
+            if not isinstance(steps, list):
+                steps = [steps]
+
+            for i, step in enumerate(steps):
+                step["step"] = i + 1
+                yield json.dumps(step) + "\n"
+
+        except (requests.RequestException, KeyError, json.JSONDecodeError) as exc:
+            yield json.dumps({"error": str(exc)}) + "\n"
+
+    bump_stat(current_user.id, "debug_count")
+    return Response(generate(), mimetype="application/x-ndjson")
+
+
+# ─────────────────────────────────────────────────────────────────────
+# FEATURE 12 — VOICE-TO-VOICE CODING LOOP
+# Takes transcribed speech text + language, returns a spoken fix.
+# The frontend handles speech-to-text (Web Speech API) and
+# text-to-speech (existing /tts endpoint). This backend endpoint
+# handles the middle step: understanding the spoken problem and
+# generating a clear, speakable fix.
+# ─────────────────────────────────────────────────────────────────────
+
+@app.route("/voice_fix", methods=["POST"])
+@login_required
+@rate_limit(max_calls=30, window=60)
+def voice_fix():
+    """Convert a spoken code problem into a spoken fix.
+
+    Input JSON:
+      text      : transcribed speech from the user
+      lang      : language code (e.g. "en-US", "ta-IN")
+
+    Returns JSON:
+      fix_text  : the plain-language fix (clean, speakable — no markdown)
+      code      : the fixed code snippet (if applicable)
+    """
+    data = request.get_json(silent=True) or {}
+    text = (data.get("text") or "").strip()
+    lang_code = (data.get("lang") or "en-US").strip()
+
+    if not text:
+        return jsonify({"error": "No speech text provided"}), 400
+
+    LANG_NAMES = {
+        "en-US": "English", "ta-IN": "Tamil", "ta-en": "Tanglish",
+        "hi-IN": "Hindi", "te-IN": "Telugu", "kn-IN": "Kannada",
+        "ml-IN": "Malayalam", "bn-IN": "Bengali",
+    }
+    lang_name = LANG_NAMES.get(lang_code, "English")
+
+    system = f"""You are CodeBuddy Voice Assistant. The user spoke their code problem aloud.
+Your response will be READ ALOUD by a text-to-speech engine — so write naturally for speech.
+
+Rules:
+- Respond in {lang_name}
+- NO markdown — no **, no #, no backticks
+- Short sentences — TTS sounds best with short clauses
+- Say "Here is the fix:" before giving code, spoken as words
+- Explain the fix in 2-3 simple sentences
+- Keep the full response under 120 words for natural speech rhythm
+- Be warm and encouraging"""
+
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": get_model_for_mode("general", lang_code),
+        "max_tokens": 300,
+        "temperature": 0.6,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": text[:500]},
+        ],
+    }
+
+    try:
+        resp = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=headers, json=payload, timeout=20
+        )
+        fix_text = resp.json()["choices"][0]["message"]["content"].strip()
+        # Extract code block if present (for display — not spoken)
+        code_match = re.search(r"```[\w]*\n?([\s\S]+?)```", fix_text)
+        code_snippet = code_match.group(1).strip() if code_match else ""
+        # Clean fix text for TTS
+        clean_fix = re.sub(r"```[\s\S]*?```", "see the code above", fix_text)
+        clean_fix = re.sub(r"[`*#]", "", clean_fix).strip()
+        return jsonify({"fix_text": clean_fix, "code": code_snippet})
+    except (requests.RequestException, KeyError, ValueError) as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+# ─────────────────────────────────────────────────────────────────────
+# FEATURE 13 — LIVE CODE BATTLE
+# Manages battle sessions: create, join, submit, judge.
+# Battles are stored in SQLite for persistence and multi-tab support.
+# ─────────────────────────────────────────────────────────────────────
+
+def _init_battle_tables():
+    """Create battle-related DB tables if they don't exist."""
+    conn = sqlite3.connect("codebuddy.db")
+    conn.execute("""CREATE TABLE IF NOT EXISTS battles(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        creator_id INTEGER,
+        problem TEXT,
+        status TEXT DEFAULT 'waiting',
+        created_at TEXT,
+        ended_at TEXT,
+        winner TEXT
+    )""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS battle_entries(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        battle_id INTEGER,
+        user_id INTEGER,
+        code TEXT DEFAULT '',
+        score REAL DEFAULT 0,
+        submitted_at TEXT,
+        UNIQUE(battle_id, user_id)
+    )""")
+    conn.commit()
+    conn.close()
+
+_init_battle_tables()
+
+BATTLE_PROBLEMS = [
+    "Write a function that checks if a string is a palindrome. Handle empty strings, single characters, and mixed case.",
+    "Implement a function to find all duplicate elements in an array. Return them sorted. Handle empty arrays.",
+    "Write a function that reverses words in a sentence without using built-in reverse.",
+    "Implement FizzBuzz — return results as a list for numbers 1 to N. Make it Pythonic.",
+    "Write a function that counts character frequency in a string, sorted by frequency (highest first).",
+    "Implement binary search on a sorted list. Return the index or -1 if not found.",
+    "Write a function that flattens a nested list of arbitrary depth into a single flat list.",
+    "Implement a stack using only two queues. Support push, pop, and peek operations.",
+]
+
+@app.route("/battle/create", methods=["POST"])
+@login_required
+def battle_create():
+    """Create a new battle session. Returns battle_id and problem."""
+    import random
+    problem = random.choice(BATTLE_PROBLEMS)
+    conn = sqlite3.connect("codebuddy.db")
+    conn.row_factory = sqlite3.Row
+    cursor = conn.execute(
+        "INSERT INTO battles(creator_id, problem, status, created_at) VALUES (?,?,?,?)",
+        (current_user.id, problem, "waiting", datetime.now().isoformat())
+    )
+    battle_id = cursor.lastrowid
+    conn.execute(
+        "INSERT INTO battle_entries(battle_id, user_id, submitted_at) VALUES (?,?,?)",
+        (battle_id, current_user.id, datetime.now().isoformat())
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"battle_id": battle_id, "problem": problem, "status": "waiting"})
+
+
+@app.route("/battle/join", methods=["POST"])
+@login_required
+def battle_join():
+    """Join an existing battle by ID."""
+    battle_id = (request.json or {}).get("battle_id")
+    if not battle_id:
+        return jsonify({"error": "battle_id required"}), 400
+
+    conn = sqlite3.connect("codebuddy.db")
+    conn.row_factory = sqlite3.Row
+    battle = conn.execute(
+        "SELECT * FROM battles WHERE id=? AND status='waiting'", (battle_id,)
+    ).fetchone()
+
+    if not battle:
+        conn.close()
+        return jsonify({"error": "Battle not found or already started"}), 404
+
+    try:
+        conn.execute(
+            "INSERT INTO battle_entries(battle_id, user_id, submitted_at) VALUES (?,?,?)",
+            (battle_id, current_user.id, datetime.now().isoformat())
+        )
+        conn.execute(
+            "UPDATE battles SET status='active' WHERE id=?", (battle_id,)
+        )
+        conn.commit()
+    except Exception:
+        conn.close()
+        return jsonify({"error": "Already joined"}), 409
+
+    conn.close()
+    return jsonify({"battle_id": battle_id, "problem": battle["problem"], "status": "active"})
+
+
+@app.route("/battle/update", methods=["POST"])
+@login_required
+def battle_update():
+    """Save live code for a player (called every few seconds while typing)."""
+    data = request.json or {}
+    battle_id = data.get("battle_id")
+    code = data.get("code", "")
+
+    conn = sqlite3.connect("codebuddy.db")
+    conn.execute(
+        "UPDATE battle_entries SET code=? WHERE battle_id=? AND user_id=?",
+        (code[:10000], battle_id, current_user.id)
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "saved"})
+
+
+@app.route("/battle/judge", methods=["POST"])
+@login_required
+@rate_limit(max_calls=10, window=60)
+def battle_judge():
+    """AI-judge both solutions and declare a winner.
+
+    Returns JSON with per-player scores and a verdict.
+    """
+    data = request.json or {}
+    battle_id = data.get("battle_id")
+    code1 = data.get("code1", "")
+    code2 = data.get("code2", "")
+    problem = data.get("problem", "")
+    player1 = data.get("player1", "Player 1")
+    player2 = data.get("player2", "Player 2")
+
+    if not code1.strip() and not code2.strip():
+        return jsonify({"error": "No code to judge"}), 400
+
+    system_prompt = """You are an expert code judge for a live coding battle.
+Evaluate both solutions and return ONLY a JSON object (no markdown) with:
+{
+  "p1_score": <0-100>,
+  "p2_score": <0-100>,
+  "p1_feedback": "<one sentence>",
+  "p2_feedback": "<one sentence>",
+  "winner": "player1" | "player2" | "tie",
+  "verdict": "<2-3 sentence final verdict explaining why the winner won>",
+  "p1_strengths": ["<strength1>", "<strength2>"],
+  "p2_strengths": ["<strength1>", "<strength2>"]
+}
+Score criteria: correctness (40%), efficiency (30%), readability (20%), edge cases (10%)."""
+
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": MODELS["fast"],
+        "max_tokens": 600,
+        "temperature": 0.2,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": (
+                f"Problem: {problem}\n\n"
+                f"--- {player1}'s solution ---\n{code1[:2000]}\n\n"
+                f"--- {player2}'s solution ---\n{code2[:2000]}"
+            )},
+        ],
+    }
+
+    try:
+        resp = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=headers, json=payload, timeout=25
+        )
+        raw = resp.json()["choices"][0]["message"]["content"].strip()
+        raw = re.sub(r"```json|```", "", raw).strip()
+        result = json.loads(raw)
+
+        # Persist winner
+        if battle_id:
+            conn = sqlite3.connect("codebuddy.db")
+            conn.execute(
+                "UPDATE battles SET status='ended', ended_at=?, winner=? WHERE id=?",
+                (datetime.now().isoformat(), result.get("winner", "tie"), battle_id)
+            )
+            conn.commit()
+            conn.close()
+
+        return jsonify(result)
+
+    except (requests.RequestException, KeyError, json.JSONDecodeError, ValueError) as exc:
+        return jsonify({
+            "p1_score": 50, "p2_score": 50, "winner": "tie",
+            "p1_feedback": "Could not analyze.", "p2_feedback": "Could not analyze.",
+            "verdict": f"AI judging failed: {exc}. Scores are equal.",
+            "p1_strengths": [], "p2_strengths": []
+        })
+
+
+@app.route("/battle/status/<int:battle_id>")
+@login_required
+def battle_status(battle_id):
+    """Poll battle status — used to detect when opponent has joined."""
+    conn = sqlite3.connect("codebuddy.db")
+    conn.row_factory = sqlite3.Row
+    battle = conn.execute("SELECT * FROM battles WHERE id=?", (battle_id,)).fetchone()
+    entries = conn.execute(
+        "SELECT user_id, code FROM battle_entries WHERE battle_id=?", (battle_id,)
+    ).fetchall()
+    conn.close()
+    if not battle:
+        return jsonify({"error": "Not found"}), 404
+    # Return opponent's latest code (the other player's code, not current user's)
+    opponent_code = ""
+    for entry in entries:
+        if entry["user_id"] != current_user.id:
+            opponent_code = entry["code"] or ""
+            break
+    return jsonify({
+        "status": battle["status"],
+        "players": len(entries),
+        "winner": battle["winner"],
+        "opponent_code": opponent_code,
+    })
+
+
+# ─────────────────────────────────────────────────────────────────────
+# FEATURE 14 — CODE KARMA SYSTEM
+# Users earn karma by helping others. Karma unlocks features and ranks.
+# ─────────────────────────────────────────────────────────────────────
+
+def _init_karma_tables():
+    """Create karma DB tables."""
+    conn = sqlite3.connect("codebuddy.db")
+    conn.execute("""CREATE TABLE IF NOT EXISTS karma(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER UNIQUE,
+        total INTEGER DEFAULT 0,
+        updated_at TEXT
+    )""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS karma_events(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        event_type TEXT,
+        delta INTEGER,
+        note TEXT,
+        created_at TEXT
+    )""")
+    conn.commit()
+    conn.close()
+
+_init_karma_tables()
+
+KARMA_RULES = {
+    "share_solution":  {"delta": 50,  "label": "Shared a solution"},
+    "explain_concept": {"delta": 30,  "label": "Explained a concept"},
+    "fix_bug":         {"delta": 75,  "label": "Fixed someone's bug"},
+    "blind_review":    {"delta": 40,  "label": "Submitted a blind review"},
+    "battle_win":      {"delta": 100, "label": "Won a code battle"},
+    "battle_play":     {"delta": 20,  "label": "Participated in a battle"},
+    "streak_7":        {"delta": 200, "label": "7-day coding streak"},
+    "streak_30":       {"delta": 1000,"label": "30-day coding streak"},
+}
+
+KARMA_LEVELS = [
+    (0,     "NOVICE"),
+    (500,   "LEARNER"),
+    (1000,  "CODER"),
+    (2000,  "BUILDER"),
+    (2500,  "SAGE"),
+    (5000,  "ORACLE"),
+    (10000, "LEGEND"),
+    (50000, "GODMODE"),
+]
+
+def _get_karma_level(total):
+    """Return the karma level name for a given total."""
+    level = "NOVICE"
+    for threshold, name in KARMA_LEVELS:
+        if total >= threshold:
+            level = name
+    return level
+
+def _add_karma(user_id, event_type, note=""):
+    """Add karma for an event. Returns new total."""
+    rule = KARMA_RULES.get(event_type)
+    if not rule:
+        return 0
+    delta = rule["delta"]
+    conn = sqlite3.connect("codebuddy.db")
+    conn.execute("""
+        INSERT INTO karma(user_id, total, updated_at) VALUES (?,?,datetime('now'))
+        ON CONFLICT(user_id) DO UPDATE SET
+            total = total + ?,
+            updated_at = datetime('now')
+    """, (user_id, delta, delta))
+    conn.execute(
+        "INSERT INTO karma_events(user_id, event_type, delta, note, created_at) VALUES (?,?,?,?,datetime('now'))",
+        (user_id, event_type, delta, note or rule["label"])
+    )
+    conn.commit()
+    row = conn.execute("SELECT total FROM karma WHERE user_id=?", (user_id,)).fetchone()
+    conn.close()
+    return row[0] if row else delta
+
+
+@app.route("/karma/earn", methods=["POST"])
+@login_required
+def karma_earn():
+    """Award karma to the current user for a community action.
+
+    Input JSON:
+      event_type : one of the KARMA_RULES keys
+      note       : optional description
+    """
+    data = request.json or {}
+    event_type = data.get("event_type", "")
+    note = data.get("note", "")[:200]
+
+    if event_type not in KARMA_RULES:
+        return jsonify({"error": f"Unknown event type. Valid: {list(KARMA_RULES.keys())}"}), 400
+
+    new_total = _add_karma(current_user.id, event_type, note)
+    level = _get_karma_level(new_total)
+    delta = KARMA_RULES[event_type]["delta"]
+
+    return jsonify({
+        "delta": delta,
+        "total": new_total,
+        "level": level,
+        "label": KARMA_RULES[event_type]["label"],
+    })
+
+
+@app.route("/karma/me")
+@login_required
+def karma_me():
+    """Return current user's karma total, level, rank, and recent events."""
+    conn = sqlite3.connect("codebuddy.db")
+    conn.row_factory = sqlite3.Row
+
+    row = conn.execute("SELECT total FROM karma WHERE user_id=?", (current_user.id,)).fetchone()
+    total = row["total"] if row else 0
+
+    # Rank = position in global karma leaderboard
+    rank_row = conn.execute(
+        "SELECT COUNT(*)+1 AS rank FROM karma WHERE total > ?", (total,)
+    ).fetchone()
+    rank = rank_row["rank"] if rank_row else 1
+
+    events = conn.execute(
+        "SELECT event_type, delta, note, created_at FROM karma_events WHERE user_id=? ORDER BY id DESC LIMIT 20",
+        (current_user.id,)
+    ).fetchall()
+    conn.close()
+
+    level = _get_karma_level(total)
+    # Find next level threshold
+    next_threshold = total + 500
+    for threshold, name in KARMA_LEVELS:
+        if threshold > total:
+            next_threshold = threshold
+            break
+
+    return jsonify({
+        "total": total,
+        "level": level,
+        "rank": rank,
+        "next_threshold": next_threshold,
+        "progress_pct": min(100, round((total / next_threshold) * 100)),
+        "events": [dict(e) for e in events],
+    })
+
+
+@app.route("/karma/leaderboard")
+def karma_leaderboard():
+    """Public karma leaderboard — top 20 users."""
+    conn = sqlite3.connect("codebuddy.db")
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute("""
+        SELECT u.username, u.avatar_color, k.total
+        FROM karma k
+        JOIN users u ON k.user_id = u.id
+        ORDER BY k.total DESC
+        LIMIT 20
+    """).fetchall()
+    conn.close()
+    result = []
+    for i, r in enumerate(rows):
+        result.append({
+            "rank": i + 1,
+            "username": r["username"],
+            "avatar_color": r["avatar_color"],
+            "total": r["total"],
+            "level": _get_karma_level(r["total"]),
+        })
+    return jsonify({"leaderboard": result})
+
+
+# ─────────────────────────────────────────────────────────────────────
+# FEATURE 15 — REPLAY MY LEARNING
+# Returns the user's conversation history formatted as a learning
+# journey timeline — milestones, insights, stats.
+# ─────────────────────────────────────────────────────────────────────
+
+@app.route("/learning_replay")
+@login_required
+def learning_replay():
+    """Return the user's learning journey as a structured timeline.
+
+    Fetches conversations + first message from each, groups them by
+    month, and returns milestone cards with AI-generated insights.
+    """
+    conn = sqlite3.connect("codebuddy.db")
+    conn.row_factory = sqlite3.Row
+
+    # Get all conversations with their first user message
+    convos = conn.execute("""
+        SELECT c.id, c.title, c.mode, c.created_at,
+               MIN(m.id) as first_msg_id
+        FROM conversations c
+        LEFT JOIN messages m ON m.conversation_id = c.id AND m.role = 'user'
+        WHERE c.user_id = ?
+        GROUP BY c.id
+        ORDER BY c.id ASC
+        LIMIT 100
+    """, (current_user.id,)).fetchall()
+
+    stats = conn.execute(
+        "SELECT * FROM user_stats WHERE user_id=?", (current_user.id,)
+    ).fetchone()
+
+    # Get first messages for each convo
+    timeline = []
+    for c in convos:
+        if c["first_msg_id"]:
+            msg = conn.execute(
+                "SELECT content FROM messages WHERE id=?", (c["first_msg_id"],)
+            ).fetchone()
+            question = msg["content"][:200] if msg else c["title"]
+        else:
+            question = c["title"]
+
+        created = c["created_at"] or ""
+        timeline.append({
+            "id": c["id"],
+            "title": c["title"],
+            "mode": c["mode"],
+            "date": created[:10] if created else "Unknown",
+            "question": question,
+        })
+
+    conn.close()
+
+    # Group into milestones
+    milestones = []
+    if timeline:
+        chunk = max(1, len(timeline) // 5)
+        labels = ["First Steps", "Building Basics", "Going Deeper", "Real Projects", "Advanced Mastery"]
+        for i, label in enumerate(labels):
+            start = i * chunk
+            end = start + chunk if i < 4 else len(timeline)
+            slice_ = timeline[start:end]
+            if slice_:
+                milestones.append({
+                    "label": label,
+                    "count": len(slice_),
+                    "start_date": slice_[0]["date"],
+                    "end_date": slice_[-1]["date"],
+                    "entries": slice_,
+                })
+
+    return jsonify({
+        "milestones": milestones,
+        "total_conversations": len(timeline),
+        "total_messages": stats["total_messages"] if stats else 0,
+        "streak_days": stats["streak_days"] if stats else 0,
+        "debug_count": stats["debug_count"] if stats else 0,
+        "code_runs": stats["code_runs"] if stats else 0,
+    })
+
+
+@app.route("/learning_insight", methods=["POST"])
+@login_required
+@rate_limit(max_calls=10, window=60)
+def learning_insight():
+    """Generate an AI insight for a specific learning milestone.
+
+    Input JSON:
+      questions : list of question strings from that milestone period
+      milestone : label string (e.g. "Building Basics")
+
+    Returns JSON:
+      insight   : one-paragraph motivational + analytical insight
+    """
+    data = request.json or {}
+    questions = data.get("questions", [])[:10]
+    milestone = data.get("milestone", "your learning journey")
+
+    if not questions:
+        return jsonify({"insight": "Keep learning — every question brings you closer to mastery."})
+
+    joined = "\n".join(f"- {q}" for q in questions)
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": MODELS["fast"],
+        "max_tokens": 200,
+        "temperature": 0.7,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "You are a coding coach reviewing a student's learning journey. "
+                    "Given a list of questions they asked during a learning period, "
+                    "write ONE short paragraph (3-4 sentences) that: "
+                    "1) identifies the main skill theme they were learning, "
+                    "2) highlights the most impressive question, "
+                    "3) ends with one motivating observation about their growth. "
+                    "Be specific and warm. No bullet points."
+                ),
+            },
+            {"role": "user", "content": f"Milestone: {milestone}\n\nQuestions:\n{joined}"},
+        ],
+    }
+
+    try:
+        resp = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=headers, json=payload, timeout=20
+        )
+        insight = resp.json()["choices"][0]["message"]["content"].strip()
+        return jsonify({"insight": insight})
+    except (requests.RequestException, KeyError, ValueError):
+        return jsonify({"insight": f"During '{milestone}', you asked great questions that show real depth of curiosity."})
+
+
+# ─────────────────────────────────────────────────────────────────────
+# FEATURE 16 — BLIND CODE REVIEW
+# Users submit code anonymously. Other users review without knowing
+# the author. AI aggregates all reviews into a consensus report.
+# ─────────────────────────────────────────────────────────────────────
+
+def _init_blind_review_tables():
+    """Create blind review DB tables."""
+    conn = sqlite3.connect("codebuddy.db")
+    conn.execute("""CREATE TABLE IF NOT EXISTS blind_submissions(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        anon_id TEXT,
+        code TEXT,
+        language TEXT DEFAULT 'python',
+        status TEXT DEFAULT 'open',
+        created_at TEXT
+    )""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS blind_reviews(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        submission_id INTEGER,
+        reviewer_id INTEGER,
+        reviewer_anon TEXT,
+        stars INTEGER,
+        comment TEXT,
+        created_at TEXT
+    )""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS blind_ai_reports(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        submission_id INTEGER UNIQUE,
+        report TEXT,
+        scores TEXT,
+        generated_at TEXT
+    )""")
+    conn.commit()
+    conn.close()
+
+_init_blind_review_tables()
+
+
+def _generate_anon_id():
+    """Generate a short anonymous ID like ANON_7X4F."""
+    import random, string
+    chars = string.ascii_uppercase + string.digits
+    return "ANON_" + "".join(random.choices(chars, k=4))
+
+
+@app.route("/blind/submit", methods=["POST"])
+@login_required
+@rate_limit(max_calls=10, window=60)
+def blind_submit():
+    """Submit code anonymously for blind review.
+
+    Input JSON:
+      code     : source code string
+      language : programming language name
+    """
+    data = request.json or {}
+    code = (data.get("code") or "").strip()
+    language = (data.get("language") or "python").strip()[:30]
+
+    if not code:
+        return jsonify({"error": "No code provided"}), 400
+    if len(code) > 20000:
+        return jsonify({"error": "Code too long (max 20,000 chars)"}), 400
+
+    anon_id = _generate_anon_id()
+    conn = sqlite3.connect("codebuddy.db")
+    cursor = conn.execute(
+        "INSERT INTO blind_submissions(user_id, anon_id, code, language, created_at) VALUES (?,?,?,?,datetime('now'))",
+        (current_user.id, anon_id, code, language)
+    )
+    submission_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+
+    # Award karma for submitting
+    _add_karma(current_user.id, "blind_review", "Submitted code for blind review")
+
+    return jsonify({
+        "submission_id": submission_id,
+        "anon_id": anon_id,
+        "status": "open",
+        "message": "Code submitted anonymously. You'll receive reviews soon.",
+    })
+
+
+@app.route("/blind/queue")
+@login_required
+def blind_queue():
+    """Get open submissions available to review (excluding own submissions)."""
+    conn = sqlite3.connect("codebuddy.db")
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute("""
+        SELECT bs.id, bs.anon_id, bs.language, bs.created_at,
+               SUBSTR(bs.code, 1, 300) as preview,
+               COUNT(br.id) as review_count
+        FROM blind_submissions bs
+        LEFT JOIN blind_reviews br ON br.submission_id = bs.id
+        WHERE bs.user_id != ? AND bs.status = 'open'
+        GROUP BY bs.id
+        ORDER BY review_count ASC, bs.id DESC
+        LIMIT 20
+    """, (current_user.id,)).fetchall()
+    conn.close()
+    return jsonify({"submissions": [dict(r) for r in rows]})
+
+
+@app.route("/blind/review", methods=["POST"])
+@login_required
+@rate_limit(max_calls=20, window=60)
+def blind_review_submit():
+    """Submit a review for a blind submission.
+
+    Input JSON:
+      submission_id : ID of the submission
+      stars         : 1-5
+      comment       : review text
+    """
+    data = request.json or {}
+    submission_id = data.get("submission_id")
+    stars = int(data.get("stars", 3))
+    comment = (data.get("comment") or "").strip()[:1000]
+
+    if not submission_id or not comment:
+        return jsonify({"error": "submission_id and comment required"}), 400
+    stars = max(1, min(5, stars))
+
+    conn = sqlite3.connect("codebuddy.db")
+    conn.row_factory = sqlite3.Row
+
+    # Can't review own submission
+    own = conn.execute(
+        "SELECT id FROM blind_submissions WHERE id=? AND user_id=?",
+        (submission_id, current_user.id)
+    ).fetchone()
+    if own:
+        conn.close()
+        return jsonify({"error": "Cannot review your own submission"}), 403
+
+    # Can't review twice
+    already = conn.execute(
+        "SELECT id FROM blind_reviews WHERE submission_id=? AND reviewer_id=?",
+        (submission_id, current_user.id)
+    ).fetchone()
+    if already:
+        conn.close()
+        return jsonify({"error": "Already reviewed this submission"}), 409
+
+    reviewer_anon = _generate_anon_id()
+    conn.execute(
+        "INSERT INTO blind_reviews(submission_id, reviewer_id, reviewer_anon, stars, comment, created_at) VALUES (?,?,?,?,?,datetime('now'))",
+        (submission_id, current_user.id, reviewer_anon, stars, comment)
+    )
+    conn.commit()
+
+    # Count reviews for this submission
+    count = conn.execute(
+        "SELECT COUNT(*) as cnt FROM blind_reviews WHERE submission_id=?",
+        (submission_id,)
+    ).fetchone()["cnt"]
+    conn.close()
+
+    # Award karma for reviewing
+    _add_karma(current_user.id, "blind_review", "Reviewed anonymous code")
+
+    # Auto-generate AI report when 3+ reviews received
+    if count >= 3:
+        _trigger_ai_report(submission_id)
+
+    return jsonify({"status": "review submitted", "total_reviews": count})
+
+
+@app.route("/blind/reviews/<int:submission_id>")
+@login_required
+def blind_get_reviews(submission_id):
+    """Get all reviews for a submission (only accessible to the author or all after 3 reviews)."""
+    conn = sqlite3.connect("codebuddy.db")
+    conn.row_factory = sqlite3.Row
+
+    sub = conn.execute(
+        "SELECT * FROM blind_submissions WHERE id=?", (submission_id,)
+    ).fetchone()
+    if not sub:
+        conn.close()
+        return jsonify({"error": "Not found"}), 404
+
+    reviews = conn.execute(
+        "SELECT reviewer_anon, stars, comment, created_at FROM blind_reviews WHERE submission_id=? ORDER BY id ASC",
+        (submission_id,)
+    ).fetchall()
+
+    ai_report_row = conn.execute(
+        "SELECT report, scores FROM blind_ai_reports WHERE submission_id=?", (submission_id,)
+    ).fetchone()
+    conn.close()
+
+    ai_report = None
+    if ai_report_row:
+        try:
+            ai_report = {
+                "report": ai_report_row["report"],
+                "scores": json.loads(ai_report_row["scores"] or "{}"),
+            }
+        except (json.JSONDecodeError, TypeError):
+            ai_report = {"report": ai_report_row["report"], "scores": {}}
+
+    return jsonify({
+        "submission_id": submission_id,
+        "anon_id": sub["anon_id"],
+        "language": sub["language"],
+        "is_author": sub["user_id"] == current_user.id,
+        "reviews": [dict(r) for r in reviews],
+        "ai_report": ai_report,
+    })
+
+
+def _trigger_ai_report(submission_id):
+    """Generate and store an AI consensus report for a submission (background)."""
+    try:
+        conn = sqlite3.connect("codebuddy.db")
+        conn.row_factory = sqlite3.Row
+
+        sub = conn.execute(
+            "SELECT code, language FROM blind_submissions WHERE id=?", (submission_id,)
+        ).fetchone()
+        reviews = conn.execute(
+            "SELECT stars, comment FROM blind_reviews WHERE submission_id=?", (submission_id,)
+        ).fetchall()
+        conn.close()
+
+        if not sub or not reviews:
+            return
+
+        review_text = "\n".join(
+            f"Reviewer rated {r['stars']}/5: {r['comment']}" for r in reviews
+        )
+
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": MODELS["fast"],
+            "max_tokens": 600,
+            "temperature": 0.3,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are an AI code review synthesizer. Given code and multiple human reviews, "
+                        "produce a JSON object (no markdown) with:\n"
+                        "{\n"
+                        "  \"summary\": \"<2-3 sentence overall assessment>\",\n"
+                        "  \"consensus\": \"<what all reviewers agreed on>\",\n"
+                        "  \"top_fix\": \"<the single most important improvement>\",\n"
+                        "  \"scores\": {\"quality\": <1-10>, \"style\": <1-10>, \"readability\": <1-10>, \"robustness\": <1-10>}\n"
+                        "}"
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        f"Language: {sub['language']}\n\n"
+                        f"Code:\n{sub['code'][:1500]}\n\n"
+                        f"Reviews:\n{review_text}"
+                    ),
+                },
+            ],
+        }
+
+        resp = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=headers, json=payload, timeout=25
+        )
+        raw = resp.json()["choices"][0]["message"]["content"].strip()
+        raw = re.sub(r"```json|```", "", raw).strip()
+        result = json.loads(raw)
+
+        conn2 = sqlite3.connect("codebuddy.db")
+        conn2.execute("""
+            INSERT INTO blind_ai_reports(submission_id, report, scores, generated_at)
+            VALUES (?,?,?,datetime('now'))
+            ON CONFLICT(submission_id) DO UPDATE SET
+                report=excluded.report,
+                scores=excluded.scores,
+                generated_at=excluded.generated_at
+        """, (
+            submission_id,
+            result.get("summary", "") + "\n\n" + result.get("consensus", "") + "\n\nTop fix: " + result.get("top_fix", ""),
+            json.dumps(result.get("scores", {})),
+        ))
+        conn2.commit()
+        conn2.close()
+
+    except Exception as exc:
+        app.logger.warning(f"AI report generation failed for submission {submission_id}: {exc}")
+
+
+@app.route("/blind/my_submissions")
+@login_required
+def blind_my_submissions():
+    """Get all blind submissions made by the current user."""
+    conn = sqlite3.connect("codebuddy.db")
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute("""
+        SELECT bs.id, bs.anon_id, bs.language, bs.status, bs.created_at,
+               COUNT(br.id) as review_count,
+               AVG(br.stars) as avg_stars
+        FROM blind_submissions bs
+        LEFT JOIN blind_reviews br ON br.submission_id = bs.id
+        WHERE bs.user_id = ?
+        GROUP BY bs.id
+        ORDER BY bs.id DESC
+    """, (current_user.id,)).fetchall()
+    conn.close()
+    return jsonify({"submissions": [dict(r) for r in rows]})
+
+
+# ================= FILE FORGE: EDIT FILE =================
+
+@app.route("/edit_file", methods=["POST"])
+@login_required
+def edit_file():
+    """AI-powered file editor — streams back the edited code."""
+    data = request.get_json(force=True)
+    original = (data.get("original") or "")[:8000]
+    instruction = (data.get("instruction") or "").strip()
+    filename = (data.get("filename") or "file.py").strip()
+    lang_code = (data.get("lang") or "en-US").strip()
+
+    if not original or not instruction:
+        return jsonify({"error": "Missing original code or instruction"}), 400
+
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else "py"
+
+    system_prompt = (
+        "You are an expert code editor. "
+        "The user will give you a file and an instruction. "
+        "Apply the instruction to the file and return ONLY the full updated code "
+        f"inside a single ```{ext} ... ``` fenced block. "
+        "Do not add explanations before or after the code block."
+    )
+
+    user_prompt = (
+        f"File: `{filename}`\n\n"
+        f"Instruction: {instruction}\n\n"
+        f"```{ext}\n{original}\n```"
+    )
+
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": get_model_for_mode("general", lang_code),
+        "max_tokens": 4096,
+        "temperature": 0.2,
+        "stream": True,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user",   "content": user_prompt},
+        ],
+    }
+
+    def generate():
+        try:
+            with requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers, json=payload, stream=True, timeout=60
+            ) as resp:
+                for line in resp.iter_lines():
+                    if not line:
+                        continue
+                    decoded = line.decode("utf-8", errors="ignore")
+                    if decoded.startswith("data: "):
+                        chunk = decoded[6:]
+                        if chunk.strip() == "[DONE]":
+                            break
+                        try:
+                            delta = json.loads(chunk)["choices"][0]["delta"].get("content", "")
+                            if delta:
+                                yield delta
+                        except Exception:
+                            pass
+        except Exception as exc:
+            yield f"\n\n[Error: {exc}]"
+
+    return Response(generate(), mimetype="text/plain")
+
+
+# ================= FILE FORGE: AUTOCOMPLETE =================
+
+@app.route("/autocomplete", methods=["POST"])
+@login_required
+def autocomplete():
+    """Return up to 3 short code completions for the cursor position."""
+    data = request.get_json(force=True)
+    before   = (data.get("before") or "")[-1500:]   # last 1500 chars before cursor
+    after    = (data.get("after")  or "")[:400]      # first 400 chars after cursor
+    language = (data.get("language") or "python").strip()
+    lang_code = (data.get("lang") or "en-US").strip()
+    filename  = (data.get("filename") or "").strip()
+
+    system_prompt = (
+        "You are an AI code autocomplete engine. "
+        "Given the code before and after the cursor, suggest up to 3 short completions. "
+        "Rules:\n"
+        "- Return ONLY a JSON array of strings, no markdown, no explanation.\n"
+        "- Each string is a code snippet (1-5 lines) that fits naturally at the cursor.\n"
+        "- If the language is Tanglish (ta-en), add a short Tamil comment as the first "
+        "  line starting with `# ` so the user sees a bilingual hint.\n"
+        "- Keep each completion under 200 characters.\n"
+        "- Example output: [\"return result\", \"result = []\", \"for i in range(n):\\n    pass\"]"
+    )
+
+    user_prompt = (
+        f"Language: {language}\n"
+        f"File: {filename or 'untitled'}\n\n"
+        f"<before_cursor>\n{before}\n</before_cursor>\n\n"
+        f"<after_cursor>\n{after}\n</after_cursor>"
+    )
+
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": MODELS["fast"],   # Llama 3.3 70B — fast & multilingual
+        "max_tokens": 300,
+        "temperature": 0.2,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user",   "content": user_prompt},
+        ],
+    }
+
+    try:
+        resp = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=headers, json=payload, timeout=15
+        )
+        raw = resp.json()["choices"][0]["message"]["content"].strip()
+        # Strip any accidental markdown fences
+        raw = re.sub(r"```json|```", "", raw).strip()
+        completions = json.loads(raw)
+        if not isinstance(completions, list):
+            completions = []
+        # Sanitise — keep only strings, max 3
+        completions = [str(c) for c in completions if c][:3]
+        return jsonify({"completions": completions})
+    except Exception as exc:
+        app.logger.warning(f"Autocomplete failed: {exc}")
+        return jsonify({"completions": []})
+
+
 # ================= RUN APP =================
+
+
+# ═══════════════════════════════════════════════════
+# VOICE CLONE — Save/retrieve user voice, TTS in user voice
+# ═══════════════════════════════════════════════════
+import os as _vc_os, datetime as _vc_dt, json as _vc_json
+
+_VOICE_DIR = _vc_os.path.join(_vc_os.path.dirname(_vc_os.path.abspath(__file__)), "voice_profiles")
+_vc_os.makedirs(_VOICE_DIR, exist_ok=True)
+
+def _vc_path(user_id):
+    """Path to raw audio file (kept only for duration check, not played back)."""
+    return _vc_os.path.join(_VOICE_DIR, f"user_{user_id}.webm")
+
+def _vc_meta_path(user_id):
+    """Path to JSON metadata — stores detected language + profile info."""
+    return _vc_os.path.join(_VOICE_DIR, f"user_{user_id}.json")
+
+def _vc_detect_language_from_transcript(transcript):
+    """Detect language from transcribed text.
+    
+    The browser's Web Speech API gives us a transcript of what the user said.
+    We detect language from:
+    1. Unicode script ranges (instant, no API call needed for Indic scripts)
+    2. AI text classifier as fallback for ambiguous/Latin-script languages
+    
+    Returns (lang_code, lang_name)
+    """
+    if not transcript or not transcript.strip():
+        return "en-US", "English"
+
+    text = transcript.strip()
+
+    # ── Step 1: Script-based detection (instant, 100% accurate for Indic) ──
+    # Unicode block ranges for each script
+    script_map = [
+        ('஀', '௿', "ta-IN", "Tamil"),
+        ('ఀ', '౿', "te-IN", "Telugu"),
+        ('ಀ', '೿', "kn-IN", "Kannada"),
+        ('ഀ', 'ൿ', "ml-IN", "Malayalam"),
+        ('ঀ', '৿', "bn-IN", "Bengali"),
+        ('ऀ', 'ॿ', "hi-IN", "Hindi"),   # also Marathi
+        ('਀', '੿', "pa-IN", "Punjabi"),
+        ('઀', '૿', "gu-IN", "Gujarati"),
+        ('؀', 'ۿ', "ar-SA", "Arabic"),
+        ('一', '鿿', "zh-CN", "Chinese"),
+        ('぀', 'ヿ', "ja-JP", "Japanese"),
+        ('가', '힯', "ko-KR", "Korean"),
+        ('Ѐ', 'ӿ', "ru-RU", "Russian"),
+    ]
+    for start, end, code, name in script_map:
+        if any(start <= c <= end for c in text):
+            return code, name
+
+    # ── Step 2: AI classifier for Latin-script languages ───────────────────
+    # English, Tamil written in Roman (Tanglish), French, German, Spanish, etc.
+    try:
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": MODELS["classifier"],
+            "max_tokens": 30,
+            "temperature": 0,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "Detect the language of the text. "
+                        "Reply ONLY as JSON with keys lang and name. "
+                        "Use BCP47 codes: en-US, ta-en, fr-FR, de-DE, es-ES, pt-BR, ja-JP, ko-KR. "
+                        "Example output: lang=en-US name=English"
+                    )
+                },
+                {"role": "user", "content": text[:300]}
+            ]
+        }
+        resp = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=headers, json=payload, timeout=(5, 8)
+        )
+        if resp.status_code == 200:
+            raw = resp.json()["choices"][0]["message"]["content"].strip()
+            # Parse "lang=en-US name=English" format
+            lang, name = "en-US", "English"
+            for part in raw.replace(",", " ").split():
+                if part.startswith("lang="):
+                    lang = part[5:].strip().strip('"').strip("'")
+                elif part.startswith("name="):
+                    name = part[5:].strip().strip('"').strip("'")
+            valid = {"en-US","ta-en","fr-FR","de-DE","es-ES","pt-BR","ja-JP","ko-KR"}
+            if lang in valid:
+                return lang, name
+    except Exception as e:
+        app.logger.warning(f"AI language classifier failed: {e}")
+
+    return "en-US", "English"
+
+@app.route("/voice_clone/status")
+@login_required
+def voice_clone_status():
+    """Check if current user has a voice profile and return detected language."""
+    meta_path = _vc_meta_path(current_user.id)
+    if _vc_os.path.exists(meta_path):
+        try:
+            with open(meta_path, "r") as f:
+                meta = _vc_json.load(f)
+            return jsonify({
+                "has_profile": True,
+                "profile_id": f"voice_{current_user.id}",
+                "created_at": meta.get("created_at", ""),
+                "detected_lang": meta.get("detected_lang", "en-US"),
+                "detected_lang_name": meta.get("detected_lang_name", "English"),
+            })
+        except Exception:
+            pass
+    return jsonify({"has_profile": False})
+
+@app.route("/voice_clone/delete", methods=["POST"])
+@login_required
+def voice_clone_delete():
+    """Delete the user voice profile — removes both audio and metadata files from disk."""
+    deleted = []
+    for path in [_vc_path(current_user.id), _vc_meta_path(current_user.id)]:
+        if _vc_os.path.exists(path):
+            try:
+                _vc_os.remove(path)
+                deleted.append(_vc_os.path.basename(path))
+            except Exception as e:
+                app.logger.warning(f"Could not delete {path}: {e}")
+    return jsonify({"deleted": True, "files": deleted})
+
+@app.route("/voice_clone/upload", methods=["POST"])
+@login_required
+@rate_limit(max_calls=10, window=60)
+def voice_clone_upload():
+    """Save voice language profile.
+    
+    The browser records audio AND transcribes it via Web Speech API simultaneously.
+    The transcript is sent here for language detection — we detect from the actual
+    words spoken (Unicode script + AI classifier), NOT from audio bytes.
+    
+    When PLAY is pressed, gTTS generates the AI answer in the detected language.
+    """
+    # Get transcript from browser STT (the real language signal)
+    transcript = (request.form.get("transcript") or "").strip()
+    lang_hint   = (request.form.get("lang_hint") or "").strip()  # BCP-47 hint from browser STT
+
+    # Audio file is optional — only used to confirm something was recorded
+    audio_file = request.files.get("audio")
+    if audio_file:
+        data = audio_file.read()
+        if len(data) < 500:
+            return jsonify({"error": "Recording too short — speak for at least 3 seconds"}), 400
+
+    # ── Detect language ──────────────────────────────────────────────────────
+    # Priority 1: lang_hint from browser (browser already knows the language code)
+    # Priority 2: detect from transcript text
+    # Priority 3: default to English
+    LANG_NAMES = {
+        "en-US": "English", "ta-IN": "Tamil", "ta-en": "Tanglish",
+        "hi-IN": "Hindi", "te-IN": "Telugu", "kn-IN": "Kannada",
+        "ml-IN": "Malayalam", "bn-IN": "Bengali", "mr-IN": "Marathi",
+        "pa-IN": "Punjabi", "gu-IN": "Gujarati", "fr-FR": "French",
+        "de-DE": "German", "es-ES": "Spanish", "ja-JP": "Japanese",
+        "zh-CN": "Chinese", "ko-KR": "Korean", "ar-SA": "Arabic",
+        "ru-RU": "Russian", "pt-BR": "Portuguese",
+    }
+
+    if lang_hint and lang_hint in LANG_NAMES:
+        detected_lang = lang_hint
+        detected_lang_name = LANG_NAMES[lang_hint]
+    elif transcript:
+        detected_lang, detected_lang_name = _vc_detect_language_from_transcript(transcript)
+    else:
+        detected_lang, detected_lang_name = "en-US", "English"
+
+    # Save metadata JSON — this is what drives all TTS output
+    meta = {
+        "detected_lang": detected_lang,
+        "detected_lang_name": detected_lang_name,
+        "transcript": transcript[:200],  # store snippet for debug
+        "created_at": _vc_dt.datetime.now().isoformat(),
+        "profile_id": f"voice_{current_user.id}",
+    }
+    with open(_vc_meta_path(current_user.id), "w") as f:
+        _vc_json.dump(meta, f)
+
+    return jsonify({
+        "profile_id": f"voice_{current_user.id}",
+        "status": "active",
+        "detected_lang": detected_lang,
+        "detected_lang_name": detected_lang_name,
+        "message": f"Language detected: {detected_lang_name}. All PLAY buttons will now speak AI answers in {detected_lang_name}."
+    })
+
+@app.route("/voice_clone/tts", methods=["POST"])
+@login_required
+@rate_limit(max_calls=60, window=60)
+def voice_clone_tts():
+    """Generate TTS using the user\'s detected voice language.
+    
+    Flow:
+    1. User records voice → language detected → saved in JSON profile
+    2. When PLAY is pressed → this route reads the saved language
+    3. Generates gTTS audio in that detected language with the correct AI answer text
+    4. Falls back to the selected UI language if no profile exists
+    
+    The user\'s voice is ANALYSED (language detected), NOT played back.
+    The output is always the correct AI answer in the correct language.
+    """
+    if not _GTTS_OK:
+        return jsonify({"error": "gTTS not installed. Run: pip install gtts"}), 503
+
+    req_data = request.get_json(silent=True) or {}
+    raw = (req_data.get("text") or "").strip()[:2000]
+    ui_lang = (req_data.get("lang") or "en-US").strip()
+
+    if not raw:
+        return jsonify({"error": "No text provided"}), 400
+
+    # ── Determine which language to speak in ─────────────────────────────────
+    # Priority 1: user\'s detected voice language (from profile)
+    # Priority 2: current UI language selection
+    lang_code = ui_lang  # default to UI selection
+    meta_path = _vc_meta_path(current_user.id)
+    if _vc_os.path.exists(meta_path):
+        try:
+            with open(meta_path, "r") as f:
+                meta = _vc_json.load(f)
+            profile_lang = meta.get("detected_lang", "").strip()
+            if profile_lang:
+                lang_code = profile_lang  # use detected voice language
+        except Exception:
+            pass
+
+    # ── Generate TTS in the detected/selected language ────────────────────────
+    text = _clean_for_tts(raw)
+    if not text:
+        return jsonify({"error": "Text empty after cleaning"}), 400
+
+    gtts_lang = TTS_LANG_MAP.get(lang_code)
+    if not gtts_lang:
+        # Fallback to UI lang if detected lang not in TTS map
+        gtts_lang = TTS_LANG_MAP.get(ui_lang, "en")
+
+    is_tanglish = (lang_code == "ta-en")
+    try:
+        segments = _smart_split(text, gtts_lang, is_tanglish=is_tanglish)
+        chunks = []
+        for seg_lang, seg_text in segments:
+            if not seg_text.strip():
+                continue
+            try:
+                use_slow = is_tanglish or (seg_lang == "en" and len(seg_text.split()) <= 3)
+                chunks.append(_gtts_chunk(seg_text, seg_lang, slow=use_slow))
+            except Exception as e:
+                app.logger.warning(f"voice_clone TTS chunk failed lang={seg_lang}: {e}")
+        if not chunks:
+            return jsonify({"error": "TTS generation failed"}), 502
+        return Response(b"".join(chunks), mimetype="audio/mpeg",
+                        headers={"Cache-Control": "no-cache",
+                                 "X-Detected-Lang": lang_code})
+    except Exception as exc:
+        app.logger.error(f"voice_clone TTS error: {exc}")
+        return jsonify({"error": f"TTS failed: {str(exc)}"}), 502
+
 
 if __name__ == "__main__":
     app.run(debug=True, host="127.0.0.1", port=5000)

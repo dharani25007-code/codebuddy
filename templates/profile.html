@@ -429,15 +429,15 @@ body::after {
     <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-label">Total Chats</div>
-        <div class="stat-val" id="totalChats">—</div>
+        <div class="stat-val" id="totalChats">{{ stats.total_messages if stats else '—' }}</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Messages</div>
-        <div class="stat-val nova" id="totalMsgs">—</div>
+        <div class="stat-val nova" id="totalMsgs">{{ stats.total_messages if stats else '—' }}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Active Since</div>
-        <div class="stat-val gold" style="font-size:14px;margin-top:4px" id="activeSince">—</div>
+        <div class="stat-label">Streak</div>
+        <div class="stat-val gold" style="font-size:14px;margin-top:4px" id="activeSince">🔥 {{ stats.streak_days if stats else 0 }}d</div>
       </div>
     </div>
   </div>
@@ -459,7 +459,15 @@ body::after {
     </div>
     <div class="info-row">
       <div class="info-key">Interface</div>
-      <div class="info-val">CodeBuddy UI · v3.0</div>
+      <div class="info-val">CodeBuddy UI · v5.0</div>
+    </div>
+    <div class="info-row">
+      <div class="info-key">Bugs Fixed</div>
+      <div class="info-val">{{ stats.debug_count if stats else 0 }}</div>
+    </div>
+    <div class="info-row">
+      <div class="info-key">Code Runs</div>
+      <div class="info-val">{{ stats.code_runs if stats else 0 }}</div>
     </div>
     <div class="info-row">
       <div class="info-key">Session Time</div>
@@ -536,9 +544,7 @@ function updateSessionTime(){
 setInterval(updateSessionTime,1000);
 updateSessionTime();
 
-/* ── ACTIVE SINCE ── */
-document.getElementById('activeSince').textContent =
-  new Date().toLocaleDateString('en-US',{month:'short',year:'numeric'});
+/* ── ACTIVE SINCE — rendered server-side ── */
 
 /* ── NEURAL CANVAS ── */
 (function(){

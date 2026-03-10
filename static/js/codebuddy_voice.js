@@ -34,6 +34,8 @@
     autoSpeak: false,
     codeContext: true,
     initialized: false,
+    onSpeakEnd: null,   // fired when audio finishes — used by PLAY button to reset UI
+    onSpeakStart: null, // fired when audio starts — used by PLAY button to show STOP
   };
 
   /* ═══════════════════════════════════════════════════════
@@ -252,6 +254,49 @@
     'self dot': 'self.',
   };
 
+  // CODE_SYMBOLS_WITH_DESC: [symbol, description] for the SYMBOLS tab UI
+  const CODE_SYMBOLS_WITH_DESC = {
+    'arrow function':        [' => ',  'Arrow function — shorthand for function()'],
+    'arrow':                 [' => ',  'Same as arrow function'],
+    'equals equals':         [' === ', 'Strict equality — checks value AND type'],
+    'not equals':            [' !== ', 'Strict inequality — true if different value or type'],
+    'greater than or equal': [' >= ',  'Comparison — true if left is bigger or same'],
+    'less than or equal':    [' <= ',  'Comparison — true if left is smaller or same'],
+    'double pipe':           [' || ',  'Logical OR — true if either side is true'],
+    'double ampersand':      [' && ',  'Logical AND — true only if both sides are true'],
+    'spread operator':       ['...',   'Spread — expands array/object into individual items'],
+    'optional chain':        ['?.',    'Optional chain — safely access property, null if missing'],
+    'nullish coalescing':    [' ?? ',  'Nullish — use right side only if left is null/undefined'],
+    'plus equals':           [' += ',  'Add and assign — x += 3 means x = x + 3'],
+    'minus equals':          [' -= ',  'Subtract and assign — x -= 3 means x = x - 3'],
+    'times equals':          [' *= ',  'Multiply and assign — x *= 2 means x = x * 2'],
+    'divide equals':         [' /= ',  'Divide and assign — x /= 2 means x = x / 2'],
+    'open bracket':          ['[',     'Start of array or index access'],
+    'close bracket':         [']',     'End of array or index access'],
+    'open brace':            ['{',     'Start of object, block, or function body'],
+    'close brace':           ['}',     'End of object, block, or function body'],
+    'open paren':            ['(',     'Start of function call or expression group'],
+    'close paren':           [')',     'End of function call or expression group'],
+    'semicolon':             [';',     'Statement terminator — ends a line of code'],
+    'colon':                 [':',     'Key-value separator in objects'],
+    'dot':                   ['.',     'Property accessor — obj.property'],
+    'comma':                 [',',     'Separator — between items in list, function args'],
+    'hash':                  ['#',     'Private class field prefix, or CSS ID selector'],
+    'at sign':               ['@',     'Decorator syntax — @decorator before class/method'],
+    'dollar sign':           ['$',     'Variable prefix in template literals: ${var}'],
+    'backtick':              ['`',     'Template literal — allows ${expressions} inside'],
+    'double quote':          ['"',     'String delimiter'],
+    'single quote':          ["'",     'String delimiter'],
+    'console log':           ['console.log()', 'Print to browser DevTools console'],
+    'console error':         ['console.error()', 'Print error (red) to console'],
+    'return statement':      ['return ', 'Return a value from a function'],
+    'const variable':        ['const ', 'Declare constant — cannot be reassigned'],
+    'let variable':          ['let ',   'Declare block-scoped variable — can be reassigned'],
+    'async function':        ['async function ', 'Declare async function — can use await inside'],
+  };
+
+
+
   const PROG_LANGS = [
     'python', 'javascript', 'typescript', 'java', 'c', 'cpp', 'c#', 'csharp',
     'go', 'golang', 'rust', 'ruby', 'php', 'swift', 'kotlin', 'scala', 'r',
@@ -401,7 +446,7 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
     <div class="cb-divider"></div>
     <div id="cbStatus" class="idle">IDLE</div>
     <div class="cb-divider"></div>
-    <button class="cbCtrl" id="cbPauseBtn" onclick="CBVoice.pause()" title="Pause speech">⏸</button>
+    <button class="cbCtrl" id="cbPauseBtn" onclick="CBVoice.togglePause()" title="Pause speech">⏸</button>
     <button class="cbCtrl" id="cbStopBtn" onclick="CBVoice.stop()" title="Stop speech">⏹</button>
     <div class="cb-divider"></div>
     <button id="cbUploadBtn" title="Upload file for AI analysis" onclick="document.getElementById('cbFileInput').click()">📎</button>
@@ -481,14 +526,19 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
         <div class="cbSymRow"><span class="cbSymPhrase">"Stop speaking"</span><span class="cbSymResult">Silence TTS</span></div>
       </div>
       <div class="cbPanelSection" id="cbTab-symbols">
-        <div class="cbSymLabel">SAY THIS → GET CODE</div>
-        ${Object.entries(CODE_SYMBOLS).slice(0, 20).map(([k, v]) => `
-          <div class="cbSymRow">
-            <span class="cbSymPhrase">"${k}"</span>
-            <span class="cbSymResult">${v.replace(/\n/g, '↵').replace(/\t/g, '→')}</span>
+        <div class="cbSymLabel">🎙 SAY THIS → GET CODE SYMBOL</div>
+        <div style="font-family:IBM Plex Mono,monospace;font-size:9px;color:rgba(226,244,255,0.3);margin-bottom:10px;line-height:1.6">
+          Speak these phrases while coding by voice. They are replaced with the exact symbol in your code editor.
+        </div>
+        ${Object.entries(CODE_SYMBOLS_WITH_DESC).map(([k, [sym, desc]]) => `
+          <div class="cbSymRow" style="flex-direction:column;align-items:flex-start;gap:2px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.04)">
+            <div style="display:flex;justify-content:space-between;width:100%;align-items:center">
+              <span class="cbSymPhrase" style="font-size:10px">"${k}"</span>
+              <span class="cbSymResult" style="font-size:13px;min-width:36px;text-align:center">${sym.replace(/\n/g,'↵').replace(/\t/g,'→')}</span>
+            </div>
+            <span style="font-family:IBM Plex Mono,monospace;font-size:9px;color:rgba(0,255,224,0.4);margin-top:2px">${desc}</span>
           </div>
         `).join('')}
-        <div style="margin-top:8px;text-align:center;font-family:Orbitron,monospace;font-size:7px;letter-spacing:2px;color:rgba(226,244,255,0.2)">+ ${Object.keys(CODE_SYMBOLS).length - 20} MORE SYMBOLS</div>
       </div>
       <div class="cbPanelSection" id="cbTab-history">
         <div id="cbHistoryList" style="font-family:IBM Plex Mono,monospace;font-size:10px;color:rgba(226,244,255,0.3)">No voice interactions yet.</div>
@@ -671,6 +721,8 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
   }
 
   let _currentAudio = null;
+  let _pendingController = null;  // AbortController for in-flight TTS fetch
+
 
   // Maps UI lang code → backend /tts lang param
   // ta-en (Tanglish) sends 'ta-en' so backend uses Tamil voice for whole response
@@ -700,27 +752,45 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
   // ── _speakViaGTTS: internal helper — sends text+lang to gTTS backend ────────
   // Called by speak() for normal path AND by auto-translate callback.
   function _speakViaGTTS(text, activeLang) {
-    const ttsLang = LANG_TO_TTS[activeLang] || activeLang;
-    const browserLang = LANG_TO_BROWSER[activeLang] || activeLang;
+    // ── If voice clone is active, use the detected language from the profile ──
+    // window._vcDetectedLang is set by VoiceClone after upload/checkStatus.
+    // The backend also reads it from the JSON profile as a safety net,
+    // but we send it explicitly here so it's always correct.
+    const effectiveLang = (window._hasVoiceClone && window._vcDetectedLang)
+      ? window._vcDetectedLang
+      : activeLang;
+
+    const ttsLang = LANG_TO_TTS[effectiveLang] || effectiveLang;
+
+    // ── CRITICAL: kill browser TTS immediately before starting gTTS ──────────
+    // Without this, any queued/running speechSynthesis utterance keeps playing
+    // alongside the gTTS audio, causing the double-voice (male+female) bug.
+    if (STATE.synth) STATE.synth.cancel();
+    STATE.currentUtterance = null;
 
     setStatus('SPEAKING', 'speaking');
     animateWaveformSpeak(true);
     STATE.isSpeaking = true;
-    addHistory('TTS', '[' + activeLang + '] ' + text.slice(0, 80) + '...');
+    addHistory('TTS', '[' + effectiveLang + '] ' + text.slice(0, 80) + '...');
 
-    const isTanglish = (activeLang === 'ta-en');
+    const isTanglish = (effectiveLang === 'ta-en');
     const effectiveRate = isTanglish ? Math.min(STATE.rate, 0.85) : Math.min(Math.max(STATE.rate, 0.5), 2.0);
 
-    fetch('/tts', {
+    if (_pendingController) { try { _pendingController.abort(); } catch(e){} }
+    _pendingController = new AbortController();
+    fetch(window._hasVoiceClone ? '/voice_clone/tts' : '/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: text, lang: ttsLang })
+      body: JSON.stringify({ text: text, lang: ttsLang }),
+      signal: _pendingController.signal
     })
     .then(res => {
       if (!res.ok) return res.json().catch(() => ({})).then(err => { throw new Error(err.error || 'TTS error ' + res.status); });
       return res.blob();
     })
     .then(blob => {
+      // Cancel browser TTS again in case it started while fetch was in flight
+      if (STATE.synth) STATE.synth.cancel();
       const url = URL.createObjectURL(blob);
       if (_currentAudio) { _currentAudio.pause(); _currentAudio = null; }
       _currentAudio = new Audio(url);
@@ -729,29 +799,42 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
       _currentAudio.onended = () => {
         STATE.isSpeaking = false; setStatus('IDLE', 'idle');
         animateWaveformSpeak(false); URL.revokeObjectURL(url); _currentAudio = null;
+        if (typeof STATE.onSpeakEnd === 'function') { STATE.onSpeakEnd(); STATE.onSpeakEnd = null; }
       };
       _currentAudio.onerror = () => {
         STATE.isSpeaking = false; setStatus('IDLE', 'idle');
         animateWaveformSpeak(false); _currentAudio = null;
+        if (typeof STATE.onSpeakEnd === 'function') { STATE.onSpeakEnd(); STATE.onSpeakEnd = null; }
       };
-      _currentAudio.play();
+      _pendingController = null;
+      _currentAudio.play().then(() => {
+        if (typeof STATE.onSpeakStart === 'function') { STATE.onSpeakStart(); STATE.onSpeakStart = null; }
+      }).catch(() => {});
     })
     .catch(err => {
-      console.warn('CBVoice: gTTS failed (' + err.message + ') -> browser TTS fallback');
-      speakBrowser(text, browserLang);
+      if (err && err.name === 'AbortError') return; // intentionally cancelled, don't fall back
+      console.warn('CBVoice: gTTS failed (' + err.message + ') — no browser TTS fallback (prevents double voice)');
+      STATE.isSpeaking = false; setStatus('IDLE', 'idle');
+      animateWaveformSpeak(false);
+      // Do NOT call speakBrowser() here — it plays female voice over gTTS = double voice bug
     });
   }
 
     function speak(text, forceLang) {
     if (!text) return;
 
-    if (_currentAudio) {
-      _currentAudio.pause();
-      _currentAudio = null;
-    }
-    if (STATE.synth) STATE.synth.cancel();
+    // ── Stop EVERYTHING first — prevents any double-voice overlap ────────────
+    if (_currentAudio) { _currentAudio.pause(); _currentAudio = null; }
+    if (_pendingController) { try { _pendingController.abort(); } catch(e){} _pendingController = null; }
+    if (STATE.synth) { STATE.synth.cancel(); }
+    STATE.currentUtterance = null;
+    STATE.isSpeaking = false;
 
-    const activeLang = forceLang || STATE.currentLang;
+    // If voice clone profile exists, always use the detected language
+    // so the AI answer is spoken in the user's own language regardless of UI selector
+    const activeLang = (window._hasVoiceClone && window._vcDetectedLang)
+      ? window._vcDetectedLang
+      : (forceLang || STATE.currentLang);
 
     let clean = text
       .replace(/```[\s\S]*?```/g, ' code block. ')
@@ -814,6 +897,10 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
     function speakBrowser(clean, lang) {
     if (!STATE.synth) return;
 
+    // Stop gTTS audio if somehow still playing
+    if (_currentAudio) { _currentAudio.pause(); _currentAudio = null; }
+    STATE.synth.cancel();
+
     // lang is already the correct BCP-47 code (ta-IN, hi-IN etc.)
     // passed by speak() via LANG_TO_BROWSER — never 'ta-en' here
     const utter = new SpeechSynthesisUtterance(clean);
@@ -821,17 +908,13 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
     utter.pitch  = STATE.pitch;
     utter.volume = STATE.volume;
 
-    // Try to find a matching voice — search multiple ways
-    const voice = getBestVoice(lang);
+    // Try to find a matching FEMALE voice — always prefer female
+    const voice = getBestVoice(lang, true); // true = prefer female
     if (voice) {
       utter.voice = voice;
       utter.lang  = voice.lang;
     } else {
-      // Set the lang tag even without a named voice —
-      // Chrome/Android may still use the right TTS engine
       utter.lang = lang;
-      console.warn('CBVoice: No native voice found for', lang,
-        '— setting lang tag and letting browser decide. Install the language pack in device settings for best results.');
     }
 
     utter.onstart = () => { STATE.isSpeaking = true; setStatus('SPEAKING', 'speaking'); animateWaveformSpeak(true); };
@@ -862,51 +945,58 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
     return 'en-US';
   }
 
-  function getBestVoice(lang) {
+  function getBestVoice(lang, preferFemale) {
     const latest = STATE.synth ? STATE.synth.getVoices() : [];
     if (latest.length) STATE.voices = latest;
     const voices = STATE.voices;
     if (!voices.length) return null;
 
-    // Tanglish should look for Tamil voice
     const searchLang = (lang === 'ta-en') ? 'ta-IN' : lang;
     const base = searchLang.split('-')[0].toLowerCase();
 
-    // 1. Exact match + local service (highest quality on-device)
-    let v = voices.find(x => x.lang === searchLang && x.localService);
-    // 2. Exact match any
-    if (!v) v = voices.find(x => x.lang === searchLang);
-    // 3. Same language family (ta-IN, ta-LK both have base 'ta')
-    if (!v) v = voices.find(x => x.lang.toLowerCase().startsWith(base + '-'));
-    // 4. Base lang code prefix
-    if (!v) v = voices.find(x => x.lang.toLowerCase().startsWith(base));
-    // 5. Voice name contains language keyword (covers "Google Tamil", "Lekha", etc.)
+    // Detect female voices — used to prefer them when preferFemale=true
+    const isFemale = v => {
+      const n = v.name.toLowerCase();
+      const femaleWords = ['female','woman','girl','fiona','samantha','karen','victoria','moira',
+        'veena','tessa','alice','amelie','anna','aurelie','claire','joana','lekha','heera',
+        'kalpana','meijia','sin-ji','tingting','yuna','milena','luciana','paulina','monica',
+        'chitra','zira','susan','hazel','linda','eva','julia','natasha','kate','aria','jenny',
+        'aditi','raveena','priya','asha','pallavi'];
+      const maleWords = ['male','man','david','daniel','alex','jorge','thomas','markus',
+        'stefan','otoya','maged','yuri','ravi','hemant','reed','fred','bruce','tarik','felix'];
+      if (femaleWords.some(w => n.includes(w))) return true;
+      if (maleWords.some(w => n.includes(w))) return false;
+      return null; // unknown gender — acceptable
+    };
+
     const VOICE_NAMES = {
-      'ta': ['tamil', 'தமிழ்', 'lekha'],
-      'hi': ['hindi', 'हिन्दी', 'hemant', 'kalpana', 'ravi', 'heera'],
-      'te': ['telugu', 'తెలుగు', 'chitra'],
-      'kn': ['kannada', 'ಕನ್ನಡ', 'samantha'],
-      'ml': ['malayalam', 'മലയാളം'],
-      'bn': ['bengali', 'বাংলা'],
-      'mr': ['marathi', 'मराठी'],
-      'pa': ['punjabi', 'ਪੰਜਾਬੀ'],
-      'gu': ['gujarati', 'ગુજરાતી'],
-      'fr': ['french', 'français', 'amelie', 'thomas', 'aurelie'],
-      'de': ['german', 'deutsch', 'anna', 'markus', 'stefan'],
-      'es': ['spanish', 'español', 'monica', 'jorge', 'paulina'],
-      'ja': ['japanese', '日本語', 'kyoko', 'otoya'],
-      'zh': ['chinese', '中文', '普通话', 'tingting', 'sin-ji', 'mei-jia'],
-      'ko': ['korean', '한국어', 'yuna', 'sin-ji'],
-      'ar': ['arabic', 'عربي', 'maged', 'tarik'],
-      'ru': ['russian', 'русский', 'milena', 'yuri'],
-      'pt': ['portuguese', 'português', 'luciana', 'joana'],
-      'en': ['english', 'samantha', 'alex', 'daniel', 'karen'],
+      'ta': ['lekha','tamil'], 'hi': ['kalpana','heera','hindi'],
+      'te': ['chitra','telugu'], 'kn': ['kannada'], 'ml': ['malayalam'],
+      'bn': ['bengali'], 'mr': ['marathi'], 'pa': ['punjabi'], 'gu': ['gujarati'],
+      'fr': ['amelie','aurelie','french'], 'de': ['anna','german'],
+      'es': ['monica','paulina','spanish'], 'ja': ['kyoko','japanese'],
+      'zh': ['tingting','meijia','chinese'], 'ko': ['yuna','korean'],
+      'ar': ['arabic'], 'ru': ['milena','russian'],
+      'pt': ['joana','luciana','portuguese'],
+      'en': ['samantha','karen','zira','moira','tessa','aria','jenny','victoria'],
     };
     const keywords = VOICE_NAMES[base] || [];
-    if (!v && keywords.length) {
-      v = voices.find(x => keywords.some(kw => x.name.toLowerCase().includes(kw)));
+
+    const tryFind = arr => {
+      let v = arr.find(x => x.lang === searchLang && x.localService);
+      if (!v) v = arr.find(x => x.lang === searchLang);
+      if (!v) v = arr.find(x => x.lang.toLowerCase().startsWith(base + '-'));
+      if (!v) v = arr.find(x => x.lang.toLowerCase().startsWith(base));
+      if (!v && keywords.length) v = arr.find(x => keywords.some(kw => x.name.toLowerCase().includes(kw)));
+      return v || null;
+    };
+
+    if (preferFemale) {
+      // Try female voices first, fall back to any voice if no female found
+      const femalePool = voices.filter(v => isFemale(v) !== false);
+      return tryFind(femalePool) || tryFind(voices);
     }
-    return v || null;
+    return tryFind(voices);
   }
   function waitForVoices() {
     return new Promise(resolve => {
@@ -1187,22 +1277,57 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
       setStatus('IDLE', 'idle');
     },
     speak(text, lang) { speak(text, lang); },
+    // Stop any running SpeechRecognition — Chrome allows only ONE at a time.
+    // If voice-clone STT is still running when PLAY is clicked, it blocks
+    // audio playback for up to 20 seconds until the STT session times out.
+    stopSTT() {
+      if (STATE.recognition) { try { STATE.recognition.stop(); } catch(e){} }
+      if (window._vcSttRec) { try { window._vcSttRec.stop(); } catch(e){} window._vcSttRec = null; }
+    },
+    // Register callbacks for when audio actually starts/ends.
+    // More reliable than polling getCurrentAudio() in a setInterval.
+    setSpeakCallbacks(onStart, onEnd) {
+      STATE.onSpeakStart = onStart || null;
+      STATE.onSpeakEnd = onEnd || null;
+    },
     stop() {
+      if (_pendingController) { try { _pendingController.abort(); } catch(e){} _pendingController = null; }
       if (_currentAudio) { _currentAudio.pause(); _currentAudio = null; }
       STATE.synth?.cancel();
       STATE.isSpeaking = false;
+      STATE.isPaused = false;
       animateWaveformSpeak(false);
       setStatus('IDLE', 'idle');
+      const pb = document.getElementById('cbPauseBtn');
+      if (pb) pb.textContent = '⏸';
+      // Fire onSpeakEnd so PLAY button resets even on manual stop
+      if (typeof STATE.onSpeakEnd === 'function') { STATE.onSpeakEnd(); STATE.onSpeakEnd = null; }
+    },
+    togglePause() {
+      if (STATE.isPaused) { this.resume(); } else { this.pause(); }
     },
     pause() {
+      // Abort any in-flight TTS fetch (user paused before audio loaded)
+      if (_pendingController) { try { _pendingController.abort(); } catch(e){} _pendingController = null; }
+      // Pause the gTTS <audio> element (primary audio source)
+      if (_currentAudio && !_currentAudio.paused) _currentAudio.pause();
+      // Also pause Web Speech API fallback
       STATE.synth?.pause();
       STATE.isPaused = true;
+      STATE.isSpeaking = false;
+      animateWaveformSpeak(false);
       setStatus('PAUSED', 'idle');
+      const pb = document.getElementById('cbPauseBtn');
+      if (pb) pb.textContent = '▶';
     },
     resume() {
+      // Resume the gTTS <audio> element
+      if (_currentAudio && _currentAudio.paused) _currentAudio.play();
       STATE.synth?.resume();
       STATE.isPaused = false;
       setStatus('SPEAKING', 'speaking');
+      const pb = document.getElementById('cbPauseBtn');
+      if (pb) pb.textContent = '⏸';
     },
     togglePanel() {
       STATE.isOpen = !STATE.isOpen;
@@ -1240,6 +1365,34 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
         'en-US': '🇺🇸 English mode',
       };
       setTranscript(hints[lang] || ('🌐 ' + (LANGS[lang] ? LANGS[lang].name : lang) + ' mode active'), 'cmd');
+    },
+    // Called by VoiceClone after voice is uploaded and language detected.
+    // Pass null to RESET (after delete) — restores UI language selector.
+    setDetectedLang(lang, langName) {
+      if (!lang) {
+        // RESET — profile was deleted
+        window._vcDetectedLang = null;
+        window._hasVoiceClone = false;
+        // Restore to whatever the UI selector shows
+        const sel = document.getElementById('cbLangSel') || document.getElementById('cbLangSel2');
+        const uiLang = (sel && sel.value) ? sel.value : 'en-US';
+        STATE.currentLang = uiLang;
+        const recogLang = (uiLang === 'ta-en') ? 'ta-IN' : uiLang;
+        if (STATE.recognition) STATE.recognition.lang = recogLang;
+        setTranscript('🎙 Voice profile deleted — using language selector', 'cmd');
+        return;
+      }
+      window._vcDetectedLang = lang;
+      window._hasVoiceClone = true;
+      STATE.currentLang = lang;
+      ['cbLangSel', 'cbLangSel2', 'voiceLang'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { const opt = [...el.options].find(o => o.value === lang); if (opt) el.value = lang; }
+      });
+      const recogLang = (lang === 'ta-en') ? 'ta-IN' : lang;
+      if (STATE.recognition) STATE.recognition.lang = recogLang;
+      setTranscript('🎙 Voice profile active — speaking in ' + (langName || lang), 'cmd');
+      addHistory('VC', 'Voice language locked: ' + (langName || lang));
     },
     setRate(v) { STATE.rate = v; },
     setPitch(v) { STATE.pitch = v; },

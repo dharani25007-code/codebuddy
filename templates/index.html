@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#00ffe0">
-  <title>CodeBuddy v4.0 — Neural AI</title>
+  <title>CodeBuddy</title>
   <link rel="manifest" href="/manifest.json">
   <link
     href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Exo+2:wght@200;300;400;600&display=swap"
@@ -39,6 +39,7 @@
       --display: 'Orbitron', monospace;
       --body: 'Exo 2', sans-serif;
       --r: 4px;
+      --sidebar-w: 280px;
     }
 
     body.light {
@@ -87,30 +88,11 @@
       cursor: default;
     }
 
-    /* CURSOR */
-    #cursor {
-      display: none !important;
-    }
-
-    #cursor-ring {
-      display: none !important;
-    }
-
+    /* CURSOR — custom cursor disabled; elements hidden */
+    #cursor,
+    #cursor-ring,
     .trail-dot {
       display: none !important;
-    }
-
-    #cursor-ring {
-      position: fixed;
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      border: 1px solid var(--plasma-hard);
-      pointer-events: none;
-      z-index: 99998;
-      transform: translate(-50%, -50%);
-      transition: transform 0.12s ease, width 0.25s, height 0.25s, border-color 0.2s;
-      opacity: 0.6;
     }
 
     body:has(button:hover) #cursor,
@@ -260,7 +242,7 @@
       flex-direction: column;
       gap: 12px;
       height: 100%;
-      overflow: hidden;
+      overflow: visible;
     }
 
     .logo-area {
@@ -379,6 +361,7 @@
       display: flex;
       flex-direction: column;
       gap: 4px;
+      min-height: 0;
     }
 
     #chatList::-webkit-scrollbar {
@@ -399,7 +382,7 @@
       cursor: pointer;
       transition: all 0.2s;
       position: relative;
-      overflow: hidden;
+      overflow: visible;
     }
 
     .chat-item::before {
@@ -473,15 +456,15 @@
       background: #060d1a;
       border: 1px solid var(--border-hi);
       border-radius: var(--r);
-      min-width: 150px;
-      z-index: 9999;
+      min-width: 160px;
+      z-index: 99999;
       overflow: hidden;
       box-shadow: 0 12px 40px rgba(0, 0, 0, 0.8), 0 0 20px var(--plasma-glow);
-      animation: dropIn 0.15s ease;
     }
 
     body.light .dropdown {
       background: #e8f4f8;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15), 0 0 20px rgba(8, 145, 178, 0.1);
     }
 
     @keyframes dropIn {
@@ -498,6 +481,7 @@
 
     .menu.open .dropdown {
       display: block;
+      animation: dropIn 0.15s ease forwards;
     }
 
     .dropdown div {
@@ -888,6 +872,34 @@
       max-width: 440px;
       width: 100%;
     }
+
+    /* ── Onboarding Guide ── */
+    .ob-card {
+      display:flex;align-items:flex-start;gap:14px;
+      background:rgba(226,244,255,0.025);
+      border:1px solid rgba(226,244,255,0.07);
+      border-radius:10px;padding:16px 18px;cursor:pointer;
+      transition:all 0.2s;
+    }
+    .ob-card:hover { background:rgba(0,255,224,0.04);border-color:rgba(0,255,224,0.18);transform:translateX(3px); }
+    .ob-num { font-family:var(--display);font-size:11px;font-weight:900;color:rgba(0,255,224,0.25);letter-spacing:1px;min-width:24px;margin-top:2px; }
+    .ob-body { flex:1; }
+    .ob-title { font-family:var(--display);font-size:11px;font-weight:800;letter-spacing:1.5px;color:rgba(226,244,255,0.85);margin-bottom:6px; }
+    .ob-desc { font-family:var(--mono);font-size:10.5px;color:rgba(226,244,255,0.4);line-height:1.75;margin-bottom:10px; }
+    .ob-chips { display:flex;flex-wrap:wrap;gap:7px; }
+    .ob-chip { font-family:var(--display);font-size:8px;font-weight:700;letter-spacing:1px;
+      padding:5px 10px;border-radius:20px;border:1px solid rgba(0,255,224,0.2);
+      background:rgba(0,255,224,0.05);color:#00ffe0;cursor:pointer;transition:all 0.15s; }
+    .ob-chip:hover { background:rgba(0,255,224,0.12);border-color:rgba(0,255,224,0.4); }
+    .ob-arrow { font-size:18px;color:rgba(0,255,224,0.2);margin-top:4px;transition:all 0.2s; }
+    .ob-card:hover .ob-arrow { color:rgba(0,255,224,0.6);transform:translateX(4px); }
+    .ob-mode-grid { display:flex;flex-wrap:wrap;gap:7px;margin-top:4px; }
+    .ob-mode { position:relative;font-family:var(--display);font-size:8px;font-weight:700;letter-spacing:1px;
+      padding:5px 10px;border-radius:4px;border:1px solid rgba(255,255,255,0.08);
+      background:rgba(255,255,255,0.03);color:rgba(226,244,255,0.55);cursor:default;
+      display:flex;flex-direction:column;gap:2px; }
+    .ob-mode-tip { font-size:7px;font-weight:400;letter-spacing:0.5px;color:rgba(226,244,255,0.3);font-family:var(--mono); }
+    @media(max-width:520px){.ob-mode-grid{gap:5px}.ob-mode{font-size:7px;padding:4px 8px}}
 
     .qchip {
       padding: 10px 14px;
@@ -1598,6 +1610,16 @@
     }
 
     /* Send button — hexagonal sci-fi */
+    .mic-btn {
+      flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%;
+      border: 1px solid rgba(0,255,224,0.2); background: rgba(0,255,224,0.04);
+      color: var(--text-3); font-size: 15px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s; outline: none; line-height: 1;
+    }
+    .mic-btn:hover { border-color: rgba(0,255,224,0.5); background: rgba(0,255,224,0.1); color: var(--plasma); }
+    .mic-btn.active { border-color: var(--fire); background: rgba(255,60,60,0.12); color: var(--fire);
+      box-shadow: 0 0 14px rgba(255,60,60,0.4); animation: hbeat 0.8s ease infinite; }
     .forge-send {
       width: 44px;
       height: 44px;
@@ -1704,7 +1726,7 @@
       backdrop-filter: blur(40px) saturate(200%);
       border: 1px solid var(--border-hi);
       border-radius: 2px;
-      z-index: 200;
+      z-index: 8000;
       overflow: hidden;
       box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7), 0 0 40px var(--plasma-glow);
       transition: opacity 0.25s, transform 0.25s;
@@ -2079,7 +2101,7 @@
       background: #060d1a;
       border: 1px solid var(--border-hi);
       border-radius: 2px;
-      z-index: 600;
+      z-index: 9000;
       overflow: hidden;
       box-shadow: 0 16px 48px rgba(0, 0, 0, 0.8), 0 0 30px var(--plasma-glow);
       animation: dropIn 0.18s cubic-bezier(0.34, 1.2, 0.64, 1);
@@ -2182,7 +2204,7 @@
 
     /* VOICE ENGINE BAR */
     #cbBar {
-      left: 280px !important;
+      left: var(--sidebar-w, 280px) !important;
       z-index: 10 !important;
       height: 54px !important;
     }
@@ -2197,7 +2219,7 @@
     }
 
     #cbVoiceBar {
-      left: 280px !important;
+      left: var(--sidebar-w, 280px) !important;
       z-index: 10 !important;
       height: 54px !important;
     }
@@ -3471,7 +3493,224 @@
       display: block;
       margin-top: 1px;
     }
-  </style>
+  
+    /* ═══════════════════════════════════════════════════
+       FULL LIGHT MODE — body.light comprehensive overrides
+    ═══════════════════════════════════════════════════ */
+
+    /* Topbar */
+    body.light .topbar {
+      background: rgba(232,244,250,0.97) !important;
+      border-bottom: 1px solid rgba(8,145,178,0.2) !important;
+      box-shadow: 0 2px 20px rgba(8,145,178,0.1) !important;
+    }
+    body.light .topbar-left *, body.light .topbar-right * { color: #0c2a3a; }
+    body.light .mode-select {
+      background: rgba(8,145,178,0.06) !important;
+      border-color: rgba(8,145,178,0.22) !important;
+      color: #0c2a3a !important;
+    }
+    body.light .mode-select option { background: #e8f4f8; color: #0c2a3a; }
+    body.light .mode-chip { background: rgba(8,145,178,0.06); border-color: rgba(8,145,178,0.18); color: rgba(12,42,58,0.6); }
+    body.light .mode-chip.active, body.light .mode-chip:hover { background: rgba(8,145,178,0.14); border-color: #0891b2; color: #0891b2; }
+    body.light .hud-badge { color: rgba(12,42,58,0.4) !important; border-color: rgba(8,145,178,0.15) !important; }
+
+    /* Live / HUB / topbar buttons */
+    body.light .live-btn { background: rgba(8,145,178,0.07) !important; border-color: rgba(8,145,178,0.28) !important; color: #0369a1 !important; }
+    body.light .live-btn:hover { background: rgba(8,145,178,0.15) !important; }
+    body.light #liveBtn .lb-dot { background: #0891b2 !important; box-shadow: 0 0 5px #0891b2 !important; }
+    body.light #hubNavBtn { color: #0891b2 !important; border-color: rgba(8,145,178,0.4) !important; background: rgba(8,145,178,0.07) !important; }
+    body.light #voiceLabBtn { color: #7c3aed !important; border-color: rgba(124,58,237,0.35) !important; background: rgba(124,58,237,0.06) !important; }
+    body.light #voiceCloneBtn { color: #7c3aed !important; border-color: rgba(124,58,237,0.3) !important; background: rgba(124,58,237,0.04) !important; }
+    body.light #fp-topbtn { color: #0891b2 !important; border-color: rgba(8,145,178,0.25) !important; background: rgba(8,145,178,0.06) !important; }
+
+    /* Profile / user dropdown */
+    body.light .user-menu-btn .user-menu-name, body.light .user-menu-btn .user-menu-caret { color: #0c2a3a; }
+    body.light .user-dropdown {
+      background: #daeef8 !important;
+      border: 1px solid rgba(8,145,178,0.25) !important;
+      box-shadow: 0 8px 32px rgba(8,145,178,0.15) !important;
+    }
+    body.light .udrop-header { background: rgba(8,145,178,0.08); border-bottom-color: rgba(8,145,178,0.15) !important; }
+    body.light .udrop-name { color: #0c2a3a !important; }
+    body.light .udrop-role { color: rgba(12,42,58,0.5) !important; }
+    body.light .udrop-divider { background: rgba(8,145,178,0.12) !important; }
+    body.light .udrop-item { color: rgba(12,42,58,0.72) !important; }
+    body.light .udrop-item:hover { background: rgba(8,145,178,0.1) !important; color: #0891b2 !important; }
+    body.light .udrop-item.logout:hover { background: rgba(220,38,38,0.08) !important; color: #dc2626 !important; }
+
+    /* LIVE overlay */
+    body.light .live-overlay {
+      background: rgba(224,242,251,0.99) !important;
+      border: 1px solid rgba(8,145,178,0.22) !important;
+      box-shadow: 0 16px 60px rgba(8,145,178,0.15) !important;
+    }
+    body.light .live-overlay .ov-title { color: #0891b2 !important; }
+    body.light .live-overlay .ov-sub { color: rgba(12,42,58,0.5) !important; }
+    body.light .overlay-top-bar { background: rgba(210,236,248,0.97) !important; border-bottom-color: rgba(8,145,178,0.15) !important; }
+    body.light .ov-close { color: rgba(12,42,58,0.4) !important; }
+    body.light #liveInput { background: rgba(8,145,178,0.05) !important; border-color: rgba(8,145,178,0.2) !important; color: #0c2a3a !important; }
+    body.light #liveInput::placeholder { color: rgba(12,42,58,0.35) !important; }
+    body.light .live-msg { color: #0c2a3a !important; }
+    body.light .live-msg.ai { background: rgba(8,145,178,0.07) !important; border-color: rgba(8,145,178,0.12) !important; }
+
+    /* Three-dot dropdown menus */
+    body.light .dropdown {
+      background: #daeef8 !important;
+      border-color: rgba(8,145,178,0.25) !important;
+      box-shadow: 0 8px 30px rgba(8,145,178,0.12) !important;
+    }
+    body.light .dropdown div, body.light .dropdown a { color: #0c2a3a !important; }
+    body.light .dropdown div:hover, body.light .dropdown a:hover { background: rgba(8,145,178,0.1) !important; color: #0891b2 !important; }
+
+    /* Sidebar */
+    body.light .chat-item { border-color: rgba(8,145,178,0.1) !important; color: #0c2a3a !important; }
+    body.light .chat-item:hover { background: rgba(8,145,178,0.08) !important; border-color: rgba(8,145,178,0.25) !important; }
+    body.light .chat-item.active { background: rgba(8,145,178,0.12) !important; border-color: rgba(8,145,178,0.35) !important; }
+    body.light .chat-title { color: #0c2a3a !important; }
+    body.light .new-chat-btn { background: rgba(8,145,178,0.08) !important; border-color: rgba(8,145,178,0.25) !important; color: #0891b2 !important; }
+    body.light .nav-label { color: rgba(12,42,58,0.35) !important; }
+    body.light #sidebarSearch { background: rgba(8,145,178,0.05) !important; border-color: rgba(8,145,178,0.15) !important; color: #0c2a3a !important; }
+    body.light #sidebarSearch::placeholder { color: rgba(12,42,58,0.35) !important; }
+    body.light .menu-btn { color: rgba(12,42,58,0.45) !important; }
+    body.light .menu-btn:hover { background: rgba(8,145,178,0.1) !important; color: #0891b2 !important; }
+
+    /* Chat bubbles */
+    body.light .bubble-content { color: #0c2a3a !important; }
+    body.light .msg-row.ai .bubble-content { background: rgba(8,145,178,0.06) !important; border-color: rgba(8,145,178,0.12) !important; }
+    body.light .msg-row.user .bubble-content { background: rgba(109,40,217,0.05) !important; border-color: rgba(109,40,217,0.1) !important; }
+    body.light .msg-role { color: rgba(12,42,58,0.4) !important; }
+    body.light .rxn-btn, body.light .play-speak-btn, body.light .code-btn { background: rgba(8,145,178,0.06) !important; border-color: rgba(8,145,178,0.18) !important; color: rgba(12,42,58,0.6) !important; }
+    body.light .rxn-btn:hover, body.light .play-speak-btn:hover, body.light .code-btn:hover { background: rgba(8,145,178,0.12) !important; color: #0891b2 !important; }
+
+    /* Code blocks */
+    body.light .bubble-content pre { background: #1a2b3f !important; border-color: rgba(8,145,178,0.2) !important; }
+    body.light .bubble-content pre code { color: #e2f4ff !important; }
+    body.light .code-toolbar { background: rgba(26,43,63,0.95) !important; border-bottom-color: rgba(8,145,178,0.15) !important; }
+    body.light .lang-tag { color: rgba(226,244,255,0.5) !important; }
+    body.light .run-output { background: #111827 !important; border-color: rgba(8,145,178,0.15) !important; }
+    body.light .run-console { background: #111827 !important; color: #e2f4ff !important; }
+
+    /* Input area */
+    body.light .input-area { background: rgba(226,242,250,0.99) !important; border-top-color: rgba(8,145,178,0.14) !important; }
+    body.light .input-row { background: rgba(8,145,178,0.06) !important; border-color: rgba(8,145,178,0.22) !important; }
+    body.light #message { color: #0c2a3a !important; background: transparent !important; }
+    body.light #message::placeholder { color: rgba(12,42,58,0.35) !important; }
+    body.light #sendBtn { background: linear-gradient(135deg,#0891b2,#0369a1) !important; color: #fff !important; border-color: transparent !important; }
+    body.light .char-ctr { color: rgba(12,42,58,0.35) !important; }
+
+    /* HUB panel */
+    body.light #featuresHub { background: #e3f2fa !important; border-left: 1px solid rgba(8,145,178,0.2) !important; box-shadow: -12px 0 60px rgba(8,145,178,0.12) !important; }
+    body.light .mic-btn { border-color: rgba(8,145,178,0.3) !important; color: rgba(12,42,58,0.5) !important; }
+    body.light .mic-btn:hover { background: rgba(8,145,178,0.1) !important; color: #0891b2 !important; }
+    body.light .hub-feature-header { background: rgba(8,145,178,0.05) !important; border-color: rgba(8,145,178,0.18) !important; }
+    body.light .hub-feature-label { color: #7c3aed !important; }
+    body.light .hub-feature-title { color: #0c2a3a !important; }
+    body.light .hub-feature-desc { color: rgba(12,42,58,0.6) !important; }
+    body.light .hub-feature-icon { background: rgba(8,145,178,0.08) !important; border-color: rgba(8,145,178,0.2) !important; }
+    body.light #hubBackdrop { background: rgba(8,145,178,0.1) !important; }
+    body.light .hub-hdr { background: rgba(220,240,250,0.99) !important; border-bottom-color: rgba(8,145,178,0.14) !important; }
+    body.light .hub-hdr-title { color: #0891b2 !important; }
+    body.light .hub-close { color: rgba(12,42,58,0.5) !important; }
+    body.light .hub-tabs { background: rgba(208,232,246,0.9) !important; border-bottom-color: rgba(8,145,178,0.14) !important; }
+    body.light .hub-tab { color: rgba(12,42,58,0.5) !important; }
+    body.light .hub-tab.active { color: #0891b2 !important; border-bottom-color: #0891b2 !important; background: rgba(8,145,178,0.07) !important; }
+    body.light .hub-panel { color: #0c2a3a !important; }
+    body.light .hub-pane-title { color: #0891b2 !important; }
+    body.light .hub-pane-desc { color: rgba(12,42,58,0.55) !important; }
+    body.light .hub-section-title { color: rgba(12,42,58,0.4) !important; border-bottom-color: rgba(8,145,178,0.1) !important; }
+    body.light .hub-btn { background: rgba(8,145,178,0.08) !important; border-color: rgba(8,145,178,0.3) !important; color: #0891b2 !important; }
+    body.light .hub-btn:hover { background: rgba(8,145,178,0.16) !important; }
+    body.light .hub-btn.fire { background: rgba(220,38,38,0.08) !important; border-color: rgba(220,38,38,0.3) !important; color: #dc2626 !important; }
+    body.light .hub-badge.cyan { background: rgba(8,145,178,0.12) !important; color: #0891b2 !important; border-color: rgba(8,145,178,0.25) !important; }
+    body.light .hub-badge.purple { background: rgba(109,40,217,0.08) !important; color: #6d28d9 !important; border-color: rgba(109,40,217,0.2) !important; }
+    body.light .hub-body textarea, body.light .hub-body input, body.light .hub-body select { background: rgba(8,145,178,0.05) !important; border-color: rgba(8,145,178,0.2) !important; color: #0c2a3a !important; }
+    body.light .hub-body textarea::placeholder, body.light .hub-body input::placeholder { color: rgba(12,42,58,0.35) !important; }
+    body.light .hub-result { background: rgba(8,145,178,0.04) !important; border-color: rgba(8,145,178,0.15) !important; color: #0c2a3a !important; }
+    body.light .hub-result.show { border-color: rgba(8,145,178,0.25) !important; }
+
+    /* HUB feature-specific */
+    body.light .tr-step { background: rgba(8,145,178,0.04) !important; border-color: rgba(8,145,178,0.12) !important; color: #0c2a3a !important; }
+    body.light .tr-label { color: #0891b2 !important; }
+    body.light .tr-text { color: rgba(12,42,58,0.7) !important; }
+    body.light .karma-stat { background: rgba(8,145,178,0.05) !important; border-color: rgba(8,145,178,0.15) !important; }
+    body.light .karma-val { color: #0891b2 !important; -webkit-text-fill-color: #0891b2 !important; }
+    body.light .karma-label { color: rgba(12,42,58,0.5) !important; }
+    body.light .karma-event-row { border-bottom-color: rgba(8,145,178,0.1) !important; }
+    body.light .karma-event-label { color: rgba(12,42,58,0.72) !important; }
+    body.light .karma-delta.pos { color: #16a34a !important; }
+    body.light .karma-delta.neg { color: #dc2626 !important; }
+    body.light .blind-card { background: rgba(8,145,178,0.04) !important; border-color: rgba(8,145,178,0.14) !important; }
+    body.light .blind-card:hover { background: rgba(8,145,178,0.09) !important; border-color: rgba(8,145,178,0.3) !important; }
+    body.light .blind-card-hdr { border-bottom-color: rgba(8,145,178,0.1) !important; }
+    body.light .blind-card-lang { color: #0891b2 !important; }
+    body.light .blind-card-preview { color: rgba(12,42,58,0.65) !important; }
+    body.light .lr-entry { border-bottom-color: rgba(8,145,178,0.1) !important; }
+    body.light .lr-date { color: rgba(12,42,58,0.42) !important; }
+    body.light .lr-title { color: #0891b2 !important; }
+    body.light .lr-mode { color: rgba(12,42,58,0.6) !important; }
+    body.light .battle-card { background: rgba(8,145,178,0.04) !important; border-color: rgba(8,145,178,0.12) !important; }
+
+    /* Other panels */
+    body.light #memoryPanel { background: #e3f2fa !important; border-color: rgba(8,145,178,0.22) !important; color: #0c2a3a !important; }
+    body.light #promptAutocomplete, body.light #fp-ac { background: #daeef8 !important; border-color: rgba(8,145,178,0.25) !important; }
+    body.light .ac-item, body.light .fp-ac-item { color: #0c2a3a !important; }
+    body.light .ac-item:hover, body.light .fp-ac-item:hover, body.light .ac-item.selected { background: rgba(8,145,178,0.1) !important; color: #0891b2 !important; }
+    body.light .toast { background: #daeef8 !important; border-color: rgba(8,145,178,0.3) !important; color: #0c2a3a !important; }
+    body.light ::-webkit-scrollbar-track { background: rgba(8,145,178,0.04) !important; }
+    body.light ::-webkit-scrollbar-thumb { background: rgba(8,145,178,0.2) !important; }
+    body.light ::-webkit-scrollbar-thumb:hover { background: rgba(8,145,178,0.38) !important; }
+
+    /* Voice clone panel */
+    body.light #voiceClonePanel { background: #e3f2fa !important; border-left-color: rgba(124,58,237,0.22) !important; }
+    body.light .vc-hdr { background: rgba(218,238,250,0.98) !important; border-bottom-color: rgba(124,58,237,0.14) !important; }
+    body.light .vc-label { color: rgba(12,42,58,0.4) !important; }
+    body.light .vc-status { color: rgba(12,42,58,0.55) !important; }
+    body.light .vc-profile-card { background: rgba(124,58,237,0.05) !important; border-color: rgba(124,58,237,0.18) !important; }
+    body.light .vc-record-btn { color: #7c3aed !important; border-color: rgba(124,58,237,0.3) !important; }
+    body.light .vc-record-btn:hover { background: rgba(124,58,237,0.06) !important; }
+    /* ═══════════════════════════════════════════════════
+       END LIGHT MODE OVERRIDES
+    ═══════════════════════════════════════════════════ */
+
+    /* ── Karma event rows (were missing, causing invisible events) ── */
+    .karma-event-row { display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:1px solid rgba(0,255,224,0.06); gap:8px; }
+    .karma-event-label { font-family:var(--mono); font-size:11px; color:var(--text-2); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .karma-delta { font-family:var(--display); font-size:10px; font-weight:800; letter-spacing:1px; flex-shrink:0; }
+    .karma-delta.pos { color:#4ade80; }
+    .karma-delta.neg { color:#ff6b2b; }
+
+    /* ── Blind review cards (were unstyled) ── */
+    .blind-card { border:1px solid rgba(0,255,224,0.1); border-radius:6px; padding:12px 14px; margin-bottom:8px; cursor:pointer; transition:all 0.15s ease; background:rgba(0,255,224,0.02); }
+    .blind-card:hover { background:rgba(0,255,224,0.05); border-color:rgba(0,255,224,0.25); }
+    .blind-card-hdr { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid rgba(0,255,224,0.07); }
+    .blind-card-lang { font-family:var(--display); font-size:9px; font-weight:700; letter-spacing:2px; color:var(--plasma); }
+    .blind-card-preview { font-family:var(--mono); font-size:10.5px; color:var(--text-3); line-height:1.6; white-space:pre-wrap; overflow:hidden; max-height:60px; }
+
+    /* ── Learning timeline entries ── */
+    .lr-entry { display:flex; gap:12px; padding:10px 0; border-bottom:1px solid rgba(0,255,224,0.06); }
+    .lr-date { font-family:var(--display); font-size:8px; letter-spacing:1px; color:var(--text-3); min-width:72px; flex-shrink:0; padding-top:2px; }
+    .lr-content { flex:1; min-width:0; }
+    .lr-title { font-family:var(--display); font-size:10px; font-weight:700; letter-spacing:1px; color:var(--plasma); margin-bottom:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .lr-mode { font-family:var(--mono); font-size:10px; color:var(--text-2); }
+
+    /* ── Voice Clone Panel ── */
+    #voiceClonePanel { display:none; position:fixed; right:0; top:0; bottom:0; width:min(400px,92vw); z-index:9997; background:#060d1a; border-left:1px solid rgba(168,85,247,0.2); flex-direction:column; box-shadow:-8px 0 40px rgba(0,0,0,0.7); }
+    #voiceClonePanel.show { display:flex; }
+    .vc-hdr { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-bottom:1px solid rgba(168,85,247,0.12); flex-shrink:0; background:rgba(168,85,247,0.04); }
+    .vc-hdr-title { font-family:var(--display); font-size:12px; font-weight:800; letter-spacing:3px; color:#a855f7; }
+    .vc-body { flex:1; overflow-y:auto; padding:20px 18px; }
+    .vc-section { margin-bottom:24px; }
+    .vc-label { font-family:var(--display); font-size:8px; font-weight:700; letter-spacing:2px; color:var(--text-3); margin-bottom:10px; display:flex; align-items:center; gap:6px; }
+    .vc-label::before { content:''; display:inline-block; width:3px; height:12px; border-radius:2px; background:#a855f7; flex-shrink:0; }
+    .vc-status { font-family:var(--mono); font-size:11px; color:var(--text-3); margin-top:8px; line-height:1.7; }
+    .vc-profile-card { padding:12px 14px; border:1px solid rgba(168,85,247,0.2); border-radius:6px; background:rgba(168,85,247,0.04); margin-top:10px; }
+    .vc-record-btn { width:100%; padding:14px; border:2px dashed rgba(168,85,247,0.3); border-radius:8px; background:transparent; color:#a855f7; font-family:var(--display); font-size:10px; font-weight:700; letter-spacing:2px; cursor:pointer; transition:all 0.2s; display:flex; align-items:center; justify-content:center; gap:8px; }
+    .vc-record-btn:hover { background:rgba(168,85,247,0.06); border-color:rgba(168,85,247,0.5); }
+    .vc-record-btn.recording { background:rgba(255,107,43,0.08); border-color:#ff6b2b; border-style:solid; color:#ff6b2b; }
+    .vc-waveform { height:40px; display:flex; align-items:center; justify-content:center; gap:3px; margin:12px 0; }
+    .vc-bar { width:3px; background:#a855f7; border-radius:2px; transition:height 0.1s; opacity:0.7; }
+</style>
 </head>
 
 <body>
@@ -3660,10 +3899,21 @@
         <span id="streakDays" style="font-family:var(--display);font-size:16px;font-weight:900;color:#ff6b2b;text-shadow:0 0 10px rgba(255,107,43,0.4)">—</span>
         <span style="font-family:var(--mono);font-size:8px;color:rgba(226,244,255,0.25)">DAYS</span>
       </div>
+      <!-- Search + Hub -->
+      <div style="display:flex;gap:5px;margin-bottom:0">
+        <div style="flex:1;position:relative">
+          <input id="sidebarSearch" placeholder="🔎  Search sessions…"
+            style="width:100%;background:rgba(0,255,224,0.03);border:1px solid rgba(0,255,224,0.1);border-radius:4px;color:var(--text);font-family:var(--mono);font-size:11px;padding:7px 10px 7px 10px;outline:none;box-sizing:border-box;transition:border-color 0.2s"
+            onfocus="this.style.borderColor='rgba(0,255,224,0.3)'"
+            onblur="this.style.borderColor='rgba(0,255,224,0.1)'"
+            onkeydown="if(event.key==='Enter'){HUB.open('search');document.getElementById('search-q').value=this.value;HUB.searchChats();}"
+            oninput="sidebarLiveSearch(this.value)">
+        </div>
+      </div>
       <div class="nav-label">Active Sessions</div>
       <div id="chatList">
         {% for chat in chats %}
-        <div class="chat-item" onclick="selectChat({{ chat['id'] }}, this)">
+        <div class="chat-item" onclick="if(!event.target.closest('.menu'))selectChat({{ chat['id'] }}, this)">
           <span class="chat-title">{{ chat['title'] }}</span>
           <div class="menu">
             <button class="menu-btn" onclick="toggleMenu(event,this)">⋯</button>
@@ -3688,10 +3938,7 @@
         </div>
         <div class="welcome-forge">CODEBUDDY / <em>{{ username }}</em></div>
         <!-- v4: Model indicator -->
-        <div style="display:flex;align-items:center;gap:5px;padding:4px 10px;border:1px solid rgba(0,255,224,0.08);border-radius:2px;background:rgba(0,255,224,0.02);font-family:var(--display);font-size:7px;font-weight:700;letter-spacing:1.5px;color:rgba(0,255,224,0.35);">
-          <span style="width:5px;height:5px;border-radius:50%;background:#a855f7;box-shadow:0 0 5px #a855f7;display:inline-block;animation:hbeat 2s ease infinite"></span>
-          <span id="modelBadge">DEEPSEEK·R1</span>
-        </div>
+        
       </div>
       <div class="topbar-right">
         <div class="mode-dial-wrap">
@@ -3712,13 +3959,13 @@
           style="border-color:rgba(168,85,247,0.4);color:#a855f7;background:rgba(168,85,247,0.08);">
           <div class="lb-dot" style="background:#a855f7;box-shadow:0 0 5px #a855f7"></div>VOICE LAB
         </button>
+        <button class="live-btn" id="voiceCloneBtn" onclick="window.VoiceClone&&VoiceClone.open()" title="Clone your voice">
+          <div class="lb-dot" id="vc-dot" style="background:rgba(168,85,247,0.3)"></div>🎙 MY VOICE
+        </button>
         <button id="fp-topbtn" onclick="FP.togglePanel()" title="Upload & edit code files">
           📁 <span id="fp-topbtn-lbl">FILE FORGE</span>
         </button>
-        <button id="autoSpeakToggle" onclick="toggleAutoSpeak()" title="Toggle auto-speak"
-          style="display:flex;align-items:center;gap:5px;padding:0 10px;height:34px;border-radius:2px;border:1px solid rgba(0,255,224,0.2);background:rgba(0,255,224,0.04);color:rgba(226,244,255,0.35);font-family:var(--display);font-size:8px;font-weight:700;letter-spacing:1.5px;cursor:pointer;transition:all 0.2s;white-space:nowrap;">
-          <span style="font-size:13px">🔊</span><span id="autoSpeakLabel">SPEAK OFF</span>
-        </button>
+        
         <div class="theme-morph" onclick="toggleTheme()" title="Morph Theme">
           <div class="morph-bg"></div>
           <div class="morph-icons"><span>🌙</span><span>☀️</span></div>
@@ -3726,6 +3973,10 @@
         </div>
         <button class="live-btn" id="liveBtn" onclick="toggleOverlay()">
           <div class="lb-dot"></div>LIVE
+        </button>
+        <button class="live-btn" id="hubNavBtn" onclick="HUB.open()"
+          style="border-color:rgba(0,255,224,0.35);color:var(--plasma);background:rgba(0,255,224,0.06);font-weight:800;">
+          <div class="lb-dot" style="background:var(--plasma);box-shadow:0 0 6px var(--plasma);animation:hbeat 1.4s ease infinite"></div>⚡ HUB
         </button>
         <div class="user-menu" id="userMenu">
           <div class="user-menu-btn" onclick="toggleUserMenu()">
@@ -3757,15 +4008,126 @@
 
     <div class="chat-box" id="chatBox">
       <div class="empty-forge" id="emptyState">
+        {% if is_new_user %}
+        <!-- ══════════════ ONBOARDING GUIDE (new users only) ══════════════ -->
+        <div id="onboardGuide" style="width:100%;max-width:680px;margin:0 auto;padding:24px 16px 40px">
+
+          <!-- Header -->
+          <div style="text-align:center;margin-bottom:28px">
+            <div style="font-family:var(--display);font-size:22px;font-weight:900;letter-spacing:4px;color:#00ffe0;margin-bottom:8px">👋 WELCOME TO CODEBUDDY</div>
+            <div style="font-family:var(--mono);font-size:12px;color:rgba(226,244,255,0.45);line-height:1.7">Hi <strong style="color:#c084fc">{{ username }}</strong> — here's everything you can do. Click any card to try it now.</div>
+          </div>
+
+          <!-- Step-by-step cards -->
+          <div style="display:flex;flex-direction:column;gap:12px">
+
+            <!-- 1. Ask anything -->
+            <div class="ob-card" onclick="document.getElementById('message').focus()">
+              <div class="ob-num">01</div>
+              <div class="ob-body">
+                <div class="ob-title">💬 Ask Any Coding Question</div>
+                <div class="ob-desc">Type or speak any question — Python, JS, React, SQL, DSA, anything. Click the textbox below or press <kbd style="background:rgba(0,255,224,0.1);border:1px solid rgba(0,255,224,0.25);padding:1px 5px;border-radius:3px;font-size:9px">↵ Enter</kbd> to send.</div>
+                <div class="ob-chips">
+                  <span class="ob-chip" onclick="event.stopPropagation();quickAsk('How do I reverse a string in Python?')">Try: Reverse string in Python</span>
+                  <span class="ob-chip" onclick="event.stopPropagation();quickAsk('Explain async/await in JavaScript')">Try: Async/Await JS</span>
+                </div>
+              </div>
+              <div class="ob-arrow">→</div>
+            </div>
+
+            <!-- 2. AI Modes -->
+            <div class="ob-card" onclick="document.getElementById('modeBtn')&&document.getElementById('modeBtn').click()">
+              <div class="ob-num">02</div>
+              <div class="ob-body">
+                <div class="ob-title">🎯 9 AI Modes — Switch Anytime</div>
+                <div class="ob-desc">Each mode changes how the AI thinks. Choose the right one for your task.</div>
+                <div class="ob-mode-grid">
+                  <span class="ob-mode">⚙ GENERAL<span class="ob-mode-tip">All purpose help</span></span>
+                  <span class="ob-mode">🐛 DEBUG<span class="ob-mode-tip">Fix errors & bugs</span></span>
+                  <span class="ob-mode">⚡ OPTIMIZE<span class="ob-mode-tip">Make code faster</span></span>
+                  <span class="ob-mode">📖 EXPLAIN<span class="ob-mode-tip">Understand code</span></span>
+                  <span class="ob-mode">🎤 INTERVIEW<span class="ob-mode-tip">Prep for job interviews</span></span>
+                  <span class="ob-mode">🧩 DSA<span class="ob-mode-tip">Data structures & algorithms</span></span>
+                  <span class="ob-mode">🤖 ML<span class="ob-mode-tip">Machine learning help</span></span>
+                  <span class="ob-mode">📊 DATA SCI<span class="ob-mode-tip">Data science & analysis</span></span>
+                  <span class="ob-mode">🗺 ROADMAP<span class="ob-mode-tip">Learning path generator</span></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. Voice -->
+            <div class="ob-card" onclick="document.getElementById('micBtn')&&document.getElementById('micBtn').click()">
+              <div class="ob-num">03</div>
+              <div class="ob-body">
+                <div class="ob-title">🎙 Voice Input & Output</div>
+                <div class="ob-desc">Click the 🎙 mic button to speak your question. Click 🔊 PLAY on any answer to hear it spoken aloud. Supports Tamil, Hindi, Telugu, English and 16 more languages.</div>
+                <div class="ob-chips">
+                  <span class="ob-chip" onclick="event.stopPropagation();document.getElementById('micBtn')&&document.getElementById('micBtn').click()">🎙 Start Speaking</span>
+                  <span class="ob-chip" onclick="event.stopPropagation();document.getElementById('voiceCloneBtn')&&document.getElementById('voiceCloneBtn').click()">🌐 Set Your Language</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 4. Run Code -->
+            <div class="ob-card" onclick="quickAsk('Write a hello world in Python with a for loop')">
+              <div class="ob-num">04</div>
+              <div class="ob-body">
+                <div class="ob-title">▶ Run Code Instantly</div>
+                <div class="ob-desc">Ask CodeBuddy to write code — every code block has a <strong style="color:#00ffe0">▶ RUN</strong> button. Runs Python, JavaScript, C++, Java and 40+ languages directly in your browser. No install needed.</div>
+                <div class="ob-chips">
+                  <span class="ob-chip" onclick="event.stopPropagation();quickAsk('Write a Python fibonacci sequence')">Try: Python Fibonacci</span>
+                  <span class="ob-chip" onclick="event.stopPropagation();quickAsk('Write a JavaScript bubble sort')">Try: JS Bubble Sort</span>
+                </div>
+              </div>
+              <div class="ob-arrow">→</div>
+            </div>
+
+            <!-- 5. Features Hub -->
+            <div class="ob-card" onclick="window.HUB&&HUB.open()">
+              <div class="ob-num">05</div>
+              <div class="ob-body">
+                <div class="ob-title">⚡ 5 World-First Features</div>
+                <div class="ob-desc">Click <strong style="color:#fbbf24">⚡ FEATURES HUB</strong> in the sidebar to unlock exclusive tools no other AI coding assistant has.</div>
+                <div class="ob-mode-grid">
+                  <span class="ob-mode" style="--ob-c:#a855f7">🧠 THOUGHT REPLAY<span class="ob-mode-tip">Watch AI think step-by-step</span></span>
+                  <span class="ob-mode" style="--ob-c:#f97316">⚔ LIVE BATTLE<span class="ob-mode-tip">Code duel vs other users</span></span>
+                  <span class="ob-mode" style="--ob-c:#4ade80">✨ KARMA<span class="ob-mode-tip">Earn XP for helping others</span></span>
+                  <span class="ob-mode" style="--ob-c:#38bdf8">📈 LEARNING<span class="ob-mode-tip">Replay your coding journey</span></span>
+                  <span class="ob-mode" style="--ob-c:#e879f9">👁 BLIND REVIEW<span class="ob-mode-tip">Anonymous peer code review</span></span>
+                </div>
+              </div>
+              <div class="ob-arrow">→</div>
+            </div>
+
+            <!-- 6. Languages -->
+            <div class="ob-card" onclick="quickAsk('வணக்கம்! Python-இல் ஒரு சுழல் எழுது')">
+              <div class="ob-num">06</div>
+              <div class="ob-body">
+                <div class="ob-title">🌍 20 Languages — Ask in Your Language</div>
+                <div class="ob-desc">Use the language selector (top bar) to switch. Ask questions in Tamil, Hindi, Telugu, Kannada, Malayalam, Bengali and more — CodeBuddy answers in the same language.</div>
+                <div class="ob-chips">
+                  <span class="ob-chip" onclick="event.stopPropagation();quickAsk('Python-இல் for loop எப்படி பயன்படுத்துவது?')">தமிழில் கேளுங்கள்</span>
+                  <span class="ob-chip" onclick="event.stopPropagation();quickAsk('Python में for loop कैसे use करते हैं?')">हिंदी में पूछें</span>
+                </div>
+              </div>
+              <div class="ob-arrow">→</div>
+            </div>
+
+          </div>
+
+          <!-- Dismiss button -->
+          <div style="text-align:center;margin-top:24px">
+            <button onclick="dismissOnboarding()" style="background:rgba(0,255,224,0.06);border:1px solid rgba(0,255,224,0.2);color:#00ffe0;font-family:var(--display);font-size:9px;font-weight:700;letter-spacing:2px;padding:10px 28px;border-radius:6px;cursor:pointer;transition:all 0.2s">
+              ✓ GOT IT — START CODING
+            </button>
+          </div>
+        </div>
+
+        {% else %}
+        <!-- ══════════════ RETURNING USER: quick topic chips ══════════════ -->
         <div class="empty-holo">
-          <div class="empty-rings">
-            <div class="ering"></div>
-            <div class="ering"></div>
-            <div class="ering"></div>
-          </div>
-          <div class="empty-rings">
-            <div class="empty-icon-core">⚡</div>
-          </div>
+          <div class="empty-rings"><div class="ering"></div><div class="ering"></div><div class="ering"></div></div>
+          <div class="empty-rings"><div class="empty-icon-core">⚡</div></div>
         </div>
         <div class="empty-title">CODEBUDDY</div>
         <div class="empty-sub">Select a session or initialize a new one.<br>The forge awaits your query.</div>
@@ -3777,6 +4139,7 @@
           <div class="qchip" onclick="quickAsk('Explain REST vs GraphQL differences')">→ REST vs GraphQL</div>
           <div class="qchip" onclick="quickAsk('What are Python decorators?')">→ Python Decorators</div>
         </div>
+        {% endif %}
       </div>
     </div>
 
@@ -3785,6 +4148,7 @@
     <div class="input-zone">
       <div class="input-shell-wrap">
         <div class="input-shell">
+          <button class="mic-btn" id="micBtn" onclick="startVoice()" title="Voice input">🎙</button>
           <textarea id="message" placeholder="INITIALIZE QUERY // Press Enter to transmit" rows="1"
             onkeydown="handleKey(event)" oninput="onInput(this)"></textarea>
           <button class="forge-send" id="sendBtn" onclick="sendMessage()">▶</button>
@@ -3937,6 +4301,14 @@
 
     /* SIDEBAR */
     function toggleSidebar() { const sb = document.getElementById('sidebar'), tg = document.getElementById('sidebarToggle'); sb.classList.toggle('collapsed'); tg.textContent = sb.classList.contains('collapsed') ? '▶' : '◀'; }
+    function sidebarLiveSearch(q) {
+      const items = document.querySelectorAll('#chatList .chat-item');
+      const term = q.trim().toLowerCase();
+      items.forEach(item => {
+        const title = (item.querySelector('.chat-title') || item).textContent.toLowerCase();
+        item.style.display = (!term || title.includes(term)) ? '' : 'none';
+      });
+    }
 
     /* MODE */
     const modeNames = { general: 'GENERAL', interview: 'INTERVIEW', debug: 'DEBUG·ENGINE', optimize: 'OPTIMIZER', explain: 'EXPLAINER', dsa: 'DSA·MASTER', ml: 'ML·FORGE', ds: 'DATA·SCI', roadmap: 'ROADMAP' };
@@ -3962,10 +4334,9 @@
       // v4: Update model badge
       const codeModels = ['debug','optimize','dsa','ml','general','ds'];
       const fastModels = ['explain','interview','roadmap'];
-      const mb = document.getElementById('modelBadge');
-      if (mb) {
-        if (codeModels.includes(sel.value)) { mb.textContent = 'DEEPSEEK·R1'; mb.style.color='rgba(0,255,224,0.45)'; }
-        else { mb.textContent = 'GEMINI·FLASH'; mb.style.color='rgba(251,191,36,0.45)'; }
+      // Wire roadmap mode → stays as normal chat mode (roadmap is handled by the AI in chat)
+      if (sel.value === 'roadmap') {
+        // Nothing extra needed — roadmap works through the /chat endpoint like other modes
       }
     }
 
@@ -3982,6 +4353,19 @@
     function addHistory(role, text) { const list = document.getElementById('histList'); if (list.textContent.trim() === 'NO TRANSMISSIONS YET.') list.innerHTML = ''; const ts = new Date().toLocaleTimeString(); list.innerHTML += `<div class="hist-entry"><div class="hdot ${role}"></div><div class="htext"><span class="hmeta">${role === 'u' ? 'YOU' : 'AI'} · ${ts}</span>${text.slice(0, 90)}${text.length > 90 ? '…' : ''}</div></div>`; list.scrollTop = list.scrollHeight; }
 
     /* CODE BLOCKS */
+    function ensurePlayBars() {
+      document.querySelectorAll('.msg-row.bot .bubble-forge').forEach(function(forge) {
+        if (!forge.querySelector('.msg-play-bar')) {
+          var bar = document.createElement('div');
+          bar.className = 'msg-play-bar';
+          bar.innerHTML = '<button class="play-speak-btn" onclick="speakMsgBtn(this)">🔊 PLAY</button>'
+            + '<button class="rxn-btn" onclick="react(this,\'like\')">&#9650; <span>0</span></button>'
+            + '<button class="rxn-btn" onclick="react(this,\'dislike\')">&#9660; <span>0</span></button>'
+            + '<button class="rxn-btn" onclick="copyMsg(this)">COPY</button>';
+          forge.appendChild(bar);
+        }
+      });
+    }
     function enhanceCodeBlocks(container) {
       container.querySelectorAll('pre code').forEach(block => {
         const pre = block.parentElement;
@@ -4020,7 +4404,7 @@
         const iframe = content.querySelector('iframe');
         iframe.srcdoc = html;
         iframe.onload = () => { btn.classList.remove('running'); btn.classList.add('run-active'); btn.textContent = '■ CLOSE'; };
-      } else if (['python', 'javascript', 'bash'].includes(normLang) || normLang === '') {
+      } else {
         const displayLang = normLang || 'python';
         content.innerHTML = `<div class="run-console"><span class="con-info" style="opacity:0.5">⚙ Running ${displayLang.toUpperCase()}…</span></div>`;
         fetch('/run_code', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, language: displayLang }) })
@@ -4047,10 +4431,8 @@
             if (normLang === 'javascript' || normLang === '') { runInBrowser(code, content, btn); }
             else { content.innerHTML = `<div class="run-console"><span class="con-err">🔴 Server unreachable. Make sure CodeBuddy is running.</span></div>`; btn.classList.remove('running'); btn.classList.add('run-active'); btn.textContent = '■ CLOSE'; }
           });
-      } else {
-        runInBrowser(code, content, btn);
-      }
       lastCodeBlock = code;
+    }
     }
 
     function renderRunOutput(data, lang, content, btn) {
@@ -4100,20 +4482,38 @@
 
     /* BUILD MESSAGE */
     function buildAvatar(role) { const isUser = role === 'user'; const color = isUser ? 'rgba(0,255,224,0.6)' : 'rgba(168,85,247,0.6)'; const fill = isUser ? 'rgba(0,255,224,0.08)' : 'rgba(168,85,247,0.08)'; const label = isUser ? 'U' : 'AI'; return `<div class="avatar-forge"><svg viewBox="0 0 28 28" fill="none"><polygon points="14,1 26,7.5 26,20.5 14,27 2,20.5 2,7.5" fill="${fill}" stroke="${color}" stroke-width="1"/></svg><div class="avatar-inner" style="color:${isUser ? 'var(--plasma)' : 'var(--nova)'}">${label}</div></div>`; }
-    function makeMsgRow(role, content = '') {
+    function makeMsgRow(role, content) {
+      content = content || '';
       const row = document.createElement('div');
-      row.className = `msg-row ${role}`;
+      row.className = 'msg-row ' + role;
       const ts = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      const botBar = `<div class="msg-play-bar">
-    <button class="play-speak-btn" onclick="speakMsgBtn(this)">🔊 PLAY</button>
-    <button class="rxn-btn" onclick="react(this,'like')">▲ <span>0</span></button>
-    <button class="rxn-btn" onclick="react(this,'dislike')">▼ <span>0</span></button>
-    <button class="rxn-btn" onclick="copyMsg(this)">COPY</button>
-  </div>`;
-      const userBar = `<div class="msg-reactions"><button class="rxn-btn" onclick="copyMsg(this)">COPY</button></div>`;
-      row.innerHTML = `<div class="msg-meta">${buildAvatar(role)}<div class="msg-time">${ts}</div></div><div class="bubble-forge"><div class="bubble-content">${content}</div>${role === 'bot' ? botBar : userBar}</div>`;
+      // DOM methods — template literals break when content has backticks or ${...}
+      const meta = document.createElement('div');
+      meta.className = 'msg-meta';
+      meta.innerHTML = buildAvatar(role) + '<div class="msg-time">' + ts + '</div>';
+      const forge = document.createElement('div');
+      forge.className = 'bubble-forge';
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble-content';
+      bubble.innerHTML = content;
+      forge.appendChild(bubble);
+      const bar = document.createElement('div');
+      if (role === 'bot') {
+        bar.className = 'msg-play-bar';
+        bar.innerHTML = '<button class="play-speak-btn" onclick="speakMsgBtn(this)">🔊 PLAY</button>'
+          + '<button class="rxn-btn" onclick="react(this,\'like\')">&#9650; <span>0</span></button>'
+          + '<button class="rxn-btn" onclick="react(this,\'dislike\')">&#9660; <span>0</span></button>'
+          + '<button class="rxn-btn" onclick="copyMsg(this)">COPY</button>';
+      } else {
+        bar.className = 'msg-reactions';
+        bar.innerHTML = '<button class="rxn-btn" onclick="copyMsg(this)">COPY</button>';
+      }
+      forge.appendChild(bar);
+      row.appendChild(meta);
+      row.appendChild(forge);
       return row;
     }
+
     function react(btn, type) { const isL = type === 'like', cls = isL ? 'liked' : 'disliked', opp = isL ? 'disliked' : 'liked'; const sib = isL ? btn.nextElementSibling : btn.previousElementSibling; if (btn.classList.contains(cls)) { btn.classList.remove(cls); btn.querySelector('span').textContent = Math.max(0, +btn.querySelector('span').textContent - 1); } else { btn.classList.add(cls); btn.querySelector('span').textContent = +btn.querySelector('span').textContent + 1; if (sib && sib.classList.contains(opp)) { sib.classList.remove(opp); sib.querySelector('span').textContent = Math.max(0, +sib.querySelector('span').textContent - 1); } } }
     function copyMsg(btn) { navigator.clipboard.writeText(btn.closest('.msg-row').querySelector('.bubble-content').innerText || '').then(() => { const o = btn.textContent; btn.textContent = 'COPIED'; setTimeout(() => btn.textContent = o, 1500); }); }
 
@@ -4141,35 +4541,50 @@
         b.style.color = ''; b.style.borderColor = '';
       });
 
-      btn.textContent = '⏹ STOP';
+      // Show ⏳ LOADING… immediately — gives instant feedback
+      btn.textContent = '⏳ LOADING…';
       btn.classList.add('speaking-now');
-      btn.style.color = '#00ffe0';
-      btn.style.borderColor = 'rgba(0,255,224,0.4)';
+      btn.style.color = '#d97706';
+      btn.style.borderColor = 'rgba(217,119,6,0.35)';
 
       const resetBtn = () => {
         btn.textContent = '🔊 PLAY';
         btn.classList.remove('speaking-now');
         btn.style.color = ''; btn.style.borderColor = '';
       };
+      const setPlaying = () => {
+        btn.textContent = '⏹ STOP';
+        btn.style.color = '#00ffe0';
+        btn.style.borderColor = 'rgba(0,255,224,0.4)';
+      };
 
       const lang = typeof getLangRaw === 'function' ? getLangRaw() : 'en-US';
 
-      // Use CBVoice gTTS if available
+      // Route: CBVoice → gTTS (server)
       if (window.CBVoice && typeof window.CBVoice.speak === 'function') {
-        // Intercept the audio end to reset button
-        const origStop = () => resetBtn();
-        // Patch: listen for audio end on _currentAudio after a tick
-        setTimeout(() => {
-          if (window._currentAudio) {
-            window._currentAudio.addEventListener('ended', resetBtn, { once: true });
-            window._currentAudio.addEventListener('pause', resetBtn, { once: true });
-          }
-        }, 300);
+        // Stop any running SpeechRecognition IMMEDIATELY.
+        // Chrome blocks audio output while STT is active — this causes the 20-sec delay.
+        if (typeof window.CBVoice.stopSTT === 'function') window.CBVoice.stopSTT();
+
+        // Register direct callbacks — no polling, no race condition.
+        if (typeof window.CBVoice.setSpeakCallbacks === 'function') {
+          window.CBVoice.setSpeakCallbacks(
+            () => setPlaying(),   // onSpeakStart: audio loaded and playing
+            () => resetBtn()      // onSpeakEnd:   audio finished or stopped
+          );
+        }
+
+        // Show loading immediately for instant feedback
+        btn.textContent = '⏳ LOADING…';
+        btn.classList.add('speaking-now');
+        btn.style.color = '#d97706';
+        btn.style.borderColor = 'rgba(217,119,6,0.35)';
+
         window.CBVoice.speak(text, lang);
         return;
       }
 
-      // Fallback: direct /tts fetch
+      const ttsEP = window._hasVoiceClone ? '/voice_clone/tts' : '/tts';
       const clean = text.replace(/```[\s\S]*?```/g,'code block.')
         .replace(/`[^`]+`/g,'code').replace(/#{1,6}\s+/g,'')
         .replace(/\*\*([^*]+)\*\*/g,'$1').replace(/\*([^*]+)\*/g,'$1')
@@ -4177,7 +4592,7 @@
         .replace(/\s{2,}/g,' ').trim().slice(0, 2000);
       if (!clean) { resetBtn(); return; }
 
-      fetch('/tts', {
+      fetch(ttsEP, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: clean, lang })
@@ -4189,20 +4604,21 @@
         window._currentAudio = audio;
         audio.onended = () => { resetBtn(); URL.revokeObjectURL(url); window._currentAudio = null; };
         audio.onerror = () => { resetBtn(); window._currentAudio = null; };
-        audio.play();
+        audio.play().then(() => setPlaying()).catch(() => resetBtn());
       })
       .catch(() => {
-        // Last resort: browser TTS
-        window.speechSynthesis.cancel();
-        const utter = new SpeechSynthesisUtterance(clean);
-        utter.lang = lang; utter.rate = 0.92;
-        utter.onend = resetBtn; utter.onerror = resetBtn;
-        window.speechSynthesis.speak(utter);
+        // Do NOT fall back to browser TTS (female voice) — just reset button
+        resetBtn();
       });
     }
 
     /* CHAT */
     function selectChat(id, el) {
+      // Cancel any in-flight stream before switching
+      if (isStreaming) {
+        isStreaming = false;
+        sendBtn.disabled = false;
+      }
       currentChatId = id;
       sessionMsgCount = 0;
       document.querySelectorAll('.chat-item').forEach(e => e.classList.remove('active'));
@@ -4230,6 +4646,7 @@
             sessionMsgCount++;
           });
           chatBox.scrollTop = chatBox.scrollHeight;
+          setTimeout(ensurePlayBars, 200);
           updateStats('', null);
         })
         .catch(() => {
@@ -4237,7 +4654,7 @@
         });
     }
     function newChat() {
-      fetch('/new_chat', { method: 'POST' })
+      fetch('/new_chat', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({mode: document.getElementById('mode').value}) })
         .then(r => r.json())
         .then(d => {
           const id = d.chat_id || d.id;
@@ -4284,9 +4701,73 @@
     /* SEND */
     function handleKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }
     function onInput(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 150) + 'px'; const ctr = document.getElementById('charCtr'); const n = el.value.length; ctr.textContent = n + ' CHARS'; ctr.classList.toggle('active', n > 0); }
-    function quickAsk(text) { if (!currentChatId) { alert('Initialize a session first!'); return; } document.getElementById('message').value = text; sendMessage(); }
+    function dismissOnboarding() {
+      // Tell backend to set session flag so reload won't show onboarding again
+      fetch('/onboarding/dismiss', { method: 'POST' }).catch(() => {});
+
+      const guide = document.getElementById('onboardGuide');
+      if (!guide) return;
+      guide.style.opacity = '0';
+      guide.style.transform = 'translateY(-10px)';
+      guide.style.transition = 'all 0.3s';
+      setTimeout(() => {
+        const emp = document.getElementById('emptyState');
+        if (emp) {
+          emp.innerHTML = `
+            <div class="empty-holo">
+              <div class="empty-rings"><div class="ering"></div><div class="ering"></div><div class="ering"></div></div>
+              <div class="empty-rings"><div class="empty-icon-core">⚡</div></div>
+            </div>
+            <div class="empty-title">CODEBUDDY</div>
+            <div class="empty-sub">The forge awaits your query.</div>
+            <div class="quick-grid">
+              <div class="qchip" onclick="quickAsk('Explain async/await in JavaScript')">→ Async / Await JS</div>
+              <div class="qchip" onclick="quickAsk('What is Big O notation?')">→ Big O Notation</div>
+              <div class="qchip" onclick="quickAsk('How does React reconciliation work?')">→ React Reconciliation</div>
+              <div class="qchip" onclick="quickAsk('Write a Python quicksort implementation')">→ Python Quicksort</div>
+              <div class="qchip" onclick="quickAsk('Explain REST vs GraphQL differences')">→ REST vs GraphQL</div>
+              <div class="qchip" onclick="quickAsk('What are Python decorators?')">→ Python Decorators</div>
+            </div>`;
+        }
+      }, 300);
+      setTimeout(() => { document.getElementById('message') && document.getElementById('message').focus(); }, 350);
+    }
+
+    function quickAsk(text) {
+      if (!currentChatId) {
+        fetch('/new_chat', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({mode: document.getElementById('mode').value}) })
+          .then(r => r.json())
+          .then(d => {
+            const id = d.chat_id || d.id;
+            if (!id) return;
+            const list = document.getElementById('chatList');
+            document.querySelectorAll('.chat-item').forEach(e => e.classList.remove('active'));
+            const item = document.createElement('div');
+            item.className = 'chat-item active';
+            item.setAttribute('data-id', id);
+            item.innerHTML = '<span class="chat-title">New Session</span><div class="menu"><button class="menu-btn" onclick="toggleMenu(event,this)">⋯</button><div class="dropdown"><div onclick="event.stopPropagation();renameChat('+id+')">✏ RENAME</div><div onclick="event.stopPropagation();deleteChat('+id+')">✕ DELETE</div><div onclick="event.stopPropagation();shareChat('+id+')">⟁ SHARE</div></div></div>';
+            item.addEventListener('click', function(e) { if (!e.target.closest('.menu')) selectChat(id, item); });
+            list.insertBefore(item, list.firstChild);
+            currentChatId = id;
+            sessionMsgCount = 0;
+            const emp = document.getElementById('emptyState');
+            if (emp) emp.remove();
+            chatBox.innerHTML = '';
+            document.getElementById('message').value = text;
+            sendMessage();
+          }).catch(() => {});
+        return;
+      }
+      document.getElementById('message').value = text;
+      sendMessage();
+    }
     async function sendMessage() {
-      if (!currentChatId) { alert('Initialize a session first'); return; }
+      if (!currentChatId) {
+        // Auto-create chat if none exists
+        newChat();
+        setTimeout(sendMessage, 600);
+        return;
+      }
       const msgEl = document.getElementById('message'), msg = msgEl.value.trim();
       if (!msg || isStreaming) return;
       const emp = document.getElementById('emptyState'); if (emp) emp.remove();
@@ -4300,14 +4781,24 @@
       const personalityEl = document.getElementById('personality'); const confidenceEl = document.getElementById('confidence');
       fd.append('personality', personalityEl ? personalityEl.value : 'mentor'); fd.append('confidence', confidenceEl ? confidenceEl.value : '5');
       // v4: send user context for memory injection (backend handles it)
-      fd.append('user_agent', navigator.userAgent.slice(0, 50));
+      fd.append('user_agent', navigator.userAgent.slice(0, 50).replace(/[^\x20-\x7E]/g, ''));
       const botRow = makeMsgRow('bot'); const bContent = botRow.querySelector('.bubble-content');
       bContent.innerHTML = `<div class="forge-typing"><div class="fbar"></div><div class="fbar"></div><div class="fbar"></div><div class="fbar"></div><div class="fbar"></div><div class="fbar"></div><div class="fbar"></div></div>`;
       chatBox.appendChild(botRow); scrollDown();
       setProgress(0); const t0 = Date.now();
       try {
         const res = await fetch('/chat', { method: 'POST', body: fd });
-        if (!res.ok) { bContent.innerHTML = `<span style="color:var(--fire)">⚠ Server error ${res.status}. Please try again.</span>`; isStreaming = false; sendBtn.disabled = false; setTimeout(() => setProgress(0), 1500); return; }
+        if (!res.ok) {
+          // Handle rate limit (429) specially — show countdown
+          if (res.status === 429) {
+            let retryAfter = 60;
+            try { const j = await res.json(); retryAfter = j.retry_after || 60; } catch(e) {}
+            showRateLimitCountdown(bContent, retryAfter, msg, botRow);
+          } else {
+            bContent.innerHTML = `<span style="color:var(--fire)">⚠ Server error ${res.status}. Please try again.</span>`;
+          }
+          isStreaming = false; sendBtn.disabled = false; setTimeout(() => setProgress(0), 1500); return;
+        }
         const reader = res.body.getReader(), decoder = new TextDecoder();
         let full = '', first = true, chunks = 0;
         while (true) {
@@ -4315,6 +4806,12 @@
           if (done) break;
           if (first) { bContent.innerHTML = ''; first = false; }
           full += decoder.decode(value); chunks++;
+          // Detect OpenRouter 429 in stream
+          if (full.trim() === '⚠ ⏳ RATE_LIMIT_429' || full.includes('RATE_LIMIT_429')) {
+            showRateLimitCountdown(bContent, 60, msg, botRow);
+            isStreaming = false; sendBtn.disabled = false; setTimeout(() => setProgress(0), 1500);
+            return;
+          }
           bContent.innerHTML = marked.parse(full) + '<span class="type-cursor"></span>';
           lastAIResponse = full;
           updateStats(full, (Date.now() - t0) / 1000);
@@ -4333,7 +4830,7 @@
           bar.innerHTML = `<button class="play-speak-btn" onclick="speakMsgBtn(this)">🔊 PLAY</button><button class="rxn-btn" onclick="react(this,'like')">▲ <span>0</span></button><button class="rxn-btn" onclick="react(this,'dislike')">▼ <span>0</span></button><button class="rxn-btn" onclick="copyMsg(this)">COPY</button>`;
           forge.appendChild(bar);
         }
-        setProgress(100); updateStats(full, (Date.now() - t0) / 1000);
+        setProgress(100); setTimeout(ensurePlayBars, 100); updateStats(full, (Date.now() - t0) / 1000);
         addHistory('b', full);
         // sessionMsgCount counts user messages only; check <= 1 to trigger title refresh after first user message
         if (sessionMsgCount <= 1 && currentChatId) {
@@ -4360,33 +4857,133 @@
       chatBox.scrollTop = chatBox.scrollHeight;
     }
 
+    /* RATE LIMIT COUNTDOWN ─────────────────────────────────────────────── */
+    function showRateLimitCountdown(bContent, seconds, originalMsg, botRow) {
+      let remaining = seconds;
+      // Style the bubble as a rate-limit card
+      const render = () => {
+        const bar = Math.round((remaining / seconds) * 16);
+        const filled = '█'.repeat(bar);
+        const empty = '░'.repeat(16 - bar);
+        bContent.innerHTML = `
+          <div style="font-family:var(--mono);padding:4px 0">
+            <div style="color:#facc15;font-size:11px;font-weight:700;letter-spacing:2px;margin-bottom:10px">⏳ RATE LIMIT REACHED</div>
+            <div style="color:rgba(226,244,255,0.55);font-size:10px;margin-bottom:12px;line-height:1.6">
+              OpenRouter free tier limit hit.<br>
+              All 3 AI models are cooling down.<br>
+              Auto-retrying in <span style="color:#facc15;font-weight:700">${remaining}s</span>…
+            </div>
+            <div style="color:#facc15;font-size:10px;letter-spacing:1px;margin-bottom:12px">${filled}<span style="color:rgba(250,204,21,0.25)">${empty}</span></div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button onclick="window._rlRetry&&window._rlRetry()" style="padding:7px 14px;background:rgba(250,204,21,0.12);border:1px solid rgba(250,204,21,0.4);color:#facc15;font-family:var(--display);font-size:9px;font-weight:700;letter-spacing:2px;cursor:pointer;border-radius:4px;transition:all 0.15s" onmouseover="this.style.background='rgba(250,204,21,0.22)'" onmouseout="this.style.background='rgba(250,204,21,0.12)'">⚡ RETRY NOW</button>
+              <button onclick="window._rlCancel&&window._rlCancel()" style="padding:7px 14px;background:rgba(226,244,255,0.04);border:1px solid rgba(226,244,255,0.12);color:rgba(226,244,255,0.35);font-family:var(--display);font-size:9px;font-weight:700;letter-spacing:2px;cursor:pointer;border-radius:4px">✕ DISMISS</button>
+            </div>
+            <div style="margin-top:10px;color:rgba(226,244,255,0.2);font-size:9px">💡 Tip: Add $10 credit at openrouter.ai to unlock 1000+ requests/day</div>
+          </div>`;
+      };
+      render();
+
+      let timer = setInterval(() => {
+        remaining--;
+        if (remaining <= 0) {
+          clearInterval(timer);
+          window._rlRetry && window._rlRetry();
+          return;
+        }
+        render();
+      }, 1000);
+
+      window._rlCancel = () => {
+        clearInterval(timer);
+        if (botRow && botRow.parentNode) botRow.parentNode.removeChild(botRow);
+        window._rlRetry = null; window._rlCancel = null;
+      };
+
+      window._rlRetry = () => {
+        clearInterval(timer);
+        window._rlRetry = null; window._rlCancel = null;
+        // Remove the rate limit bubble
+        if (botRow && botRow.parentNode) botRow.parentNode.removeChild(botRow);
+        // Re-inject the original message into the input and resend
+        const msgEl = document.getElementById('message');
+        if (msgEl && originalMsg) {
+          msgEl.value = originalMsg;
+          sendMessage();
+        }
+      };
+    }
+
     /* SCROLL */
     chatBox.addEventListener('scroll', () => { const nb = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 80; scrollFab.classList.toggle('vis', !nb && chatBox.scrollHeight > chatBox.clientHeight + 200); });
     function scrollDown() { chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' }); }
 
     /* USER MENU */
-    function toggleUserMenu() { document.getElementById('userMenu').classList.toggle('open'); }
-    document.addEventListener('click', e => { const um = document.getElementById('userMenu'); if (!um.contains(e.target)) um.classList.remove('open'); });
-
-    /* DROPDOWN */
-    function toggleMenu(e, btn) {
-      e.stopPropagation();
-      const parentMenu = btn.parentElement;
-      const isOpen = parentMenu.classList.contains('open');
-      // close all first
-      document.querySelectorAll('.menu').forEach(m => m.classList.remove('open'));
-      if (!isOpen) {
-        parentMenu.classList.add('open');
-        // position dropdown using fixed coords from button rect
-        const dropdown = parentMenu.querySelector('.dropdown');
-        const rect = btn.getBoundingClientRect();
-        dropdown.style.top = (rect.bottom + 4) + 'px';
-        dropdown.style.left = Math.max(4, rect.right - 155) + 'px';
+    function toggleUserMenu() {
+      const um = document.getElementById('userMenu');
+      const willOpen = !um.classList.contains('open');
+      um.classList.toggle('open');
+      if (willOpen) {
+        // Close when clicking outside, using setTimeout to avoid same-click closing
+        setTimeout(() => {
+          function closeMenu(e) {
+            if (!document.getElementById('userMenu').contains(e.target)) {
+              document.getElementById('userMenu').classList.remove('open');
+              document.removeEventListener('click', closeMenu, true);
+            }
+          }
+          document.addEventListener('click', closeMenu, true);
+        }, 0);
       }
     }
-    document.addEventListener('click', e => {
-      if (!e.target.closest('.menu')) document.querySelectorAll('.menu').forEach(m => m.classList.remove('open'));
-    });
+
+    /* DROPDOWN */
+    // ── Three-dot menu: simple, reliable implementation ──
+    let _menuCloseTimer = null;
+
+    function toggleMenu(e, btn) {
+      e.stopPropagation();
+      e.preventDefault();
+      clearTimeout(_menuCloseTimer);
+
+      const parentMenu = btn.parentElement;
+      const isOpen = parentMenu.classList.contains('open');
+
+      // Close any other open menus
+      document.querySelectorAll('.menu.open').forEach(m => {
+        if (m !== parentMenu) m.classList.remove('open');
+      });
+
+      if (isOpen) {
+        parentMenu.classList.remove('open');
+        return;
+      }
+
+      // Open this menu
+      const dropdown = parentMenu.querySelector('.dropdown');
+      const rect = btn.getBoundingClientRect();
+
+      let top = rect.bottom + 4;
+      let left = rect.right - 160;
+      if (left < 8) left = 8;
+      if (left + 160 > window.innerWidth - 8) left = window.innerWidth - 168;
+      if (top + 120 > window.innerHeight - 8) top = rect.top - 124;
+
+      dropdown.style.top = top + 'px';
+      dropdown.style.left = left + 'px';
+      parentMenu.classList.add('open');
+
+      // Close when clicking anywhere outside — use a one-shot mousedown on document
+      // Use setTimeout so this handler isn't triggered by the current click event
+      _menuCloseTimer = setTimeout(() => {
+        function closeOnOutside(ev) {
+          if (!ev.target.closest('.menu')) {
+            document.querySelectorAll('.menu.open').forEach(m => m.classList.remove('open'));
+          }
+          document.removeEventListener('mousedown', closeOnOutside, true);
+        }
+        document.addEventListener('mousedown', closeOnOutside, true);
+      }, 0);
+    }
     function renameChat(id) { const n = prompt('ENTER NEW SESSION NAME:'); if (!n) return; fetch('/rename_chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: id, title: n }) }).then(() => location.reload()); }
     function deleteChat(id) { if (!confirm('TERMINATE SESSION?')) return; fetch('/delete_chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: id }) }).then(() => location.reload()); }
     function shareChat(id) { fetch('/share_chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: id }) }).then(r => r.json()).then(d => alert('SHARE URL: ' + d.share_url)); }
@@ -5026,32 +5623,36 @@ Hints used: ${IV.hintCount} | Skipped: ${IV.skipCount} | Best streak: ${IV.maxSt
           window.CBVoice.speak(t, lang);
         } else if (retries > 30) {
           clearInterval(trySpeak);
-          // Hard fallback: browser TTS (last resort)
-          if (!window.speechSynthesis) return;
-          const clean = t.replace(/```[\s\S]*?```/g,' ').replace(/`[^`]+`/g,' ')
-            .replace(/\*\*([^*]+)\*\*/g,'$1').replace(/\*([^*]+)\*/g,'$1')
-            .replace(/<[^>]+>/g,' ').replace(/\s{2,}/g,' ').trim().slice(0,1500);
-          if (!clean) return;
-          window.speechSynthesis.cancel();
-          const u = new SpeechSynthesisUtterance(clean);
-          u.lang = lang; u.rate = 0.9;
-          window.speechSynthesis.speak(u);
+          // CBVoice never loaded — silently skip (no browser TTS fallback to avoid female voice)
+          console.warn('CBVoice not available after 3s, skipping TTS');
         }
       }, 100);
+      // Safety: always clear after 4s regardless
+      setTimeout(() => clearInterval(trySpeak), 4000);
     }
     function pauseSpeech() {
-      // Pause gTTS audio (Tamil/Hindi/Tanglish)
-      if (window._currentAudio) window._currentAudio.pause();
-      // Pause browser TTS (English fallback)
-      window.speechSynthesis.pause();
+      // Route through CBVoice so gTTS audio is paused correctly
+      if (window.CBVoice && typeof window.CBVoice.pause === 'function') {
+        window.CBVoice.pause();
+      } else {
+        window.speechSynthesis.pause();
+      }
     }
     function resumeSpeech() {
-      // Resume gTTS audio (Tamil/Hindi/Tanglish)
-      if (window._currentAudio) window._currentAudio.play();
-      // Resume browser TTS (English fallback)
-      window.speechSynthesis.resume();
+      // Route through CBVoice so gTTS audio is resumed correctly
+      if (window.CBVoice && typeof window.CBVoice.resume === 'function') {
+        window.CBVoice.resume();
+      } else {
+        window.speechSynthesis.resume();
+      }
     }
-    function stopSpeech() { window.speechSynthesis.cancel(); }
+    function stopSpeech() {
+      if (window.CBVoice && typeof window.CBVoice.stop === 'function') {
+        window.CBVoice.stop();
+      } else {
+        window.speechSynthesis.cancel();
+      }
+    }
     function toggleAutoSpeak() {
       const btn = document.getElementById('autoSpeakToggle');
       const lbl = document.getElementById('autoSpeakLabel');
@@ -5066,20 +5667,88 @@ Hints used: ${IV.hintCount} | Skipped: ${IV.skipCount} | Best streak: ${IV.maxSt
       else window.speechSynthesis.cancel();
     }
     function startVoice() {
-      if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) { alert('SPEECH RECOGNITION UNAVAILABLE'); return; }
-      if (recognition) { recognition.stop(); recognition = null; return; }
-      recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-      recognition.lang = getLang();
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.start();
-      recognition.onresult = e => { document.getElementById('message').value = e.results[0][0].transcript; onInput(document.getElementById('message')); };
-      recognition.onend = () => { recognition = null; };
-      recognition.onerror = e => { console.warn('Voice error:', e.error); recognition = null; };
+      const btn = document.getElementById('micBtn');
+      const msgBox = document.getElementById('message');
+
+      // If already recording → stop
+      if (recognition) {
+        recognition.stop();
+        recognition = null;
+        if (btn) { btn.classList.remove('active'); btn.textContent = '🎙'; }
+        return;
+      }
+
+      // Browser support check
+      if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+        if (btn) btn.title = 'Not supported in this browser';
+        // Show inline toast
+        const hint = document.createElement('div');
+        hint.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:rgba(255,60,60,0.9);color:#fff;font-family:var(--display);font-size:10px;letter-spacing:2px;padding:8px 18px;border-radius:20px;z-index:9999;pointer-events:none';
+        hint.textContent = '⚠ SPEECH RECOGNITION NOT SUPPORTED — USE CHROME/EDGE';
+        document.body.appendChild(hint);
+        setTimeout(() => hint.remove(), 3500);
+        return;
+      }
+
+      // Request mic permission first
+      navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(() => {
+          recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+          recognition.lang = (typeof getLang === 'function') ? getLang() : 'en-US';
+          recognition.continuous = false;
+          recognition.interimResults = true;
+
+          if (btn) { btn.classList.add('active'); btn.textContent = '🔴'; }
+          msgBox.placeholder = '🎤 Listening…';
+
+          recognition.onresult = e => {
+            let interim = '', final = '';
+            for (let i = e.resultIndex; i < e.results.length; i++) {
+              if (e.results[i].isFinal) final += e.results[i][0].transcript;
+              else interim += e.results[i][0].transcript;
+            }
+            msgBox.value = final || interim;
+            onInput(msgBox);
+          };
+
+          recognition.onend = () => {
+            recognition = null;
+            if (btn) { btn.classList.remove('active'); btn.textContent = '🎙'; }
+            msgBox.placeholder = 'INITIALIZE QUERY // Press Enter to transmit';
+          };
+
+          recognition.onerror = e => {
+            recognition = null;
+            if (btn) { btn.classList.remove('active'); btn.textContent = '🎙'; }
+            msgBox.placeholder = 'INITIALIZE QUERY // Press Enter to transmit';
+            const msgs = {
+              'not-allowed': '🚫 Microphone permission denied — check browser settings',
+              'no-speech':   '🔇 No speech detected — try again',
+              'network':     '🌐 Network error — check your connection',
+              'aborted':     '⏹ Recording stopped',
+            };
+            const txt = msgs[e.error] || ('⚠ Voice error: ' + e.error);
+            const hint = document.createElement('div');
+            hint.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:rgba(255,60,60,0.9);color:#fff;font-family:var(--display);font-size:10px;letter-spacing:2px;padding:8px 18px;border-radius:20px;z-index:9999;pointer-events:none';
+            hint.textContent = txt;
+            document.body.appendChild(hint);
+            setTimeout(() => hint.remove(), 3500);
+          };
+
+          recognition.start();
+        })
+        .catch(err => {
+          const hint = document.createElement('div');
+          hint.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:rgba(255,60,60,0.9);color:#fff;font-family:var(--display);font-size:10px;letter-spacing:2px;padding:8px 18px;border-radius:20px;z-index:9999;pointer-events:none';
+          hint.textContent = '🚫 MIC PERMISSION DENIED — allow microphone in browser settings';
+          document.body.appendChild(hint);
+          setTimeout(() => hint.remove(), 4000);
+        });
     }
   </script>
 
-  <script src="/static/js/codebuddy_voice.js">
+  <script src="/static/js/codebuddy_voice.js"></script>
+  <script>
     /* ════════════════════════════════════════════════════════════
        FILE FORGE — upload, edit, run, AI edit, autocomplete
     ════════════════════════════════════════════════════════════ */
@@ -5290,8 +5959,7 @@ Hints used: ${IV.hintCount} | Skipped: ${IV.skipCount} | Best streak: ${IV.maxSt
          TANGLISH AUTOCOMPLETE ENGINE
          Fires 750ms after typing stops
       ════════════════════════════ */
-      function onInput() {
-        const ed = document.getElementById('fp-editor');
+      function _fpOnInput() {
         const linesBefore = ed.value.slice(0, ed.selectionStart).split('\n');
         document.getElementById('fp-lines').textContent = `${_lines(ed.value)} lines`;
         _hideAC();
@@ -5394,7 +6062,7 @@ Hints used: ${IV.hintCount} | Skipped: ${IV.skipCount} | Best streak: ${IV.maxSt
       return {
         togglePanel, close, dragOver, drop, fileChosen, loadFile,
         clear, run, download, sendToChat, analyze, aiEdit,
-        onInput, onKey, _applyAC, _acIdx: 0, _hlAC
+        onInput: _fpOnInput, onKey, _applyAC, _acIdx: 0, _hlAC
       };
     })();
 
@@ -5652,4 +6320,1438 @@ Hints used: ${IV.hintCount} | Skipped: ${IV.skipCount} | Best streak: ${IV.maxSt
     });
   </script>
 
+  <!-- ═══════════════════════════════════════════════════════════
+       FEATURES HUB — CSS
+  ═══════════════════════════════════════════════════════════ -->
+  <style>
+    /* ── Hub trigger button in sidebar ── */
+    #featuresHubBtn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 10px;
+      border: 1px solid rgba(0,255,224,0.18);
+      border-radius: 4px;
+      background: rgba(0,255,224,0.03);
+      color: rgba(0,255,224,0.55);
+      font-family: var(--display); font-size: 8px; font-weight: 700;
+      letter-spacing: 1.5px; cursor: pointer;
+      transition: all 0.2s; width: 100%;
+    }
+    #featuresHubBtn:hover { color: var(--plasma); border-color: rgba(0,255,224,0.45); background: rgba(0,255,224,0.07); }
+
+    /* ── Backdrop ── */
+    #hubBackdrop {
+      display: none; position: fixed; inset: 0;
+      background: rgba(2,4,12,0.82); backdrop-filter: blur(8px);
+      z-index: 1000;
+    }
+    #hubBackdrop.show { display: block; }
+
+    /* ── Hub panel ── */
+    #featuresHub {
+      display: none; position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%,-50%);
+      width: min(900px, 96vw);
+      max-height: 88vh;
+      background: rgba(4,8,20,0.99);
+      border: 1px solid rgba(0,255,224,0.15);
+      border-radius: 10px;
+      z-index: 1001;
+      overflow: hidden;
+      box-shadow: 0 32px 100px rgba(0,0,0,0.9), 0 0 60px rgba(0,255,224,0.06);
+      flex-direction: column;
+      animation: hubIn 0.22s cubic-bezier(0.34,1.2,0.64,1);
+    }
+    #featuresHub.show { display: flex; }
+    @keyframes hubIn {
+      from { opacity:0; transform:translate(-50%,-50%) scale(0.94); }
+      to   { opacity:1; transform:translate(-50%,-50%) scale(1); }
+    }
+
+    /* header */
+    .hub-hdr {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 22px 14px;
+      border-bottom: 1px solid rgba(0,255,224,0.08);
+      flex-shrink: 0;
+      background: rgba(0,255,224,0.02);
+    }
+    .hub-hdr-title {
+      font-family: var(--display); font-size: 11px; font-weight: 800;
+      letter-spacing: 4px; color: var(--plasma);
+      text-shadow: 0 0 20px rgba(0,255,224,0.3);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .hub-hdr-title .hpulse {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--plasma); box-shadow: 0 0 8px var(--plasma);
+      animation: hbeat 1.4s ease infinite;
+    }
+    .hub-close {
+      background: none; border: none; color: rgba(226,244,255,0.25);
+      font-size: 16px; cursor: pointer; padding: 2px 6px; transition: color 0.15s;
+    }
+    .hub-close:hover { color: var(--fire); }
+
+    /* tab bar */
+    .hub-tabs {
+      display: flex; gap: 2px; padding: 10px 22px 0;
+      border-bottom: 1px solid rgba(0,255,224,0.07);
+      flex-shrink: 0; overflow-x: auto;
+    }
+    .hub-tab {
+      padding: 7px 14px; font-family: var(--display); font-size: 8px;
+      font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+      color: var(--text-3); cursor: pointer; border-bottom: 2px solid transparent;
+      transition: all 0.15s; white-space: nowrap; border-radius: 3px 3px 0 0;
+    }
+    .hub-tab:hover { color: var(--text-2); }
+    .hub-tab.active { color: var(--plasma); border-color: var(--plasma); background: rgba(0,255,224,0.04); }
+
+    /* body */
+    .hub-body { flex: 1; overflow-y: auto; padding: 20px 22px; }
+    .hub-body::-webkit-scrollbar { width: 3px; }
+    .hub-body::-webkit-scrollbar-thumb { background: var(--border-hi); }
+    .hub-panel { display: none; animation: fadeUp 0.2s ease; }
+    .hub-panel.active { display: block; }
+
+    /* Feature header block — matches screenshot design */
+    .hub-feature-header {
+      display: flex; gap: 16px; align-items: flex-start;
+      padding: 16px 18px; border-radius: 8px; margin-bottom: 20px;
+      background: rgba(0,255,224,0.03); border: 1px solid rgba(0,255,224,0.1);
+      position: relative; overflow: hidden;
+    }
+    .hub-feature-header::before {
+      content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+      background: linear-gradient(180deg, var(--plasma), var(--nova));
+      border-radius: 3px 0 0 3px;
+    }
+    .hub-feature-icon {
+      font-size: 32px; flex-shrink: 0; width: 54px; height: 54px;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(0,255,224,0.06); border: 1px solid rgba(0,255,224,0.15);
+      border-radius: 8px;
+    }
+    .hub-feature-meta { flex: 1; min-width: 0; }
+    .hub-feature-label {
+      font-family: var(--display); font-size: 8px; font-weight: 700;
+      letter-spacing: 3px; color: var(--nova); margin-bottom: 5px; text-transform: uppercase;
+    }
+    .hub-feature-title {
+      font-family: var(--display); font-size: 17px; font-weight: 900;
+      letter-spacing: 1.5px; color: var(--text); margin-bottom: 7px; text-transform: uppercase;
+    }
+    .hub-feature-desc {
+      font-family: var(--mono); font-size: 11.5px; color: var(--text-3); line-height: 1.75;
+    }
+
+    /* shared components */
+    .hub-section-title {
+      font-family: var(--display); font-size: 8px; font-weight: 700;
+      letter-spacing: 2px; color: var(--text-3); text-transform: uppercase;
+      margin-bottom: 12px; padding-bottom: 6px;
+      border-bottom: 1px solid rgba(0,255,224,0.06);
+    }
+    .hub-textarea {
+      width: 100%; background: rgba(0,255,224,0.03);
+      border: 1px solid rgba(0,255,224,0.1); border-radius: 4px;
+      color: var(--text); font-family: var(--mono); font-size: 12px;
+      line-height: 1.6; padding: 10px 12px; outline: none; resize: vertical;
+      transition: border-color 0.2s;
+    }
+    .hub-textarea:focus { border-color: rgba(0,255,224,0.3); }
+    .hub-input {
+      width: 100%; background: rgba(0,255,224,0.03);
+      border: 1px solid rgba(0,255,224,0.1); border-radius: 4px;
+      color: var(--text); font-family: var(--mono); font-size: 12px;
+      padding: 9px 12px; outline: none; transition: border-color 0.2s;
+    }
+    .hub-input:focus { border-color: rgba(0,255,224,0.3); }
+    .hub-select {
+      background: rgba(0,255,224,0.03); border: 1px solid rgba(0,255,224,0.1);
+      border-radius: 4px; color: var(--text); font-family: var(--mono);
+      font-size: 12px; padding: 8px 12px; outline: none; width: 100%;
+      appearance: none; cursor: pointer;
+    }
+    .hub-select option { background: #060d1a; }
+    .hub-btn {
+      padding: 9px 20px; border-radius: 4px; cursor: pointer;
+      font-family: var(--display); font-size: 9px; font-weight: 700;
+      letter-spacing: 2px; text-transform: uppercase; transition: all 0.2s;
+      border: 1px solid rgba(0,255,224,0.3);
+      background: rgba(0,255,224,0.06); color: var(--plasma);
+    }
+    .hub-btn:hover { background: rgba(0,255,224,0.14); box-shadow: 0 0 18px rgba(0,255,224,0.2); }
+    .hub-btn:disabled { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
+    .hub-btn.purple { border-color: rgba(168,85,247,0.3); background: rgba(168,85,247,0.06); color: var(--nova); }
+    .hub-btn.purple:hover { background: rgba(168,85,247,0.14); }
+    .hub-btn.fire { border-color: rgba(255,107,43,0.3); background: rgba(255,107,43,0.06); color: var(--fire); }
+    .hub-btn.fire:hover { background: rgba(255,107,43,0.14); }
+    .hub-btn.gold { border-color: rgba(251,191,36,0.3); background: rgba(251,191,36,0.06); color: var(--gold); }
+    .hub-btn.gold:hover { background: rgba(251,191,36,0.14); }
+    .hub-row { display: flex; gap: 10px; margin-bottom: 12px; align-items: flex-end; }
+    .hub-col { display: flex; flex-direction: column; gap: 5px; flex: 1; }
+    .hub-label {
+      font-family: var(--display); font-size: 7px; font-weight: 700;
+      letter-spacing: 2px; color: var(--text-3); text-transform: uppercase;
+    }
+    .hub-result {
+      margin-top: 14px; padding: 14px; border: 1px solid rgba(0,255,224,0.1);
+      border-radius: 4px; background: rgba(2,4,8,0.8);
+      font-family: var(--mono); font-size: 12px; color: var(--text-2);
+      line-height: 1.7; display: none; white-space: pre-wrap; word-break: break-word;
+      max-height: 340px; overflow-y: auto;
+    }
+    .hub-result.show { display: block; }
+    .hub-result::-webkit-scrollbar { width: 3px; }
+    .hub-result::-webkit-scrollbar-thumb { background: var(--border-hi); }
+    .hub-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 10px; border-radius: 20px; font-family: var(--display);
+      font-size: 8px; font-weight: 700; letter-spacing: 1px;
+    }
+    .hub-badge.cyan { border: 1px solid rgba(0,255,224,0.3); color: var(--plasma); background: rgba(0,255,224,0.06); }
+    .hub-badge.purple { border: 1px solid rgba(168,85,247,0.3); color: var(--nova); background: rgba(168,85,247,0.06); }
+    .hub-badge.gold { border: 1px solid rgba(251,191,36,0.3); color: var(--gold); background: rgba(251,191,36,0.06); }
+    .hub-badge.green { border: 1px solid rgba(74,222,128,0.3); color: #4ade80; background: rgba(74,222,128,0.06); }
+    .hub-badge.fire { border: 1px solid rgba(255,107,43,0.3); color: var(--fire); background: rgba(255,107,43,0.06); }
+    .hub-spinner { display: inline-block; width: 10px; height: 10px; border: 2px solid rgba(0,255,224,0.2); border-top-color: var(--plasma); border-radius: 50%; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Thought Replay steps */
+    .tr-step {
+      display: flex; gap: 12px; padding: 10px 0;
+      border-bottom: 1px solid rgba(0,255,224,0.05);
+      animation: fadeUp 0.2s ease;
+    }
+    .tr-step:last-child { border-bottom: none; }
+    .tr-dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+      margin-top: 5px;
+    }
+    .tr-dot.thinking { background: var(--plasma); box-shadow: 0 0 6px var(--plasma); }
+    .tr-dot.error { background: var(--fire); box-shadow: 0 0 6px var(--fire); }
+    .tr-dot.done { background: #4ade80; box-shadow: 0 0 6px #4ade80; }
+    .tr-label {
+      font-family: var(--display); font-size: 7.5px; font-weight: 700;
+      letter-spacing: 2px; color: var(--text-3); margin-bottom: 3px;
+    }
+    .tr-text { font-family: var(--mono); font-size: 11.5px; color: var(--text-2); line-height: 1.6; }
+    .tr-code {
+      margin-top: 6px; padding: 8px 12px; border-radius: 3px;
+      background: rgba(2,4,8,0.9); border: 1px solid rgba(0,255,224,0.1);
+      font-family: var(--mono); font-size: 11px; color: var(--plasma);
+      white-space: pre-wrap; word-break: break-all;
+    }
+
+    /* Battle */
+    .battle-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .battle-player {
+      padding: 12px; border: 1px solid rgba(0,255,224,0.08); border-radius: 4px;
+      background: rgba(0,255,224,0.02);
+    }
+    .battle-player-name {
+      font-family: var(--display); font-size: 8px; font-weight: 700;
+      letter-spacing: 2px; color: var(--plasma); margin-bottom: 6px;
+    }
+    .battle-score-bar { height: 4px; border-radius: 2px; background: rgba(0,255,224,0.08); overflow: hidden; margin-top: 6px; }
+    .battle-score-fill { height: 100%; border-radius: 2px; transition: width 0.8s ease; }
+
+    /* Karma */
+    .karma-level-bar { height: 6px; border-radius: 3px; background: rgba(0,255,224,0.08); overflow: hidden; margin: 8px 0; }
+    .karma-level-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--plasma), var(--nova)); transition: width 0.8s ease; }
+    .karma-event-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 7px 8px; border: 1px solid rgba(0,255,224,0.06); border-radius: 3px;
+      margin-bottom: 4px; background: rgba(0,255,224,0.01);
+    }
+    .karma-event-label { font-family: var(--mono); font-size: 10.5px; color: var(--text-2); }
+    .karma-delta { font-family: var(--display); font-size: 11px; font-weight: 700; }
+    .karma-delta.pos { color: #4ade80; }
+    .karma-delta.neg { color: var(--fire); }
+
+    /* Learning timeline */
+    .lr-entry {
+      display: flex; gap: 14px; padding: 10px 0;
+      border-bottom: 1px solid rgba(0,255,224,0.05);
+    }
+    .lr-entry:last-child { border-bottom: none; }
+    .lr-date { font-family: var(--display); font-size: 8px; color: var(--text-3); letter-spacing: 1px; flex-shrink: 0; width: 70px; padding-top: 2px; }
+    .lr-content { flex: 1; }
+    .lr-title { font-family: var(--mono); font-size: 11.5px; color: var(--text-2); margin-bottom: 2px; }
+    .lr-mode { font-family: var(--display); font-size: 7.5px; letter-spacing: 1.5px; color: var(--text-3); }
+
+    /* Blind Review cards */
+    .blind-card {
+      padding: 12px 14px; border: 1px solid rgba(0,255,224,0.08); border-radius: 4px;
+      background: rgba(0,255,224,0.02); margin-bottom: 8px; cursor: pointer;
+      transition: all 0.15s;
+    }
+    .blind-card:hover { border-color: rgba(0,255,224,0.25); background: rgba(0,255,224,0.05); }
+    .blind-card-hdr { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .blind-card-lang { font-family: var(--display); font-size: 8px; font-weight: 700; letter-spacing: 2px; color: var(--plasma); }
+    .blind-card-preview { font-family: var(--mono); font-size: 10.5px; color: var(--text-3); line-height: 1.5; white-space: pre-wrap; }
+
+    /* Search results */
+    .search-result {
+      display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+      border: 1px solid transparent; border-radius: 4px;
+      cursor: pointer; transition: all 0.15s; margin-bottom: 4px;
+    }
+    .search-result:hover { background: var(--plasma-dim); border-color: var(--border); }
+    .search-result-title { font-family: var(--mono); font-size: 11.5px; color: var(--text-2); flex: 1; }
+    .search-result-mode { font-family: var(--display); font-size: 7.5px; letter-spacing: 1.5px; color: var(--text-3); }
+  </style>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       FEATURES HUB — HTML
+  ═══════════════════════════════════════════════════════════ -->
+  <div id="hubBackdrop" onclick="HUB.close()"></div>
+
+  <div id="featuresHub">
+    <div class="hub-hdr">
+      <div class="hub-hdr-title">
+        <div class="hpulse"></div>⚡ FEATURES HUB
+      </div>
+      <button class="hub-close" onclick="HUB.close()">✕</button>
+    </div>
+    <div class="hub-tabs">
+      <div class="hub-tab active" onclick="HUB.tab('replay',this)">🧠 THOUGHT REPLAY</div>
+      <div class="hub-tab" onclick="HUB.tab('battle',this)">⚔ BATTLE</div>
+      <div class="hub-tab" onclick="HUB.tab('karma',this)">✨ KARMA</div>
+      <div class="hub-tab" onclick="HUB.tab('learning',this)">📈 LEARNING</div>
+      <div class="hub-tab" onclick="HUB.tab('blind',this)">👁 BLIND REVIEW</div>
+    </div>
+    <div class="hub-body">
+
+      <!-- THOUGHT REPLAY -->
+      <div class="hub-panel active" id="hub-replay">
+        <div class="hub-feature-header">
+          <div class="hub-feature-icon">🧠</div>
+          <div class="hub-feature-meta">
+            <div class="hub-feature-label">FEATURE 11</div>
+            <div class="hub-feature-title">THOUGHT REPLAY DEBUGGER</div>
+            <div class="hub-feature-desc">Watch the AI's internal reasoning unfold step-by-step as it debugs your code — every hypothesis, trace, and decision made visible.</div>
+          </div>
+        </div>
+        <div class="hub-section-title">BROKEN CODE INPUT</div>
+        <div class="hub-col" style="margin-bottom:14px">
+          <textarea class="hub-textarea" id="tr-code" rows="7" placeholder="// Paste your broken code here...
+def find_max(arr):
+    max = 0
+    for i in arr:
+        if i > max:
+            max = i
+    return max"></textarea>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px">
+          <button class="hub-btn" id="tr-btn" onclick="HUB.thoughtReplay()">▶ START REPLAY</button>
+          <button class="hub-btn fire" onclick="HUB.thoughtReplayReset()">↺ RESET</button>
+          <span id="tr-status" style="font-family:var(--display);font-size:8px;color:var(--text-3);letter-spacing:1.5px"></span>
+        </div>
+        <div class="hub-section-title">AI THOUGHT PROCESS — LIVE</div>
+        <div id="tr-steps" style="margin-top:8px"></div>
+      </div>
+
+
+
+
+
+
+
+      <!-- BATTLE -->
+      <div class="hub-panel" id="hub-battle">
+        <div class="hub-feature-header">
+          <div class="hub-feature-icon">⚔</div>
+          <div class="hub-feature-meta">
+            <div class="hub-feature-label">LIVE MULTIPLAYER</div>
+            <div class="hub-feature-title">CODE BATTLE ARENA</div>
+            <div class="hub-feature-desc">Compete with other coders in real-time. Create a battle to get a shareable ID, or join an existing one.</div>
+          </div>
+        </div>
+
+        <!-- Lobby: create / join -->
+        <div id="battle-lobby">
+          <div class="hub-row" style="gap:14px">
+            <div class="hub-col">
+              <button class="hub-btn" onclick="HUB.battleCreate()" style="width:100%;padding:13px 20px;font-size:10px">⚡ CREATE BATTLE</button>
+              <div style="font-family:var(--mono);font-size:10px;color:var(--text-3);margin-top:6px">Start a new session — get a shareable battle ID</div>
+            </div>
+            <div class="hub-col">
+              <label class="hub-label">Join existing battle</label>
+              <div style="display:flex;gap:6px">
+                <input class="hub-input" id="battle-join-id" placeholder="Enter Battle ID…" style="flex:1">
+                <button class="hub-btn" onclick="HUB.battleJoin()">JOIN</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Battle ID display card (shown after create) -->
+          <div id="battle-id-card" style="display:none;margin-top:18px;padding:18px 20px;border:1px solid rgba(0,255,224,0.25);border-radius:8px;background:rgba(0,255,224,0.04);position:relative;overflow:hidden">
+            <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--plasma),var(--nova),transparent);animation:scanline 2.5s linear infinite"></div>
+            <div style="font-family:var(--display);font-size:8px;font-weight:700;letter-spacing:3px;color:var(--text-3);margin-bottom:10px">YOUR BATTLE ID</div>
+            <div style="display:flex;align-items:center;gap:14px">
+              <div id="battle-id-display" style="font-family:var(--display);font-size:38px;font-weight:900;color:var(--plasma);text-shadow:0 0 30px var(--plasma-glow);letter-spacing:6px;line-height:1">—</div>
+              <div>
+                <button class="hub-btn" onclick="HUB.copyBattleId()" style="margin-bottom:6px;display:block;width:100%">📋 COPY ID</button>
+                <div style="font-family:var(--mono);font-size:9px;color:var(--text-3);line-height:1.5">Share this ID<br>with your opponent</div>
+              </div>
+            </div>
+            <div style="margin-top:12px;display:flex;align-items:center;gap:8px">
+              <div id="battle-wait-dot" style="width:8px;height:8px;border-radius:50%;background:var(--gold);box-shadow:0 0 8px var(--gold);animation:hbeat 1.2s ease infinite"></div>
+              <div id="battle-status-label" style="font-family:var(--display);font-size:9px;font-weight:700;letter-spacing:2px;color:var(--text-3)">WAITING FOR OPPONENT…</div>
+            </div>
+          </div>
+
+          <!-- Battle arena (shown after opponent joins) -->
+          <div id="battle-info" style="display:none;margin-top:14px">
+            <div style="padding:12px 14px;border:1px solid rgba(0,255,224,0.1);border-radius:6px;background:rgba(0,255,224,0.02);margin-bottom:12px">
+              <div style="font-family:var(--display);font-size:7px;font-weight:700;letter-spacing:2.5px;color:var(--text-3);margin-bottom:6px">PROBLEM STATEMENT</div>
+              <div id="battle-problem" style="font-family:var(--mono);font-size:12px;color:var(--text-2);line-height:1.7"></div>
+            </div>
+            <div class="battle-grid">
+              <div class="battle-player">
+                <div class="battle-player-name" id="bp1-name">YOU</div>
+                <textarea class="hub-textarea" id="battle-code" rows="9" placeholder="// Write your solution here..." oninput="HUB.battleUpdate()" style="font-size:11px"></textarea>
+              </div>
+              <div class="battle-player" id="bp2-panel" style="opacity:0.4">
+                <div class="battle-player-name" id="bp2-name">OPPONENT</div>
+                <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);padding:10px;border:1px solid rgba(0,255,224,0.06);border-radius:3px;min-height:120px;display:flex;align-items:center;justify-content:center">
+                  ⏳ Waiting for opponent…
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:10px">
+              <button class="hub-btn" id="battle-judge-btn" onclick="HUB.battleJudge()" disabled>⚖ JUDGE SOLUTIONS</button>
+              <button class="hub-btn fire" onclick="HUB.battleReset()">✕ END BATTLE</button>
+            </div>
+            <div id="battle-verdict" style="display:none;margin-top:14px;padding:14px;border:1px solid rgba(0,255,224,0.12);border-radius:6px;background:rgba(2,4,8,0.7)"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- KARMA -->
+      <div class="hub-panel" id="hub-karma">
+        <div class="hub-section-title">CODE KARMA — Your community reputation score</div>
+        <div style="display:flex;gap:8px;margin-bottom:14px">
+          <button class="hub-btn" onclick="HUB.loadKarma()">↻ REFRESH</button>
+        </div>
+        <div id="karma-overview" style="padding:14px;border:1px solid rgba(168,85,247,0.12);border-radius:6px;background:rgba(168,85,247,0.02);margin-bottom:14px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div id="karma-total" style="font-family:var(--display);font-size:36px;font-weight:900;color:var(--nova);text-shadow:0 0 20px rgba(168,85,247,0.4)">—</div>
+              <div id="karma-level-label" style="font-family:var(--display);font-size:9px;letter-spacing:2px;color:var(--text-3);margin-top:2px">LOADING…</div>
+            </div>
+            <div style="text-align:right">
+              <div id="karma-rank" style="font-family:var(--display);font-size:13px;font-weight:700;color:var(--gold)">Rank #—</div>
+              <div id="karma-next" style="font-family:var(--mono);font-size:10px;color:var(--text-3);margin-top:3px">Next level: —</div>
+            </div>
+          </div>
+          <div class="karma-level-bar"><div class="karma-level-fill" id="karma-progress-fill" style="width:0%"></div></div>
+        </div>
+        <div class="hub-section-title">EARN KARMA</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+          <button class="hub-btn purple" onclick="HUB.earnKarma('share_solution')">📤 Share Solution (+50)</button>
+          <button class="hub-btn gold" onclick="HUB.earnKarma('blind_review')">👁 Blind Review (+40)</button>
+          <button class="hub-btn" onclick="HUB.earnKarma('explain_concept')">💡 Explain Concept (+30)</button>
+          <button class="hub-btn green" onclick="HUB.earnKarma('fix_bug')" style="border-color:rgba(74,222,128,0.3);background:rgba(74,222,128,0.06);color:#4ade80">🐛 Fix a Bug (+75)</button>
+        </div>
+        <div class="hub-section-title">RECENT KARMA EVENTS</div>
+        <div id="karma-events"></div>
+      </div>
+
+      <!-- LEARNING REPLAY -->
+      <div class="hub-panel" id="hub-learning">
+        <div class="hub-section-title">LEARNING REPLAY — Your coding journey timeline</div>
+        <button class="hub-btn" onclick="HUB.loadLearning()" style="margin-bottom:14px">↻ LOAD MY JOURNEY</button>
+        <div id="lr-stats" style="display:none;gap:8px;flex-wrap:wrap;margin-bottom:14px"></div>
+        <div id="lr-timeline"></div>
+      </div>
+
+      <!-- BLIND CODE REVIEW -->
+      <div class="hub-panel" id="hub-blind">
+        <div class="hub-section-title">BLIND CODE REVIEW — Anonymous peer review system</div>
+        <div style="display:flex;gap:8px;margin-bottom:16px">
+          <button class="hub-btn" onclick="HUB.blindTab('submit')" id="bt-submit">📤 SUBMIT CODE</button>
+          <button class="hub-btn purple" onclick="HUB.blindTab('review')" id="bt-review">👁 REVIEW QUEUE</button>
+          <button class="hub-btn gold" onclick="HUB.blindTab('mine')" id="bt-mine">📋 MY SUBMISSIONS</button>
+        </div>
+        <!-- Submit -->
+        <div id="blind-submit-panel">
+          <div class="hub-row">
+            <div class="hub-col">
+              <label class="hub-label">Programming Language</label>
+              <select class="hub-select" id="blind-lang">
+                <option value="python">Python</option><option value="javascript">JavaScript</option>
+                <option value="typescript">TypeScript</option><option value="java">Java</option>
+                <option value="cpp">C++</option><option value="go">Go</option>
+                <option value="rust">Rust</option><option value="other">Other</option>
+              </select>
+            </div>
+          </div>
+          <div class="hub-col" style="margin-bottom:10px">
+            <label class="hub-label">Your code (submitted anonymously)</label>
+            <textarea class="hub-textarea" id="blind-code" rows="8" placeholder="// Paste your code for anonymous review..."></textarea>
+          </div>
+          <button class="hub-btn" onclick="HUB.blindSubmit()">📤 SUBMIT ANONYMOUSLY</button>
+          <div id="blind-submit-result" class="hub-result"></div>
+        </div>
+        <!-- Review queue -->
+        <div id="blind-review-panel" style="display:none">
+          <button class="hub-btn" onclick="HUB.loadBlindQueue()" style="margin-bottom:12px">↻ LOAD QUEUE</button>
+          <div id="blind-queue-list"></div>
+          <!-- Review form (shown when a card is selected) -->
+          <div id="blind-review-form" style="display:none;margin-top:14px;padding:14px;border:1px solid rgba(168,85,247,0.15);border-radius:6px;background:rgba(168,85,247,0.02)">
+            <div style="font-family:var(--display);font-size:8px;font-weight:700;letter-spacing:2px;color:var(--nova);margin-bottom:10px">REVIEWING: <span id="brf-anon"></span></div>
+            <pre id="brf-code" style="font-family:var(--mono);font-size:11px;color:var(--text-2);background:rgba(2,4,8,0.8);padding:12px;border-radius:4px;overflow-x:auto;margin-bottom:10px;white-space:pre-wrap;word-break:break-all;max-height:180px;overflow-y:auto"></pre>
+            <div class="hub-row">
+              <div class="hub-col">
+                <label class="hub-label">Rating (1–5 stars)</label>
+                <select class="hub-select" id="brf-stars">
+                  <option value="5">⭐⭐⭐⭐⭐ Excellent</option><option value="4">⭐⭐⭐⭐ Good</option>
+                  <option value="3" selected>⭐⭐⭐ Average</option><option value="2">⭐⭐ Needs work</option>
+                  <option value="1">⭐ Poor</option>
+                </select>
+              </div>
+            </div>
+            <div class="hub-col" style="margin:10px 0">
+              <label class="hub-label">Your review comment</label>
+              <textarea class="hub-textarea" id="brf-comment" rows="3" placeholder="Give constructive feedback on code quality, style, and suggestions..."></textarea>
+            </div>
+            <button class="hub-btn purple" onclick="HUB.submitBlindReview()">✔ SUBMIT REVIEW</button>
+          </div>
+        </div>
+        <!-- My submissions -->
+        <div id="blind-mine-panel" style="display:none">
+          <button class="hub-btn" onclick="HUB.loadMySubmissions()" style="margin-bottom:12px">↻ MY SUBMISSIONS</button>
+          <div id="blind-mine-list"></div>
+        </div>
+      </div>
+
+    </div><!-- /hub-body -->
+  </div><!-- /featuresHub -->
+
+  <!-- ═══════════════════════════════════════════════════════════
+       FEATURES HUB — JS
+  ═══════════════════════════════════════════════════════════ -->
+  <script>
+  const HUB = (() => {
+    /* ── state ── */
+    let _battleId = null, _battlePollTimer = null, _vfRec = null;
+    let _blindReviewTarget = null; // {id, anon_id, code}
+
+    /* ── open / close ── */
+    function open(tabId) {
+      document.getElementById('hubBackdrop').classList.add('show');
+      document.getElementById('featuresHub').classList.add('show');
+      if (tabId) {
+        const tabEl = document.querySelector(`.hub-tab[onclick*="'${tabId}'"]`);
+        if (tabEl) tab(tabId, tabEl);
+      }
+    }
+    function close() {
+      document.getElementById('hubBackdrop').classList.remove('show');
+      document.getElementById('featuresHub').classList.remove('show');
+    }
+    function tab(name, el) {
+      document.querySelectorAll('.hub-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.hub-panel').forEach(p => p.classList.remove('active'));
+      el.classList.add('active');
+      const panel = document.getElementById('hub-' + name);
+      if (panel) panel.classList.add('active');
+      // auto-load on tab open
+      if (name === 'karma') loadKarma();
+      if (name === 'learning') loadLearning();
+      if (name === 'blind') loadBlindQueue();
+    }
+    function _setBtn(id, loading, label) {
+      const b = document.getElementById(id);
+      if (!b) return;
+      b.disabled = loading;
+      b.innerHTML = loading ? `<span class="hub-spinner"></span> ${label}` : label;
+    }
+
+    /* ── THOUGHT REPLAY ── */
+    async function thoughtReplay() {
+      const code = document.getElementById('tr-code').value.trim();
+      if (!code) { hubToast('Paste some code first', 'warn'); return; }
+      _setBtn('tr-btn', true, 'ANALYSING…');
+      document.getElementById('tr-steps').innerHTML = '';
+      document.getElementById('tr-status').textContent = 'Initialising…';
+      try {
+        const r = await fetch('/thought_replay', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({code})
+        });
+        const text = await r.text();
+        const lines = text.trim().split('\n').filter(Boolean);
+        document.getElementById('tr-status').textContent = `${lines.length} steps`;
+        const container = document.getElementById('tr-steps');
+        lines.forEach(line => {
+          try {
+            const s = JSON.parse(line);
+            const cls = s.type || 'thinking';
+            const div = document.createElement('div'); div.className = 'tr-step';
+            div.innerHTML = `<div class="tr-dot ${cls}"></div><div style="flex:1">
+              <div class="tr-label">STEP ${s.step || '?'} · ${s.label || ''}</div>
+              <div class="tr-text">${s.text || ''}</div>
+              ${s.code ? `<div class="tr-code">${s.code.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>` : ''}
+            </div>`;
+            container.appendChild(div);
+          } catch {}
+        });
+      } catch (e) { hubToast('Replay failed: ' + e.message, 'err'); }
+      _setBtn('tr-btn', false, '▶ START REPLAY');
+      document.getElementById('tr-status').textContent = '';
+    }
+    function thoughtReplayReset() {
+      document.getElementById('tr-code').value = '';
+      document.getElementById('tr-steps').innerHTML = '';
+      document.getElementById('tr-status').textContent = '';
+    }
+
+    /* ── SEARCH CHATS ── */
+    async function searchChats() {
+      const q = document.getElementById('search-q').value.trim();
+      if (!q) return;
+      const res = document.getElementById('search-results');
+      res.innerHTML = '<span style="font-family:var(--mono);font-size:10px;color:var(--text-3)">Searching…</span>';
+      try {
+        const r = await fetch('/search_chats?q=' + encodeURIComponent(q));
+        const d = await r.json();
+        const results = d.results || [];
+        if (!results.length) { res.innerHTML = '<span style="font-family:var(--mono);font-size:10px;color:var(--text-3)">No sessions found.</span>'; return; }
+        res.innerHTML = results.map(r =>
+          `<div class="search-result" onclick="HUB.openSearchResult(${r.id})">
+            <span class="search-result-title">${r.title || 'Untitled'}</span>
+            <span class="search-result-mode">${(r.mode||'general').toUpperCase()}</span>
+          </div>`
+        ).join('');
+      } catch { res.innerHTML = '<span style="color:var(--fire);font-family:var(--mono);font-size:10px">Search failed.</span>'; }
+    }
+    function openSearchResult(id) {
+      close();
+      const item = document.querySelector(`.chat-item[onclick*="selectChat(${id}"]`);
+      if (item) { item.click(); }
+      else {
+        // Fallback: call selectChat directly if element found by data-id or similar
+        if (typeof selectChat === 'function') {
+          const fake = document.createElement('div');
+          selectChat(id, fake);
+        }
+      }
+    }
+
+    /* ── BOOKMARKS ── */
+    async function loadBookmarks() {
+      const list = document.getElementById('bm-list');
+      list.innerHTML = '<span style="font-family:var(--mono);font-size:10px;color:var(--text-3)">Loading…</span>';
+      try {
+        const r = await fetch('/get_bookmarks');
+        const d = await r.json();
+        const bms = d.bookmarks || [];
+        if (!bms.length) { list.innerHTML = '<div style="font-family:var(--mono);font-size:11px;color:var(--text-3);padding:10px 0">No bookmarks yet. In chat, add a bookmark button to any message.</div>'; return; }
+        list.innerHTML = bms.map(b =>
+          `<div style="padding:10px 12px;border:1px solid rgba(0,255,224,0.08);border-radius:4px;margin-bottom:7px;background:rgba(0,255,224,0.01)">
+            <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+              <span class="hub-badge cyan">${b.role || 'ai'}</span>
+              <span style="font-family:var(--display);font-size:7.5px;color:var(--text-3)">${(b.created_at||'').slice(0,10)}</span>
+            </div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--text-2);line-height:1.6">${(b.content||'').slice(0,300)}${b.content&&b.content.length>300?'…':''}</div>
+            ${b.note?`<div style="font-family:var(--display);font-size:8px;color:var(--text-3);margin-top:5px;letter-spacing:1px">📌 ${b.note}</div>`:''}
+          </div>`
+        ).join('');
+      } catch { list.innerHTML = '<span style="color:var(--fire);font-family:var(--mono);font-size:10px">Failed to load bookmarks.</span>'; }
+    }
+
+    /* ── COMPLEXITY ── */
+    async function analyzeComplexity() {
+      const code = document.getElementById('cx-code').value.trim();
+      if (!code) { hubToast('Paste code first', 'warn'); return; }
+      _setBtn('cx-btn', true, 'ANALYSING…');
+      const res = document.getElementById('cx-result');
+      res.classList.remove('show'); res.textContent = '';
+      try {
+        const r = await fetch('/analyze_complexity', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({code})
+        });
+        const d = await r.json();
+        res.innerHTML = `<div style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap">
+          <div><span class="hub-badge cyan">TIME</span> <span style="font-family:var(--display);font-size:14px;font-weight:800;color:var(--plasma);margin-left:8px">${d.time_complexity||'O(?)'}</span></div>
+          <div><span class="hub-badge purple">SPACE</span> <span style="font-family:var(--display);font-size:14px;font-weight:800;color:var(--nova);margin-left:8px">${d.space_complexity||'O(?)'}</span></div>
+        </div>
+        <div style="font-family:var(--mono);font-size:11.5px;color:var(--text-2);line-height:1.6">${d.explanation||''}</div>`;
+        res.classList.add('show');
+      } catch { res.textContent = 'Analysis failed.'; res.classList.add('show'); }
+      _setBtn('cx-btn', false, '📊 ANALYZE COMPLEXITY');
+    }
+
+    /* ── BATTLE ── */
+    async function battleCreate() {
+      try {
+        const r = await fetch('/battle/create', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'});
+        const d = await r.json();
+        _battleId = d.battle_id;
+        _battleProblem = d.problem || '';
+        // Show the battle ID card prominently
+        const idCard = document.getElementById('battle-id-card');
+        idCard.style.display = 'block';
+        document.getElementById('battle-id-display').textContent = _battleId;
+        document.getElementById('battle-status-label').textContent = 'WAITING FOR OPPONENT…';
+        hubToast(`Battle #${_battleId} created! Share this ID with opponent.`, 'ok');
+        _startBattlePoll();
+      } catch(e) { hubToast('Failed: ' + e.message, 'err'); }
+    }
+    function copyBattleId() {
+      if (!_battleId) return;
+      navigator.clipboard.writeText(String(_battleId)).then(() => {
+        hubToast('Battle ID ' + _battleId + ' copied!', 'ok');
+      }).catch(() => {
+        prompt('Copy this Battle ID:', String(_battleId));
+      });
+    }
+    async function battleJoin() {
+      const id = parseInt(document.getElementById('battle-join-id').value.trim());
+      if (!id) { hubToast('Enter a battle ID', 'warn'); return; }
+      try {
+        const r = await fetch('/battle/join', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({battle_id:id})});
+        const d = await r.json();
+        if (d.error) { hubToast(d.error, 'err'); return; }
+        _battleId = id;
+        _showBattle(d);
+        document.getElementById('battle-status-label').textContent = 'BATTLE ACTIVE — Write your solution!';
+        document.getElementById('battle-judge-btn').disabled = false;
+        document.getElementById('bp2-panel').style.opacity = '1';
+      } catch(e) { hubToast('Join failed: ' + e.message, 'err'); }
+    }
+    let _battleProblem = '';  // stored at create/join time
+    function _showBattle(d) {
+      document.getElementById('battle-info').style.display = 'block';
+      // Use stored problem or fallback to d.problem
+      const prob = d.problem || _battleProblem || '';
+      document.getElementById('battle-problem').textContent = prob;
+      if (prob) _battleProblem = prob;
+      const unEl = document.querySelector('.welcome-forge em');
+      const un = unEl ? unEl.textContent.toUpperCase() : 'YOU';
+      document.getElementById('bp1-name').textContent = un;
+    }
+    function _startBattlePoll() {
+      clearInterval(_battlePollTimer);
+      _battlePollTimer = setInterval(async () => {
+        if (!_battleId) return;
+        try {
+          const r = await fetch('/battle/status/' + _battleId);
+          const d = await r.json();
+          if (d.status === 'active') {
+            clearInterval(_battlePollTimer);
+            // Hide waiting card, show arena
+            document.getElementById('battle-id-card').style.display = 'none';
+            _showBattle(d);
+            document.getElementById('battle-status-label').textContent = 'OPPONENT JOINED — BATTLE ACTIVE!';
+            document.getElementById('battle-judge-btn').disabled = false;
+            document.getElementById('bp2-panel').style.opacity = '1';
+            document.getElementById('bp2-panel').querySelector('div').textContent = 'Opponent is coding…';
+            hubToast('Opponent joined! Battle is LIVE!', 'ok');
+          }
+        } catch {}
+      }, 3000);
+    }
+    let _battleUpdateTimer = null;
+    function battleUpdate() {
+      clearTimeout(_battleUpdateTimer);
+      _battleUpdateTimer = setTimeout(async () => {
+        if (!_battleId) return;
+        const code = document.getElementById('battle-code').value;
+        await fetch('/battle/update', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({battle_id:_battleId, code})}).catch(()=>{});
+      }, 1500);
+    }
+    async function battleJudge() {
+      const code = document.getElementById('battle-code').value.trim();
+      if (!code) { hubToast('Write your solution first', 'warn'); return; }
+      _setBtn('battle-judge-btn', true, 'JUDGING…');
+      try {
+        // First save own latest code
+        await fetch('/battle/update', {method:'POST', headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({battle_id:_battleId, code})}).catch(()=>{});
+        // Fetch opponent code from backend
+        let code2 = '# No submission';
+        try {
+          const sr = await fetch('/battle/status/' + _battleId);
+          const sd = await sr.json();
+          if (sd.opponent_code) code2 = sd.opponent_code;
+        } catch(e) {}
+        const r = await fetch('/battle/judge', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({
+            battle_id: _battleId, code1: code, code2: code2,
+            problem: document.getElementById('battle-problem').textContent,
+            player1: '{{ username }}', player2: 'Opponent'
+          })
+        });
+        const d = await r.json();
+        const vEl = document.getElementById('battle-verdict');
+        const w = d.winner === 'player1' ? '🏆 YOU WIN!' : d.winner === 'tie' ? '🤝 TIE!' : '🏅 OPPONENT WINS';
+        const wc = d.winner === 'player1' ? 'var(--plasma)' : d.winner === 'tie' ? 'var(--gold)' : 'var(--fire)';
+        vEl.innerHTML = `
+          <div style="font-family:var(--display);font-size:16px;font-weight:900;color:${wc};margin-bottom:10px;letter-spacing:3px">${w}</div>
+          <div class="battle-grid" style="margin-bottom:10px">
+            <div class="battle-player">
+              <div class="battle-player-name">YOU — ${d.p1_score}/100</div>
+              <div class="battle-score-bar"><div class="battle-score-fill" style="width:${d.p1_score}%;background:var(--plasma)"></div></div>
+              <div style="font-family:var(--mono);font-size:10px;color:var(--text-3);margin-top:5px">${d.p1_feedback||''}</div>
+            </div>
+            <div class="battle-player">
+              <div class="battle-player-name">OPPONENT — ${d.p2_score}/100</div>
+              <div class="battle-score-bar"><div class="battle-score-fill" style="width:${d.p2_score}%;background:var(--nova)"></div></div>
+              <div style="font-family:var(--mono);font-size:10px;color:var(--text-3);margin-top:5px">${d.p2_feedback||''}</div>
+            </div>
+          </div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-2);line-height:1.6">${d.verdict||''}</div>`;
+        vEl.style.display = 'block';
+      } catch(e) { hubToast('Judging failed: ' + e.message, 'err'); }
+      _setBtn('battle-judge-btn', false, '⚖ JUDGE SOLUTIONS');
+    }
+    function battleReset() { _battleId = null; _battleProblem = ''; clearInterval(_battlePollTimer); document.getElementById('battle-info').style.display='none'; document.getElementById('battle-id-card').style.display='none'; document.getElementById('battle-verdict').style.display='none'; document.getElementById('battle-code').value=''; }
+
+    /* ── KARMA ── */
+    async function loadKarma() {
+      try {
+        const r = await fetch('/karma/me');
+        const d = await r.json();
+        document.getElementById('karma-total').textContent = d.total || 0;
+        document.getElementById('karma-level-label').textContent = (d.level||'NEWCOMER').toUpperCase();
+        document.getElementById('karma-rank').textContent = 'Rank #' + (d.rank||'?');
+        document.getElementById('karma-next').textContent = 'Next level: ' + (d.next_threshold||'?') + ' pts';
+        document.getElementById('karma-progress-fill').style.width = (d.progress_pct||0) + '%';
+        const events = d.events || [];
+        document.getElementById('karma-events').innerHTML = events.length
+          ? events.map(e => `<div class="karma-event-row">
+              <span class="karma-event-label">${e.note||e.event_type}</span>
+              <span class="karma-delta ${e.delta>=0?'pos':'neg'}">${e.delta>=0?'+':''}${e.delta}</span>
+            </div>`).join('')
+          : '<div style="font-family:var(--mono);font-size:10px;color:var(--text-3);padding:8px 0">No karma events yet. Earn karma by helping the community!</div>';
+      } catch { document.getElementById('karma-events').innerHTML = '<span style="color:var(--fire);font-family:var(--mono);font-size:10px">Failed to load karma.</span>'; }
+    }
+    async function earnKarma(event_type) {
+      try {
+        const r = await fetch('/karma/earn', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({event_type})});
+        const d = await r.json();
+        hubToast(`+${d.delta} karma! Total: ${d.total} · Level: ${d.level}`, 'ok');
+        loadKarma();
+      } catch(e) { hubToast('Karma failed: ' + e.message, 'err'); }
+    }
+
+    /* ── LEARNING REPLAY ── */
+    async function loadLearning() {
+      const tl = document.getElementById('lr-timeline');
+      tl.innerHTML = '<span style="font-family:var(--mono);font-size:10px;color:var(--text-3)">Loading your journey…</span>';
+      try {
+        const r = await fetch('/learning_replay');
+        const d = await r.json();
+        // Backend: {milestones[], total_conversations, total_messages, streak_days, debug_count, code_runs}
+        const milestones = d.milestones || [];
+        const statsEl = document.getElementById('lr-stats');
+        if (statsEl) {
+          statsEl.style.display = 'flex';
+          statsEl.innerHTML = [
+            ['SESSIONS', d.total_conversations || 0],
+            ['MESSAGES', d.total_messages || 0],
+            ['RUNS', d.code_runs || 0],
+            ['DEBUG', d.debug_count || 0],
+            ['STREAK', (d.streak_days || 0) + 'd'],
+          ].map(([l,v]) => `<span class="hub-badge cyan">${l}: <strong style="margin-left:4px">${v}</strong></span>`).join('');
+        }
+        if (!milestones.length) {
+          tl.innerHTML = '<div style="font-family:var(--mono);font-size:11px;color:var(--text-3);padding:10px 0">No sessions yet. Start chatting to build your learning journey!</div>';
+          return;
+        }
+        tl.innerHTML = milestones.map(m => `
+          <div style="margin-bottom:18px">
+            <div style="font-family:var(--display);font-size:9px;font-weight:800;letter-spacing:2px;color:var(--plasma);padding:5px 0 6px;border-bottom:1px solid rgba(0,255,224,0.1);margin-bottom:8px">
+              ${m.label || 'MILESTONE'} &middot; ${m.count || 0} sessions &middot; ${m.start_date || ''} → ${m.end_date || ''}
+            </div>
+            ${(m.entries || []).slice(0, 5).map(e => `
+              <div class="lr-entry">
+                <div class="lr-date">${e.date || ''}</div>
+                <div class="lr-content">
+                  <div class="lr-title">${e.title || 'Untitled'}</div>
+                  <div class="lr-mode">${(e.mode || 'general').toUpperCase()} &middot; <span style="color:var(--text-3);font-weight:400">${(e.question || '').slice(0,80)}${(e.question||'').length>80?'…':''}</span></div>
+                </div>
+              </div>`).join('')}
+          </div>`).join('');
+      } catch(err) {
+        tl.innerHTML = '<span style="color:var(--fire);font-family:var(--mono);font-size:10px">Failed to load: ' + err.message + '</span>';
+      }
+    }
+
+    /* ── BLIND REVIEW ── */
+    function blindTab(t) {
+      ['submit','review','mine'].forEach(x => {
+        document.getElementById('blind-'+x+'-panel').style.display = x===t ? 'block' : 'none';
+      });
+      if (t==='review') loadBlindQueue();
+      if (t==='mine') loadMySubmissions();
+    }
+    async function blindSubmit() {
+      const code = document.getElementById('blind-code').value.trim();
+      const lang = document.getElementById('blind-lang').value;
+      if (!code) { hubToast('Paste your code first', 'warn'); return; }
+      const res = document.getElementById('blind-submit-result');
+      res.classList.remove('show');
+      try {
+        const r = await fetch('/blind/submit', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({code,language:lang})});
+        const d = await r.json();
+        if (d.error) { res.textContent = '⚠ ' + d.error; res.classList.add('show'); return; }
+        res.innerHTML = `<span style="color:#4ade80">✅ ${d.message}</span><br><br>Anonymous ID: <strong style="color:var(--plasma)">${d.anon_id}</strong>`;
+        res.classList.add('show');
+        document.getElementById('blind-code').value = '';
+        hubToast('Code submitted anonymously!', 'ok');
+      } catch(e) { res.textContent = '⚠ ' + e.message; res.classList.add('show'); }
+    }
+    async function loadBlindQueue() {
+      const list = document.getElementById('blind-queue-list');
+      if (!list) return;
+      list.innerHTML = '<span style="font-family:var(--mono);font-size:10px;color:var(--text-3)">Loading queue…</span>';
+      try {
+        const r = await fetch('/blind/queue');
+        const d = await r.json();
+        const subs = d.submissions || [];
+        if (!subs.length) { list.innerHTML = '<div style="font-family:var(--mono);font-size:11px;color:var(--text-3);padding:10px 0">No submissions in queue. Check back later!</div>'; return; }
+        list.innerHTML = subs.map(s =>
+          `<div class="blind-card" onclick="HUB.openBlindReview(${s.id},'${s.anon_id}',${JSON.stringify(s.preview||'').replace(/'/g,"&#39;")})">
+            <div class="blind-card-hdr">
+              <span class="blind-card-lang">${(s.language||'code').toUpperCase()}</span>
+              <span class="hub-badge purple">${s.review_count||0} reviews</span>
+            </div>
+            <div class="blind-card-preview">${(s.preview||'').replace(/</g,'&lt;').replace(/>/g,'&gt;').slice(0,200)}</div>
+          </div>`
+        ).join('');
+      } catch { list.innerHTML = '<span style="color:var(--fire);font-family:var(--mono);font-size:10px">Failed to load.</span>'; }
+    }
+    function openBlindReview(id, anonId, preview) {
+      _blindReviewTarget = {id, anon_id: anonId};
+      document.getElementById('brf-anon').textContent = anonId;
+      document.getElementById('brf-code').textContent = preview;
+      document.getElementById('blind-review-form').style.display = 'block';
+      document.getElementById('blind-review-form').scrollIntoView({behavior:'smooth'});
+    }
+    async function submitBlindReview() {
+      if (!_blindReviewTarget) return;
+      const stars = parseInt(document.getElementById('brf-stars').value);
+      const comment = document.getElementById('brf-comment').value.trim();
+      if (!comment) { hubToast('Write a review comment first', 'warn'); return; }
+      try {
+        const r = await fetch('/blind/review', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({submission_id:_blindReviewTarget.id, stars, comment})});
+        const d = await r.json();
+        hubToast('Review submitted! +40 karma earned.', 'ok');
+        document.getElementById('blind-review-form').style.display = 'none';
+        document.getElementById('brf-comment').value = '';
+        _blindReviewTarget = null;
+        loadBlindQueue();
+      } catch(e) { hubToast('Review failed: ' + e.message, 'err'); }
+    }
+    async function loadMySubmissions() {
+      const list = document.getElementById('blind-mine-list');
+      list.innerHTML = '<span style="font-family:var(--mono);font-size:10px;color:var(--text-3)">Loading…</span>';
+      try {
+        const r = await fetch('/blind/my_submissions');
+        const d = await r.json();
+        const subs = d.submissions || [];
+        if (!subs.length) { list.innerHTML = '<div style="font-family:var(--mono);font-size:11px;color:var(--text-3);padding:10px 0">You have no submissions yet.</div>'; return; }
+        list.innerHTML = subs.map(s =>
+          `<div style="padding:10px 12px;border:1px solid rgba(0,255,224,0.08);border-radius:4px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <span class="hub-badge cyan" style="margin-right:8px">${(s.language||'code').toUpperCase()}</span>
+              <span style="font-family:var(--mono);font-size:10.5px;color:var(--text-3)">${(s.created_at||'').slice(0,10)}</span>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <span class="hub-badge purple">${s.review_count||0} reviews</span>
+              ${s.avg_stars ? `<span class="hub-badge gold">⭐ ${parseFloat(s.avg_stars).toFixed(1)}</span>` : ''}
+              <span class="hub-badge ${s.status==='open'?'cyan':'green'}">${(s.status||'open').toUpperCase()}</span>
+            </div>
+          </div>`
+        ).join('');
+      } catch { list.innerHTML = '<span style="color:var(--fire);font-family:var(--mono);font-size:10px">Failed to load.</span>'; }
+    }
+
+    /* ── ROADMAP ── */
+    async function generateRoadmap() {
+      const topic = document.getElementById('rm-topic').value.trim();
+      const level = document.getElementById('rm-level').value;
+      if (!topic) { hubToast('Enter a topic first', 'warn'); return; }
+      _setBtn('rm-btn', true, 'GENERATING…');
+      const res = document.getElementById('rm-result');
+      res.classList.remove('show'); res.textContent = '';
+      try {
+        const r = await fetch('/generate_roadmap', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({topic, level})
+        });
+        const reader = r.body.getReader(); const dec = new TextDecoder();
+        let full = '';
+        res.classList.add('show'); res.textContent = '';
+        while(true) {
+          const {done, value} = await reader.read();
+          if (done) break;
+          full += dec.decode(value);
+          res.innerHTML = typeof marked !== 'undefined' ? marked.parse(full) : full;
+          res.scrollTop = res.scrollHeight;
+        }
+      } catch(e) { res.textContent = 'Failed: ' + e.message; res.classList.add('show'); }
+      _setBtn('rm-btn', false, '🗺 GENERATE ROADMAP');
+    }
+
+    /* ── VOICE FIX ── */
+    async function voiceFix() {
+      const text = document.getElementById('vf-text').value.trim();
+      if (!text) { hubToast('Describe your bug first', 'warn'); return; }
+      _setBtn('vf-btn', true, 'PROCESSING…');
+      document.getElementById('vf-status').textContent = '';
+      const res = document.getElementById('vf-result');
+      res.classList.remove('show'); res.textContent = '';
+      const lang = typeof getLangRaw === 'function' ? getLangRaw() : 'en-US';
+      try {
+        const r = await fetch('/voice_fix', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({text, lang})
+        });
+        const d = await r.json();
+        if (d.error) { res.textContent = '⚠ ' + d.error; res.classList.add('show'); return; }
+        let html = '';
+        if (d.fix_text) html += `<div style="margin-bottom:12px;font-size:13px;line-height:1.7">${d.fix_text}</div>`;
+        if (d.code) html += `<div style="font-family:var(--display);font-size:7.5px;letter-spacing:2px;color:var(--text-3);margin-bottom:5px">FIXED CODE</div><div style="background:rgba(2,4,8,0.9);border:1px solid rgba(0,255,224,0.1);border-radius:4px;padding:12px;font-family:var(--mono);font-size:11.5px;color:var(--plasma);white-space:pre-wrap">${d.code.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`;
+        res.innerHTML = html || JSON.stringify(d, null, 2);
+        res.classList.add('show');
+        // Auto-speak the fix
+        if (d.fix_text && typeof speakText === 'function') speakText(d.fix_text, lang);
+      } catch(e) { res.textContent = 'Failed: ' + e.message; res.classList.add('show'); }
+      _setBtn('vf-btn', false, '⚡ GET FIX');
+    }
+    function voiceFixMic() {
+      if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) { hubToast('Speech recognition not supported', 'warn'); return; }
+      if (_vfRec) { _vfRec.stop(); _vfRec = null; _setBtn('vf-mic-btn', false, '🎙 USE MIC'); return; }
+      _vfRec = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+      const lang = typeof getLang === 'function' ? getLang() : 'en-US';
+      _vfRec.lang = lang; _vfRec.continuous = false; _vfRec.interimResults = false;
+      _setBtn('vf-mic-btn', true, '🔴 LISTENING…');
+      document.getElementById('vf-status').textContent = 'Speak now…';
+      _vfRec.onresult = e => {
+        document.getElementById('vf-text').value = e.results[0][0].transcript;
+        document.getElementById('vf-status').textContent = '✓ Captured';
+      };
+      _vfRec.onend = () => { _vfRec = null; _setBtn('vf-mic-btn', false, '🎙 USE MIC'); };
+      _vfRec.onerror = () => { _vfRec = null; _setBtn('vf-mic-btn', false, '🎙 USE MIC'); document.getElementById('vf-status').textContent = 'Mic error'; };
+      _vfRec.start();
+    }
+
+    /* ── toast ── */
+    function hubToast(msg, type) {
+      let t = document.getElementById('hubToast');
+      if (!t) {
+        t = document.createElement('div'); t.id = 'hubToast';
+        t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);padding:9px 20px;border-radius:20px;z-index:9999;pointer-events:none;transition:opacity 0.4s;font-family:var(--display);font-size:9px;font-weight:700;letter-spacing:2px;white-space:nowrap;box-shadow:0 4px 24px rgba(0,0,0,0.5)';
+        document.body.appendChild(t);
+      }
+      const styles = {
+        ok:   'background:rgba(74,222,128,0.15);border:1px solid rgba(74,222,128,0.4);color:#4ade80',
+        warn: 'background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.4);color:#fbbf24',
+        err:  'background:rgba(255,107,43,0.12);border:1px solid rgba(255,107,43,0.4);color:#ff6b2b',
+      };
+      t.style.cssText += ';' + (styles[type]||styles.ok);
+      t.textContent = msg; t.style.opacity = '1';
+      clearTimeout(t._t); t._t = setTimeout(() => t.style.opacity='0', 3200);
+    }
+
+    /* ── keyboard close ── */
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+
+    return {
+      open, close, tab,
+      thoughtReplay, thoughtReplayReset,
+      battleCreate, battleJoin, battleUpdate, battleJudge, battleReset, copyBattleId,
+      loadKarma, earnKarma,
+      loadLearning,
+      blindTab, blindSubmit, loadBlindQueue, openBlindReview, submitBlindReview, loadMySubmissions,
+      searchChats, openSearchResult,
+      _battleId: () => _battleId,
+    };
+  })();
+  window.HUB = HUB;
+  </script>
+
+  <!-- Inject the Hub button into the sidebar after the streak bar -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const streakBar = document.getElementById('streakBar');
+      if (streakBar) {
+        const btn = document.createElement('button');
+        btn.id = 'featuresHubBtn';
+        btn.innerHTML = '⚡ <span class="new-chat-label">FEATURES HUB</span>';
+        btn.onclick = () => HUB.open();
+        streakBar.insertAdjacentElement('afterend', btn);
+      }
+    });
+  </script>
+
+
+  <!-- ══════════════════ VOICE CLONE PANEL ══════════════════ -->
+  <div id="voiceClonePanel">
+    <div class="vc-hdr">
+      <div class="vc-hdr-title">🎙 MY VOICE CLONE</div>
+      <button onclick="VoiceClone.close()" style="background:none;border:none;color:rgba(226,244,255,0.35);font-size:20px;cursor:pointer;line-height:1;padding:0 4px;">✕</button>
+    </div>
+    <div class="vc-body">
+
+      <div class="vc-section">
+        <div class="vc-label">YOUR VOICE PROFILE</div>
+        <div id="vc-profile-status" class="vc-status">Checking…</div>
+        <div id="vc-profile-card" class="vc-profile-card" style="display:none">
+          <div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:#a855f7;margin-bottom:8px">✅ VOICE ANALYSED — LANGUAGE LOCKED</div>
+          <div id="vc-profile-info" style="font-family:var(--mono);font-size:10px;color:var(--text-3);margin-bottom:6px"></div>
+          <div id="vc-lang-badge" style="display:inline-block;padding:4px 10px;background:rgba(168,85,247,0.12);border:1px solid rgba(168,85,247,0.35);border-radius:12px;font-family:var(--display);font-size:9px;font-weight:700;letter-spacing:1px;color:#c084fc;margin-bottom:12px"></div>
+          <div style="font-family:var(--mono);font-size:10px;color:rgba(226,244,255,0.3);margin-bottom:12px">PLAY buttons will speak AI answers in this language</div>
+          <div style="display:flex;gap:8px">
+            <button onclick="VoiceClone.test()" style="flex:1;padding:9px;background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.3);color:#a855f7;font-family:var(--display);font-size:8px;font-weight:700;letter-spacing:2px;cursor:pointer;border-radius:4px;transition:all 0.15s">▶ TEST</button>
+            <button onclick="VoiceClone.deleteProfile()" style="padding:9px 14px;background:rgba(255,107,43,0.06);border:1px solid rgba(255,107,43,0.22);color:#ff6b2b;font-family:var(--display);font-size:8px;font-weight:700;letter-spacing:2px;cursor:pointer;border-radius:4px">✕ DELETE</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="vc-section">
+        <div class="vc-label">RECORD YOUR VOICE (5–15 SEC)</div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-bottom:14px;line-height:1.8">
+          Speak <strong style="color:rgba(226,244,255,0.7)">naturally in any language</strong> — Tamil, Hindi, English, Telugu or any other.<br>
+          Your language is detected from your speech and locked for all voice output.
+        </div>
+        <button class="vc-record-btn" id="vc-record-btn" onclick="VoiceClone.toggleRecord()">
+          <span id="vc-rec-icon">🎙</span><span id="vc-rec-label">TAP TO RECORD</span>
+        </button>
+        <div class="vc-waveform" id="vc-waveform" style="display:none">
+          <div class="vc-bar" id="vcb0" style="height:8px"></div><div class="vc-bar" id="vcb1" style="height:16px"></div>
+          <div class="vc-bar" id="vcb2" style="height:24px"></div><div class="vc-bar" id="vcb3" style="height:18px"></div>
+          <div class="vc-bar" id="vcb4" style="height:30px"></div><div class="vc-bar" id="vcb5" style="height:14px"></div>
+          <div class="vc-bar" id="vcb6" style="height:22px"></div><div class="vc-bar" id="vcb7" style="height:28px"></div>
+          <div class="vc-bar" id="vcb8" style="height:12px"></div><div class="vc-bar" id="vcb9" style="height:20px"></div>
+        </div>
+        <div id="vc-rec-status" class="vc-status" style="margin-top:8px"></div>
+      </div>
+
+      <div class="vc-section">
+        <div class="vc-label">OR UPLOAD AUDIO FILE</div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-bottom:10px">WAV · MP3 · OGG · WebM &middot; 5–30 seconds</div>
+        <input type="file" id="vc-file-input" accept="audio/*,.wav,.mp3,.ogg,.webm,.m4a" style="display:none" onchange="VoiceClone.handleFile(this)">
+        <div class="vc-record-btn" onclick="document.getElementById('vc-file-input').click()">📂 CHOOSE AUDIO FILE</div>
+        <div id="vc-upload-status" class="vc-status" style="margin-top:8px"></div>
+      </div>
+
+      <div class="vc-section">
+        <div class="vc-label">HOW IT WORKS</div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);line-height:2">
+          1. Record 5–15 sec of your voice in any language<br>
+          2. AI <strong style="color:#a855f7">detects your language</strong> automatically<br>
+          3. Every 🔊 PLAY button speaks the AI answer in <strong style="color:#a855f7">your language</strong><br>
+          4. Works with Tamil, Hindi, Telugu, English &amp; 16 more
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+  /* ════════════════════════════════════════════════════
+     VOICE CLONE ENGINE
+  ════════════════════════════════════════════════════ */
+  window._hasVoiceClone = false;
+
+  const VoiceClone = (() => {
+    let _rec = null, _chunks = [], _stream = null, _waveTimer = null;
+    let _sttRec = null, _transcript = '', _sttLang = '';
+
+    function open() {
+      document.getElementById('voiceClonePanel').classList.add('show');
+      checkStatus();
+    }
+    function close() {
+      document.getElementById('voiceClonePanel').classList.remove('show');
+    }
+
+    async function checkStatus() {
+      const st = document.getElementById('vc-profile-status');
+      const card = document.getElementById('vc-profile-card');
+      const dot = document.getElementById('vc-dot');
+      if (st) st.textContent = 'Checking…';
+      try {
+        const r = await fetch('/voice_clone/status');
+        if (!r.ok) throw new Error('Backend not running');
+        const d = await r.json();
+        window._hasVoiceClone = !!d.has_profile;
+        if (d.has_profile) {
+          if (st) st.textContent = '';
+          if (card) card.style.display = 'block';
+
+          // Show detected language in the badge
+          const langName = d.detected_lang_name || 'Unknown';
+          const langCode = d.detected_lang || 'en-US';
+          const badge = document.getElementById('vc-lang-badge');
+          if (badge) badge.textContent = '🌐 ' + langName.toUpperCase();
+
+          const info = document.getElementById('vc-profile-info');
+          if (info) info.textContent = 'Created: ' + (d.created_at ? d.created_at.slice(0,10) : 'unknown');
+
+          // Tell CBVoice about the detected language — all speak() calls use this lang
+          window._vcDetectedLang = langCode;
+          if (window.CBVoice && typeof window.CBVoice.setDetectedLang === 'function') {
+            window.CBVoice.setDetectedLang(langCode, langName);
+          } else {
+            // CBVoice not loaded yet — sync selectors manually
+            ['cbLangSel', 'cbLangSel2', 'voiceLang'].forEach(id => {
+              const el = document.getElementById(id);
+              if (el) { const opt = [...el.options].find(o => o.value === langCode); if (opt) el.value = langCode; }
+            });
+          }
+
+          if (dot) { dot.style.background = '#a855f7'; dot.style.boxShadow = '0 0 8px #a855f7'; }
+          const vcBtn = document.getElementById('voiceCloneBtn');
+          if (vcBtn) { vcBtn.style.borderColor = 'rgba(168,85,247,0.7)'; vcBtn.style.color = '#c084fc'; }
+        } else {
+          if (st) st.textContent = 'No voice profile yet. Record or upload audio below.';
+          if (card) card.style.display = 'none';
+          window._hasVoiceClone = false;
+          window._vcDetectedLang = null;
+        }
+      } catch(e) {
+        if (st) st.textContent = 'Voice analysis needs the Python backend running.';
+        window._hasVoiceClone = false;
+      }
+    }
+
+    async function toggleRecord() {
+      if (_rec && _rec.state === 'recording') { stopRecord(); return; }
+      const st = document.getElementById('vc-rec-status');
+      _transcript = ''; _sttLang = '';
+      try {
+        _stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        _chunks = [];
+        const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg';
+        _rec = new MediaRecorder(_stream, { mimeType });
+        _rec.ondataavailable = e => { if (e.data.size > 0) _chunks.push(e.data); };
+        _rec.onstop = () => uploadBlob(new Blob(_chunks, { type: mimeType }), 'voice_sample.webm', 'rec');
+        _rec.start(100);
+
+        // ── Run Speech Recognition simultaneously to get transcript ──────────
+        // This is how we detect the language — from the actual words you say.
+        const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRec) {
+          _sttRec = new SpeechRec();
+          _sttRec.continuous = true;
+          _sttRec.interimResults = true;
+          _sttRec.maxAlternatives = 1;
+          // Start with no lang set — browser auto-detects from speech
+          _sttRec.lang = '';
+          _sttRec.onresult = e => {
+            let full = '';
+            for (let i = 0; i < e.results.length; i++) {
+              full += e.results[i][0].transcript + ' ';
+            }
+            _transcript = full.trim();
+            // Browser exposes detected language on the result
+            if (e.results[0] && e.results[0][0]) {
+              // Try to get lang from recognition object
+              _sttLang = _sttRec.lang || '';
+            }
+            if (st) st.textContent = '🔴 Heard: "' + _transcript.slice(0, 60) + ((_transcript.length > 60) ? '…' : '') + '"';
+          };
+          _sttRec.onerror = () => {}; // silent — transcript is best-effort
+          try { _sttRec.start(); window._vcSttRec = _sttRec; } catch(e) {}
+        }
+
+        const btn = document.getElementById('vc-record-btn');
+        if (btn) btn.classList.add('recording');
+        document.getElementById('vc-rec-icon').textContent = '⏹';
+        document.getElementById('vc-rec-label').textContent = 'RECORDING — TAP TO STOP';
+        document.getElementById('vc-waveform').style.display = 'flex';
+        if (st) st.textContent = '🔴 Recording… speak in your language naturally.';
+        animateWave(true);
+        setTimeout(() => { if (_rec && _rec.state === 'recording') stopRecord(); }, 20000);
+      } catch(e) {
+        if (st) st.textContent = '⚠ Mic access denied: ' + e.message;
+      }
+    }
+
+    function stopRecord() {
+      if (_rec && _rec.state === 'recording') _rec.stop();
+      if (_stream) _stream.getTracks().forEach(t => t.stop());
+      _rec = null; _stream = null;
+      // Stop STT recognition
+      if (_sttRec) { try { _sttRec.stop(); } catch(e) {} _sttRec = null; }
+      const btn = document.getElementById('vc-record-btn');
+      if (btn) btn.classList.remove('recording');
+      document.getElementById('vc-rec-icon').textContent = '🎙';
+      document.getElementById('vc-rec-label').textContent = 'TAP TO RECORD';
+      document.getElementById('vc-waveform').style.display = 'none';
+      animateWave(false);
+      const st = document.getElementById('vc-rec-status');
+      if (st) st.textContent = '⏳ Detecting language from your voice…';
+    }
+
+    function animateWave(on) {
+      clearInterval(_waveTimer);
+      if (!on) return;
+      const bars = Array.from({length:10}, (_,i) => document.getElementById('vcb' + i));
+      _waveTimer = setInterval(() => {
+        bars.forEach(b => { if (b) b.style.height = (5 + Math.random() * 28) + 'px'; });
+      }, 110);
+    }
+
+    function handleFile(input) {
+      const f = input.files[0]; if (!f) return;
+      const st = document.getElementById('vc-upload-status');
+      if (st) st.textContent = '⏳ Uploading ' + f.name + '…';
+      uploadBlob(f, f.name, 'upload');
+    }
+
+    async function uploadBlob(blob, name, source) {
+      const fd = new FormData();
+      fd.append('audio', blob, name);
+
+      // Send transcript (from live STT) so backend can detect language from real words
+      if (source === 'rec' && _transcript) {
+        fd.append('transcript', _transcript);
+        if (_sttLang) fd.append('lang_hint', _sttLang);
+      }
+
+      const recSt = document.getElementById('vc-rec-status');
+      const upSt = document.getElementById('vc-upload-status');
+
+      const analysingMsg = '🔍 Detecting your language…';
+      if (source === 'rec' && recSt) recSt.textContent = analysingMsg;
+      if (source === 'upload' && upSt) upSt.textContent = analysingMsg;
+
+      try {
+        const r = await fetch('/voice_clone/upload', { method: 'POST', body: fd });
+        const d = await r.json();
+        if (d.error) {
+          const msg = '⚠ ' + d.error;
+          if (source === 'rec' && recSt) recSt.textContent = msg;
+          if (source === 'upload' && upSt) upSt.textContent = msg;
+          return;
+        }
+
+        // Show detected language prominently
+        const langName = d.detected_lang_name || 'English';
+        const langCode = d.detected_lang || 'en-US';
+        const successMsg = '✅ Language detected: ' + langName + '. PLAY will now speak AI answers in ' + langName + '.';
+        if (source === 'rec' && recSt) recSt.textContent = successMsg;
+        if (source === 'upload' && upSt) upSt.textContent = successMsg;
+
+        window._hasVoiceClone = true;
+        window._vcDetectedLang = langCode;
+
+        // Auto-set the language selector to detected language
+        ['cbLangSel', 'cbLangSel2', 'voiceLang'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) { const opt = [...el.options].find(o => o.value === langCode); if (opt) el.value = langCode; }
+        });
+        // Tell CBVoice about the detected language — locks all speak() calls to this lang
+        if (window.CBVoice && typeof window.CBVoice.setDetectedLang === 'function') {
+          window.CBVoice.setDetectedLang(langCode, langName);
+        } else {
+          // CBVoice not loaded yet — set globals directly
+          window._vcDetectedLang = langCode;
+          window._hasVoiceClone = true;
+        }
+
+        setTimeout(checkStatus, 600);
+        if (typeof hubToast === 'function') {
+          hubToast('🎙 ' + langName + ' detected! All PLAY output now in ' + langName + '.', 'ok');
+        }
+      } catch(e) {
+        const msg = '⚠ Upload failed: ' + e.message;
+        if (recSt) recSt.textContent = msg;
+        if (upSt) upSt.textContent = msg;
+      }
+    }
+
+    async function test() {
+      const st = document.getElementById('vc-profile-status');
+      const langCode = window._vcDetectedLang || (typeof getLangRaw === 'function' ? getLangRaw() : 'en-US');
+      // Test sentences per language
+      const TEST_SENTENCES = {
+        'ta-IN': 'வணக்கம்! கோட் பட்டி உங்கள் மொழியில் பேசுகிறது. இது சரியாக உள்ளதா?',
+        'ta-en': 'Vanakkam! CodeBuddy ungal mozhiyil pesugiradu. Correct-a irukka?',
+        'hi-IN': 'नमस्ते! कोड बडी आपकी भाषा में बोल रहा है। क्या यह सही है?',
+        'te-IN': 'నమస్కారం! కోడ్ బడ్డీ మీ భాషలో మాట్లాడుతోంది. సరిగ్గా ఉందా?',
+        'kn-IN': 'ನಮಸ್ಕಾರ! ಕೋಡ್ ಬಡ್ಡಿ ನಿಮ್ಮ ಭಾಷೆಯಲ್ಲಿ ಮಾತನಾಡುತ್ತಿದೆ. ಸರಿಯಾಗಿದೆಯೇ?',
+        'ml-IN': 'നമസ്കാരം! കോഡ് ബഡ്ഡി നിങ്ങളുടെ ഭാഷയിൽ സംസാരിക്കുന്നു. ശരിയാണോ?',
+        'en-US': 'Hello! CodeBuddy is speaking in your detected language. Does this sound correct?',
+        'fr-FR': 'Bonjour! CodeBuddy parle dans votre langue détectée. Est-ce correct?',
+        'de-DE': 'Hallo! CodeBuddy spricht in Ihrer erkannten Sprache. Klingt das richtig?',
+        'es-ES': '¡Hola! CodeBuddy habla en tu idioma detectado. ¿Suena correcto?',
+      };
+      const testText = TEST_SENTENCES[langCode] || TEST_SENTENCES['en-US'];
+      if (st) st.textContent = '⏳ Testing voice output in detected language…';
+      try {
+        const r = await fetch('/voice_clone/tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: testText, lang: langCode })
+        });
+        if (!r.ok) { if (st) st.textContent = '⚠ Test failed (' + r.status + ')'; return; }
+        const blob = await r.blob();
+        const url = URL.createObjectURL(blob);
+        const a = new Audio(url);
+        a.onended = () => {
+          if (st) st.textContent = '✅ Voice output working in your detected language!';
+          URL.revokeObjectURL(url);
+        };
+        if (st) st.textContent = '🔊 Playing AI voice in your language…';
+        a.play();
+      } catch(e) { if (st) st.textContent = '⚠ ' + e.message; }
+    }
+
+    async function deleteProfile() {
+      if (!confirm('Delete your voice profile? This cannot be undone.')) return;
+
+      // ── Call backend to DELETE files from disk ────────────────────────────
+      // Without this, the .json + .webm files stay on disk and the profile
+      // comes back every time the page reloads or the panel is reopened.
+      try {
+        await fetch('/voice_clone/delete', { method: 'POST' });
+      } catch(e) {
+        console.warn('voice_clone/delete failed:', e);
+      }
+
+      // ── Clear all client-side state ───────────────────────────────────────
+      window._hasVoiceClone = false;
+      window._vcDetectedLang = null;
+      if (window.CBVoice && typeof window.CBVoice.setDetectedLang === 'function') {
+        // Reset voice engine back to UI language selector
+        window.CBVoice.setDetectedLang(null, null);
+      }
+
+      const card = document.getElementById('vc-profile-card');
+      if (card) card.style.display = 'none';
+      const badge = document.getElementById('vc-lang-badge');
+      if (badge) badge.textContent = '';
+      const st = document.getElementById('vc-profile-status');
+      if (st) st.textContent = 'Profile deleted. Record a new one below.';
+      document.getElementById('vc-rec-status') && (document.getElementById('vc-rec-status').textContent = '');
+      document.getElementById('vc-upload-status') && (document.getElementById('vc-upload-status').textContent = '');
+
+      const dot = document.getElementById('vc-dot');
+      if (dot) { dot.style.background = 'rgba(168,85,247,0.3)'; dot.style.boxShadow = ''; }
+      const vcBtn = document.getElementById('voiceCloneBtn');
+      if (vcBtn) { vcBtn.style.borderColor = 'rgba(168,85,247,0.3)'; vcBtn.style.color = '#a855f7'; }
+    }
+
+    // Auto-check status on page load
+    setTimeout(checkStatus, 1800);
+
+    return { open, close, checkStatus, toggleRecord, handleFile, test, deleteProfile };
+  })();
+  window.VoiceClone = VoiceClone;
+  </script>
 </body>
+</html>

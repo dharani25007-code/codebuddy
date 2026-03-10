@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Public Chat | CodeBuddy</title>
+<title>{{ title }} | CodeBuddy</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@300;400;500&family=Exo+2:wght@300;400;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
@@ -412,7 +412,7 @@ body::after {
       <div class="page-icon-inner">📡</div>
     </div>
     <div>
-      <div class="page-title">Public Chat</div>
+      <div class="page-title">{{ title }}</div>
       <div class="page-subtitle">Shared · Read-Only Transmission Log</div>
     </div>
     <div class="msg-count">
@@ -446,7 +446,7 @@ body::after {
           <div class="msg-sender {% if msg[0] == 'user' %}user-role{% else %}bot-role{% endif %}">
             {{ msg[0] }}
           </div>
-          <div class="msg-ts" id="ts-{{ loop.index }}">—</div>
+          <div class="msg-ts" id="ts-{{ loop.index }}">{{ msg[2][:16] if msg[2] else '—' }}</div>
         </div>
 
         <div class="bubble-body {% if msg[0] == 'user' %}user-bubble{% else %}bot-bubble{% endif %}">
@@ -501,10 +501,7 @@ hljs.highlightAll();
 const msgCount = document.querySelectorAll('.msg-wrap').length;
 document.getElementById('msgCountVal').textContent = msgCount;
 
-/* ── TIMESTAMPS ── */
-document.querySelectorAll('[id^="ts-"]').forEach(el => {
-  el.textContent = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-});
+/* ── TIMESTAMPS — rendered server-side from DB ── */
 
 /* ── CLOCK ── */
 function updateClock(){
