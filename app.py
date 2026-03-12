@@ -510,15 +510,32 @@ IMPORTANT — HOW TO ADDRESS THE USER (MANDATORY FOR ALL LANGUAGES):
 - Treat every user like a valued student or professional you deeply respect"""
 
 SYSTEM_PROMPTS = {
-    "general": """You are CodeBuddy, a friendly programming helper.
+    "general": """You are CodeBuddy, a strictly programming-only assistant.
 
-RULES:
+YOUR ONLY JOB IS TO ANSWER PROGRAMMING AND CODING QUESTIONS.
+
+ABSOLUTE RULE — NON-NEGOTIABLE:
+If the user's message is NOT about programming, coding, software, or tech development — you MUST refuse completely.
+DO NOT answer the question even partially. DO NOT provide the answer and then redirect.
+ONLY say: "I'm CodeBuddy, a programming-only assistant. I can't help with that. Ask me a coding question!"
+
+EXAMPLES OF WHAT YOU MUST REFUSE (do not answer these at all):
+- Geography, history, science facts ("What is the capital of India?") → REFUSE
+- Math homework not related to programming → REFUSE
+- General knowledge, news, recipes, advice → REFUSE
+- Jokes, riddles, casual chat → REFUSE
+
+EXAMPLES OF WHAT YOU ANSWER:
+- Code debugging, writing, or explaining (Python, JS, Java, C++, etc.)
+- Algorithms, data structures, design patterns
+- Frameworks, libraries, databases, APIs, DevOps
+
+CODING ANSWER RULES:
 - Use simple, easy words. Avoid jargon unless you explain it.
 - Keep answers short and to the point.
 - Always explain your code step by step in plain English.
 - Use code blocks with the language name (```python, ```javascript, etc.)
 - After code, show a simple example of what it outputs.
-- If there are multiple ways to do something, just recommend the easiest one.
 - Be friendly and encouraging — like a helpful friend who knows coding.""",
 
     "debug": """You are CodeBuddy's bug fixer. Help the user fix their broken code simply and clearly.
@@ -2227,18 +2244,28 @@ Rules:
         ],
     }
 
-    def generate():
+    # Try primary model then fallbacks — free models often return 429 instead of choices
+    models_to_try = [MODELS["fast"]] + [m for m in FREE_FALLBACKS if m != MODELS["fast"]]
+    last_error = "Unknown error"
+
+    for model in models_to_try:
         try:
+            payload["model"] = model
             resp = requests.post(
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers=headers, json=payload, timeout=30
             )
-            if resp.status_code != 200:
-                yield json.dumps({"error": f"API error {resp.status_code}"}) + "\n"
-                return
+            resp_json = resp.json()
 
-            raw = resp.json()["choices"][0]["message"]["content"].strip()
-            # Strip markdown fences if present
+            if "choices" not in resp_json:
+                api_err = resp_json.get("error", {})
+                last_error = api_err.get("message", str(resp_json)) if isinstance(api_err, dict) else str(api_err)
+                app.logger.warning("thought_replay: model %s returned no choices: %s", model, last_error)
+                if resp.status_code not in (429, 503, 502, 500):
+                    break
+                continue
+
+            raw = resp_json["choices"][0]["message"]["content"].strip()
             raw = re.sub(r"```json|```", "", raw).strip()
             steps = json.loads(raw)
             if not isinstance(steps, list):
@@ -2246,13 +2273,17 @@ Rules:
 
             for i, step in enumerate(steps):
                 step["step"] = i + 1
-                yield json.dumps(step) + "\n"
 
-        except (requests.RequestException, KeyError, json.JSONDecodeError) as exc:
-            yield json.dumps({"error": str(exc)}) + "\n"
+            bump_stat(current_user.id, "debug_count")
+            return jsonify(steps)
+
+        except (requests.RequestException, json.JSONDecodeError, ValueError) as exc:
+            last_error = str(exc)
+            app.logger.warning("thought_replay: model %s exception: %s", model, exc)
+            continue
 
     bump_stat(current_user.id, "debug_count")
-    return Response(generate(), mimetype="application/x-ndjson")
+    return jsonify({"error": f"AI unavailable ({last_error}). All models rate-limited — try again in a moment."}), 503
 
 
 # ─────────────────────────────────────────────────────────────────────

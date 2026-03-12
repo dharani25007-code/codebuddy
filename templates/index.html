@@ -6630,12 +6630,11 @@ Hints used: ${IV.hintCount} | Skipped: ${IV.skipCount} | Best streak: ${IV.maxSt
         <div class="hub-feature-header">
           <div class="hub-feature-icon">🧠</div>
           <div class="hub-feature-meta">
-            <div class="hub-feature-label">FEATURE 11</div>
             <div class="hub-feature-title">THOUGHT REPLAY DEBUGGER</div>
-            <div class="hub-feature-desc">Watch the AI's internal reasoning unfold step-by-step as it debugs your code — every hypothesis, trace, and decision made visible.</div>
+            <div class="hub-feature-desc">Watch the AI's internal reasoning unfold step-by-step as it analyzes any code — every hypothesis, trace, and decision made visible.</div>
           </div>
         </div>
-        <div class="hub-section-title">BROKEN CODE INPUT</div>
+        <div class="hub-section-title">PASTE ANY CODE TO ANALYZE</div>
         <div class="hub-col" style="margin-bottom:14px">
           <textarea class="hub-textarea" id="tr-code" rows="7" placeholder="// Paste your broken code here...
 def find_max(arr):
@@ -6878,32 +6877,39 @@ def find_max(arr):
       if (!code) { hubToast('Paste some code first', 'warn'); return; }
       _setBtn('tr-btn', true, 'ANALYSING…');
       document.getElementById('tr-steps').innerHTML = '';
-      document.getElementById('tr-status').textContent = 'Initialising…';
+      document.getElementById('tr-status').textContent = 'Sending to AI…';
       try {
         const r = await fetch('/thought_replay', {
           method: 'POST', headers: {'Content-Type':'application/json'},
           body: JSON.stringify({code})
         });
-        const text = await r.text();
-        const lines = text.trim().split('\n').filter(Boolean);
-        document.getElementById('tr-status').textContent = `${lines.length} steps`;
+        const data = await r.json();
+        if (data.error) { hubToast('Error: ' + data.error, 'err'); _setBtn('tr-btn', false, '▶ START REPLAY'); return; }
+        const steps = Array.isArray(data) ? data : (data.steps || []);
+        document.getElementById('tr-status').textContent = steps.length + ' steps';
         const container = document.getElementById('tr-steps');
-        lines.forEach(line => {
-          try {
-            const s = JSON.parse(line);
+        steps.forEach((s, i) => {
+          setTimeout(() => {
             const cls = s.type || 'thinking';
             const div = document.createElement('div'); div.className = 'tr-step';
             div.innerHTML = `<div class="tr-dot ${cls}"></div><div style="flex:1">
-              <div class="tr-label">STEP ${s.step || '?'} · ${s.label || ''}</div>
-              <div class="tr-text">${s.text || ''}</div>
+              <div class="tr-label">STEP ${s.step || (i + 1)} · ${s.label || ''}</div>
+              <div class="tr-text">${(s.text || '').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
               ${s.code ? `<div class="tr-code">${s.code.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>` : ''}
             </div>`;
             container.appendChild(div);
-          } catch {}
+            if (i === steps.length - 1) {
+              _setBtn('tr-btn', false, '▶ START REPLAY');
+              document.getElementById('tr-status').textContent = 'Done — ' + steps.length + ' steps';
+            }
+          }, i * 500);
         });
-      } catch (e) { hubToast('Replay failed: ' + e.message, 'err'); }
-      _setBtn('tr-btn', false, '▶ START REPLAY');
-      document.getElementById('tr-status').textContent = '';
+        if (steps.length === 0) { _setBtn('tr-btn', false, '▶ START REPLAY'); document.getElementById('tr-status').textContent = ''; }
+      } catch (e) {
+        hubToast('Replay failed: ' + e.message, 'err');
+        _setBtn('tr-btn', false, '▶ START REPLAY');
+        document.getElementById('tr-status').textContent = '';
+      }
     }
     function thoughtReplayReset() {
       document.getElementById('tr-code').value = '';

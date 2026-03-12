@@ -351,29 +351,8 @@ body::after {
 .vl-lang{font-family:var(--display);font-size:7px;letter-spacing:1px;padding:4px 10px;border:1px solid var(--border);border-radius:2px;cursor:pointer;color:var(--text-3);transition:all 0.2s;}
 .vl-lang:hover,.vl-lang.active{border-color:var(--border-hi);color:var(--plasma);background:var(--plasma-dim);}
 
-/* ══════════════════════════════════
-   FEATURE 3 — CODE BATTLE
-══════════════════════════════════ */
-.ba-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:rgba(0,0,0,0.5);border-radius:4px;margin-bottom:16px;border:1px solid var(--border);}
-.ba-timer{font-family:var(--display);font-size:22px;font-weight:800;color:var(--plasma);letter-spacing:3px;}
-.ba-timer.warning{color:var(--fire);animation:timerWarn 0.5s ease infinite alternate;}
-@keyframes timerWarn{from{opacity:1}to{opacity:0.4}}
-.ba-problem{font-family:var(--mono);font-size:12px;color:var(--text-2);padding:14px 16px;background:rgba(0,0,0,0.3);border-radius:4px;border-left:3px solid var(--gold);margin-bottom:16px;line-height:1.7;}
-.ba-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
-@media(max-width:640px){.ba-grid{grid-template-columns:1fr;}}
-.ba-player{border:1px solid var(--border);border-radius:4px;overflow:hidden;transition:border-color 0.3s,box-shadow 0.3s;}
-.ba-player.winning{border-color:var(--plasma);box-shadow:0 0 20px var(--plasma-glow);}
-.ba-player.losing{border-color:rgba(255,107,43,0.3);}
-.ba-player-head{padding:10px 14px;display:flex;align-items:center;justify-content:space-between;background:rgba(0,0,0,0.4);border-bottom:1px solid var(--border);}
-.ba-player-name{font-family:var(--display);font-size:9px;letter-spacing:2px;}
-.ba-score-badge{font-family:var(--display);font-size:10px;font-weight:700;padding:3px 10px;border-radius:2px;}
-.ba-editor{width:100%;background:transparent;border:none;outline:none;color:var(--text);font-family:var(--mono);font-size:12px;padding:14px;min-height:130px;resize:none;line-height:1.6;}
-.ba-metrics{display:flex;gap:8px;padding:10px 14px;background:rgba(0,0,0,0.2);border-top:1px solid var(--border);flex-wrap:wrap;}
-.ba-metric{font-family:var(--display);font-size:7px;letter-spacing:1px;color:var(--text-3);display:flex;flex-direction:column;gap:2px;align-items:center;}
-.ba-metric span{font-size:14px;font-weight:700;color:var(--text-2);}
-.ba-judge{margin-top:14px;padding:16px;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:4px;font-family:var(--mono);font-size:12px;line-height:1.7;min-height:60px;color:var(--text-2);}
-.ba-judge-label{font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--text-3);margin-bottom:8px;display:flex;align-items:center;gap:8px;}
-.judge-dot{width:6px;height:6px;border-radius:50%;background:var(--gold);box-shadow:0 0 6px var(--gold);animation:dotPulse 1s ease infinite;}
+/* battle JS placeholder */
+let baInterval=null;
 
 /* ══════════════════════════════════
    FEATURE 4 — CODE KARMA
@@ -541,16 +520,7 @@ body::after {
       <div class="tab active" data-tab="thought" onclick="switchTab(this,'thought')">
         <span class="tab-icon">🧠</span><span class="tab-label">THOUGHT REPLAY</span>
       </div>
-      <div class="tab" data-tab="search" onclick="switchTab(this,'search')">
-        <span class="tab-icon">🔍</span><span class="tab-label">SEARCH</span>
-      </div>
-      <div class="tab" data-tab="bookmarks" onclick="switchTab(this,'bookmarks')">
-        <span class="tab-icon">🔖</span><span class="tab-label">BOOKMARKS</span>
-      </div>
-      <div class="tab" data-tab="complexity" onclick="switchTab(this,'complexity')">
-        <span class="tab-icon">📊</span><span class="tab-label">COMPLEXITY</span>
-      </div>
-      <div class="tab" data-tab="battle" onclick="switchTab(this,'battle')">
+<div class="tab" data-tab="battle" onclick="switchTab(this,'battle')">
         <span class="tab-icon">⚔</span><span class="tab-label">BATTLE</span>
       </div>
       <div class="tab" data-tab="karma" onclick="switchTab(this,'karma')">
@@ -562,10 +532,7 @@ body::after {
       <div class="tab" data-tab="blind" onclick="switchTab(this,'blind')">
         <span class="tab-icon">👁</span><span class="tab-label">BLIND REVIEW</span>
       </div>
-      <div class="tab" data-tab="voiceclone" onclick="switchTab(this,'voiceclone')">
-        <span class="tab-icon">🎙</span><span class="tab-label">MY VOICE</span>
-      </div>
-    </div>
+</div>
     <button class="tab-scroll-btn right visible" id="tabScrollRight" onclick="scrollTabs(1)">▶</button>
   </div>
 
@@ -577,15 +544,14 @@ body::after {
       <div class="pane-head">
         <div class="pane-icon-wrap">🧠</div>
         <div class="pane-title-block">
-          <div class="pane-num">FEATURE 11</div>
           <div class="pane-title">THOUGHT REPLAY DEBUGGER</div>
-          <div class="pane-desc">Watch the AI's internal reasoning unfold step-by-step as it debugs your code — every hypothesis, trace, and decision made visible.</div>
+          <div class="pane-desc">Watch the AI's internal reasoning unfold step-by-step as it analyzes any code — every hypothesis, trace, and decision made visible.</div>
         </div>
         
       </div>
 
-      <div class="section-title">BROKEN CODE INPUT</div>
-      <textarea class="input-field" id="trCode" style="min-height:80px;margin-bottom:16px;" placeholder="// Paste your broken code here...
+      <div class="section-title">PASTE ANY CODE TO ANALYZE</div>
+      <textarea class="input-field" id="trCode" style="min-height:100px;margin-bottom:8px;" placeholder="Paste any code here — AI will analyze it step by step..."
 def find_max(arr):
     max = 0
     for i in arr:
@@ -594,167 +560,122 @@ def find_max(arr):
     return max"></textarea>
 
       <div class="btn-row">
-        <button class="btn" onclick="replayThought()">▶ START REPLAY</button>
+        <button class="btn" id="trStartBtn" onclick="replayThought()">▶ START REPLAY</button>
         <button class="btn nova" onclick="resetReplay()">↺ RESET</button>
       </div>
 
-      <div class="section-title">AI THOUGHT PROCESS — LIVE</div>
+      <div class="section-title" id="trLiveLabel" style="display:none">AI THOUGHT PROCESS — LIVE</div>
       <div class="thought-replay">
         <div class="tr-timeline" id="trTimeline"></div>
       </div>
     </div>
 
     <!-- ══ TAB 2: SEARCH ══ -->
-    <div class="tab-pane" id="pane-search">
-      <div class="pane-head">
-        <div class="pane-icon-wrap">🔍</div>
-        <div class="pane-title-block">
-          <div class="pane-num">FEATURE</div>
-          <div class="pane-title">SEARCH CHATS</div>
-          <div class="pane-desc">Search across all your conversations and messages instantly — by title, code, or keyword.</div>
-        </div>
-      </div>
-      <div class="search-bar-wrap">
-        <span class="search-icon">◈</span>
-        <input class="search-input" id="searchInput" placeholder="Search conversations, code snippets, topics..." oninput="doSearch(this.value)">
-      </div>
-      <div class="search-results" id="searchResults">
-        <div class="search-result"><span class="sr-icon">💡</span><span class="sr-title">Big O notation explained with examples</span><span class="sr-mode">EXPLAIN</span></div>
-        <div class="search-result"><span class="sr-icon">🐛</span><span class="sr-title">Python list index out of range bug fix</span><span class="sr-mode">DEBUG</span></div>
-        <div class="search-result"><span class="sr-icon">⚡</span><span class="sr-title">Optimizing nested loops to O(n log n)</span><span class="sr-mode">OPTIMIZE</span></div>
-        <div class="search-result"><span class="sr-icon">🎓</span><span class="sr-title">React useEffect interview questions</span><span class="sr-mode">INTERVIEW</span></div>
-        <div class="search-result"><span class="sr-icon">📐</span><span class="sr-title">Flask REST API with SQLite setup</span><span class="sr-mode">GENERAL</span></div>
-      </div>
-    </div>
 
     <!-- ══ TAB 3: BOOKMARKS ══ -->
-    <div class="tab-pane" id="pane-bookmarks">
-      <div class="pane-head">
-        <div class="pane-icon-wrap">🔖</div>
-        <div class="pane-title-block">
-          <div class="pane-num">FEATURE</div>
-          <div class="pane-title">BOOKMARKS</div>
-          <div class="pane-desc">Your saved AI responses — code fixes, explanations, and solutions you've bookmarked for quick reference.</div>
-        </div>
-      </div>
-      <div class="section-title">SAVED MESSAGES</div>
-      <div class="bm-list" id="bkList">
-        <div class="bm-item">
-          <div class="bm-role"><div class="bm-role-dot"></div>ASSISTANT · DEBUG MODE</div>
-          <div class="bm-content">Fixed the off-by-one error. Changed <code style="color:var(--plasma)">range(n)</code> to <code style="color:var(--plasma)">range(n+1)</code> so the loop includes the final element...</div>
-          <div class="bm-note">📝 Key fix for array iteration</div>
-          <div class="bm-date">Saved 2 days ago</div>
-        </div>
-        <div class="bm-item">
-          <div class="bm-role"><div class="bm-role-dot"></div>ASSISTANT · EXPLAIN MODE</div>
-          <div class="bm-content">A closure is a function that remembers the variables from its outer scope even after that scope has finished executing. Think of it as carrying a backpack of variables...</div>
-          <div class="bm-note">📝 Great analogy for closures</div>
-          <div class="bm-date">Saved 5 days ago</div>
-        </div>
-        <div class="bm-item">
-          <div class="bm-role"><div class="bm-role-dot"></div>ASSISTANT · OPTIMIZE MODE</div>
-          <div class="bm-content">Replaced the O(n²) nested loop with a hash map approach — time complexity dropped from O(n²) to O(n) by trading space for speed...</div>
-          <div class="bm-note">📝 Important optimization pattern</div>
-          <div class="bm-date">Saved 1 week ago</div>
-        </div>
-      </div>
-      <div style="margin-top:14px">
-        <button class="btn" onclick="loadBookmarks()">↻ LOAD FROM SERVER</button>
-      </div>
-    </div>
 
     <!-- ══ TAB 4: COMPLEXITY ══ -->
-    <div class="tab-pane" id="pane-complexity">
-      <div class="pane-head">
-        <div class="pane-icon-wrap">📊</div>
-        <div class="pane-title-block">
-          <div class="pane-num">FEATURE</div>
-          <div class="pane-title">COMPLEXITY ANALYZER</div>
-          <div class="pane-desc">AI-powered Big-O analysis — paste any code and instantly get time and space complexity with a plain-English explanation.</div>
-        </div>
-      </div>
-      <div class="section-title">PASTE CODE TO ANALYZE</div>
-      <textarea class="input-field" id="cxCode" style="min-height:100px;margin-bottom:14px;" placeholder="def bubble_sort(arr):
-    n = len(arr)
-    for i in range(n):
-        for j in range(n-i-1):
-            if arr[j] > arr[j+1]:
-                arr[j], arr[j+1] = arr[j+1], arr[j]
-    return arr"></textarea>
-      <button class="btn" onclick="analyzeComplexity()">📊 ANALYZE COMPLEXITY</button>
-      <div class="cx-output" id="cxOutput" style="display:none;">
-        <div class="cx-row">
-          <span class="cx-key">TIME COMPLEXITY</span>
-          <span class="cx-val" id="cxTime">O(n²)</span>
-        </div>
-        <div class="cx-row">
-          <span class="cx-key">SPACE COMPLEXITY</span>
-          <span class="cx-val" id="cxSpace" style="color:var(--gold)">O(1)</span>
-        </div>
-        <div class="cx-explain" id="cxExplain"></div>
-      </div>
-    </div>
 
     <!-- ══ TAB 5: BATTLE ══ -->
     <div class="tab-pane" id="pane-battle">
       <div class="pane-head">
         <div class="pane-icon-wrap">⚔️</div>
         <div class="pane-title-block">
-          <div class="pane-num">FEATURE 13</div>
-          <div class="pane-title">LIVE CODE BATTLE</div>
-          <div class="pane-desc">Two coders. One problem. AI judges speed, efficiency, and readability in real-time as you both type.</div>
-        </div>
-        
-      </div>
-      <div class="ba-header">
-        <div>
-          <div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--text-3);margin-bottom:4px;">BATTLE TIMER</div>
-          <div class="ba-timer" id="baTimer">05:00</div>
-        </div>
-        <div style="display:flex;gap:10px;">
-          <button class="btn" onclick="startBattle()" id="baStartBtn">⚡ START BATTLE</button>
-          <button class="btn fire" onclick="endBattle()" style="display:none" id="baEndBtn">🏁 JUDGE NOW</button>
-        </div>
-        <div style="text-align:right;">
-          <div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--text-3);margin-bottom:4px;">ROUND</div>
-          <div style="font-family:var(--display);font-size:20px;font-weight:800;color:var(--gold);" id="baRound">1</div>
+          <div class="pane-num">LIVE MULTIPLAYER</div>
+          <div class="pane-title">CODE BATTLE ARENA</div>
+          <div class="pane-desc">Compete with other coders in real-time. Create a battle to get a shareable ID, or join an existing one.</div>
         </div>
       </div>
-      <div class="ba-problem" id="baProblem">
-        <span style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--gold);display:block;margin-bottom:6px;">⚡ BATTLE PROBLEM</span>
-        Write a function that checks if a string is a palindrome. Optimize for both speed and readability. Handle edge cases: empty strings, single characters, and mixed case.
-      </div>
-      <div class="ba-grid">
-        <div class="ba-player" id="baP1">
-          <div class="ba-player-head">
-            <span class="ba-player-name" style="color:var(--plasma);">⚡ PLAYER 1</span>
-            <span class="ba-score-badge" style="color:var(--plasma);background:var(--plasma-dim);border:1px solid var(--border-hi);" id="baScore1">0 pts</span>
+
+      <!-- LOBBY VIEW -->
+      <div id="baLobby">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px;">
+          <div>
+            <button class="btn" style="width:100%;padding:14px;font-size:9px;" onclick="createBattle()">⚡ CREATE BATTLE</button>
+            <div style="font-family:var(--mono);font-size:10px;color:var(--text-3);margin-top:6px;">Start a new session — get a shareable battle ID</div>
           </div>
-          <textarea class="ba-editor" id="baEditor1" placeholder="// Player 1 — start coding..." oninput="analyzeBattle(1)"></textarea>
-          <div class="ba-metrics">
-            <div class="ba-metric">LINES<span id="baLines1">0</span></div>
-            <div class="ba-metric">CHARS<span id="baChars1">0</span></div>
-            <div class="ba-metric">SPEED<span id="baSpeed1">0/s</span></div>
-            <div class="ba-metric">STYLE<span id="baStyle1">–</span></div>
+          <div>
+            <div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--text-3);margin-bottom:7px;">JOIN EXISTING BATTLE</div>
+            <div style="display:flex;gap:8px;">
+              <input class="input-field" id="baJoinInput" placeholder="Enter Battle ID..." style="flex:1;min-height:0;padding:12px 14px;resize:none;">
+              <button class="btn" style="padding:12px 16px;white-space:nowrap;" onclick="joinBattle()">JOIN</button>
+            </div>
           </div>
         </div>
-        <div class="ba-player" id="baP2">
-          <div class="ba-player-head">
-            <span class="ba-player-name" style="color:var(--nova);">🔮 PLAYER 2</span>
-            <span class="ba-score-badge" style="color:var(--nova);background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.3);" id="baScore2">0 pts</span>
-          </div>
-          <textarea class="ba-editor" id="baEditor2" placeholder="// Player 2 — start coding..." oninput="analyzeBattle(2)" style="color:rgba(168,85,247,0.9)"></textarea>
-          <div class="ba-metrics">
-            <div class="ba-metric">LINES<span id="baLines2">0</span></div>
-            <div class="ba-metric">CHARS<span id="baChars2">0</span></div>
-            <div class="ba-metric">SPEED<span id="baSpeed2">0/s</span></div>
-            <div class="ba-metric">STYLE<span id="baStyle2">–</span></div>
+
+        <!-- Waiting room (shown after creating) -->
+        <div id="baWaitRoom" style="display:none;border:1px solid var(--border);border-radius:4px;padding:20px;background:rgba(0,0,0,0.3);margin-bottom:14px;">
+          <div style="display:flex;align-items:center;gap:18px;">
+            <div>
+              <div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--text-3);margin-bottom:6px;">YOUR BATTLE ID</div>
+              <div style="font-family:var(--display);font-size:42px;font-weight:800;color:var(--plasma);" id="baMyId">—</div>
+            </div>
+            <button class="btn" onclick="copyBattleId()" style="padding:10px 16px;">📋 COPY ID</button>
+            <div style="margin-left:auto;">
+              <div style="display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:var(--text-3);">
+                <div style="width:8px;height:8px;border-radius:50%;background:var(--gold);box-shadow:0 0 8px var(--gold);animation:dotPulse 1s ease infinite;" id="baWaitDot"></div>
+                <span id="baWaitMsg">WAITING FOR OPPONENT...</span>
+              </div>
+              <div style="font-family:var(--mono);font-size:10px;color:var(--text-3);margin-top:4px;">Share this ID with your opponent</div>
+            </div>
           </div>
         </div>
       </div>
-      <div class="ba-judge" id="baJudge">
-        <div class="ba-judge-label"><div class="judge-dot"></div> AI JUDGE — REAL-TIME ANALYSIS</div>
-        <span id="baJudgeText" style="color:var(--text-3);">Start the battle and begin coding — the AI judge will analyze both solutions in real-time...</span>
+
+      <!-- ACTIVE BATTLE VIEW (shown when battle starts) -->
+      <div id="baArena" style="display:none;">
+        <div class="ba-header">
+          <div>
+            <div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--text-3);margin-bottom:4px;">BATTLE TIMER</div>
+            <div class="ba-timer" id="baTimer">05:00</div>
+          </div>
+          <div style="display:flex;gap:10px;">
+            <button class="btn fire" onclick="endBattle()" id="baEndBtn">🏁 JUDGE NOW</button>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--text-3);margin-bottom:4px;">BATTLE ID</div>
+            <div style="font-family:var(--display);font-size:20px;font-weight:800;color:var(--gold);" id="baActiveBattleId">—</div>
+          </div>
+        </div>
+
+        <div class="ba-problem" id="baProblem">
+          <span style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--gold);display:block;margin-bottom:6px;">⚡ BATTLE PROBLEM</span>
+          <span id="baProblemText">Loading...</span>
+        </div>
+
+        <div class="ba-grid">
+          <!-- MY EDITOR -->
+          <div class="ba-player" id="baMyPane">
+            <div class="ba-player-head">
+              <span class="ba-player-name" style="color:var(--plasma);">⚡ YOU</span>
+              <span class="ba-score-badge" style="color:var(--plasma);background:var(--plasma-dim);border:1px solid var(--border-hi);" id="baMyScore">0 pts</span>
+            </div>
+            <textarea class="ba-editor" id="baMyEditor" placeholder="// Start coding here..." oninput="onMyCodeChange()"></textarea>
+            <div class="ba-metrics">
+              <div class="ba-metric">LINES<span id="baMyLines">0</span></div>
+              <div class="ba-metric">CHARS<span id="baMyChars">0</span></div>
+              <div class="ba-metric">STYLE<span id="baMyStyle">–</span></div>
+            </div>
+          </div>
+          <!-- OPPONENT VIEW -->
+          <div class="ba-player" id="baOppPane">
+            <div class="ba-player-head">
+              <span class="ba-player-name" style="color:var(--nova);">🔮 OPPONENT</span>
+              <span class="ba-score-badge" style="color:var(--nova);background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.3);" id="baOppScore">0 pts</span>
+            </div>
+            <div class="ba-editor" id="baOppView" style="white-space:pre-wrap;overflow:auto;font-family:var(--mono);font-size:12px;padding:14px;min-height:130px;color:rgba(168,85,247,0.7);background:transparent;line-height:1.6;border:none;outline:none;">Waiting for opponent to type...</div>
+            <div class="ba-metrics">
+              <div class="ba-metric">LINES<span id="baOppLines">0</span></div>
+              <div class="ba-metric">CHARS<span id="baOppChars">0</span></div>
+              <div class="ba-metric">STYLE<span id="baOppStyle">–</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ba-judge" id="baJudge">
+          <div class="ba-judge-label"><div class="judge-dot"></div> AI JUDGE — VERDICT</div>
+          <span id="baJudgeText" style="color:var(--text-3);">Code and click JUDGE NOW when ready — AI will score both solutions...</span>
+        </div>
       </div>
     </div>
 
@@ -953,186 +874,224 @@ window.addEventListener('resize', updateScrollBtns);
 setTimeout(updateScrollBtns, 100);
 
 /* ══════════════════════════════════════════
-   FEATURE 1 — THOUGHT REPLAY
+   FEATURE — THOUGHT REPLAY (REAL API)
 ══════════════════════════════════════════ */
-const THOUGHT_STEPS = [
-  { label:'READING CODE', text:'Scanning the function structure... I see a loop iterating over an array with a conditional comparison.', type:'thinking' },
-  { label:'IDENTIFYING VARIABLES', text:'Found variable: max = 0. Suspicious — what if all values are negative? Initial value would always be wrong.', type:'thinking' },
-  { label:'TRACING EXECUTION', text:'Walking through line by line: `for i in arr` → iterates each element. `if i > max` → compares correctly. Then...', type:'thinking' },
-  { label:'🐛 BUG FOUND', text:'Line 5: `max == i` — This is a COMPARISON, not ASSIGNMENT. Using `==` instead of `=`. The max variable is never updated!', type:'error', code:'max == i  ← WRONG (comparison)\nmax = i   ← CORRECT (assignment)' },
-  { label:'SECONDARY BUG', text:'Also: initializing max = 0 fails for arrays with all negative numbers like [-5, -3, -1]. Should use float(\'-inf\') or arr[0].', type:'thinking' },
-  { label:'GENERATING FIX', text:'Writing the corrected function with both fixes applied...', type:'thinking', code:'def find_max(arr):\n    if not arr: return None\n    max_val = arr[0]  # handles negatives\n    for i in arr:\n        if i > max_val:\n            max_val = i  # fixed assignment\n    return max_val' },
-  { label:'✅ ANALYSIS COMPLETE', text:'Two bugs found and fixed. Function now handles: negative numbers, empty arrays, and properly assigns the maximum value.', type:'done' },
-];
-
 let trAnimating = false;
-function replayThought() {
-  if (trAnimating) return;
-  trAnimating = true;
+
+function addThoughtStep(step, isLast) {
   const timeline = document.getElementById('trTimeline');
-  timeline.innerHTML = '';
-  THOUGHT_STEPS.forEach((step, i) => {
-    setTimeout(() => {
-      const el = document.createElement('div');
-      el.className = 'tr-step';
-      const dotClass = i === THOUGHT_STEPS.length-1 ? 'done' : step.type === 'error' ? 'error' : 'thinking';
-      el.innerHTML = `
-        <div class="tr-dot ${dotClass}"></div>
-        <div class="tr-content">
-          <div class="tr-label">${step.label}</div>
-          <div class="tr-text">${step.text}</div>
-          ${step.code ? `<div class="tr-code">${step.code}</div>` : ''}
-        </div>`;
-      timeline.appendChild(el);
-      requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('visible')));
-      if (i === THOUGHT_STEPS.length - 1) trAnimating = false;
-    }, i * 700);
-  });
+  const el = document.createElement('div');
+  el.className = 'tr-step';
+  const dotClass = isLast ? 'done' : step.type === 'error' ? 'error' : 'thinking';
+  const codeHtml = step.code
+    ? `<div class="tr-code">${step.code.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`
+    : '';
+  el.innerHTML = `
+    <div class="tr-dot ${dotClass}"></div>
+    <div class="tr-content">
+      <div class="tr-label">${step.label || ''}</div>
+      <div class="tr-text">${(step.text || '').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+      ${codeHtml}
+    </div>`;
+  timeline.appendChild(el);
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('visible')));
+  timeline.scrollTop = timeline.scrollHeight;
 }
+
+async function replayThought() {
+  if (trAnimating) return;
+  const code = document.getElementById('trCode').value.trim();
+  if (!code) {
+    alert('Please paste some code first.');
+    return;
+  }
+  trAnimating = true;
+  document.getElementById('trTimeline').innerHTML = '';
+  document.getElementById('trLiveLabel').style.display = '';
+  const btn = document.getElementById('trStartBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span style="display:inline-block;width:12px;height:12px;border:2px solid rgba(0,255,224,0.3);border-top-color:var(--plasma);border-radius:50%;animation:spin 0.7s linear infinite;vertical-align:middle;margin-right:6px;"></span> ANALYZING...';
+
+  // Show a "thinking" placeholder immediately
+  addThoughtStep({ label: 'READING CODE', text: 'Sending to AI debugger — analyzing your code...', type: 'thinking' }, false);
+
+  try {
+    const res = await fetch('/thought_replay', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code })
+    });
+    if (!res.ok) throw new Error(`API error ${res.status}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    // Clear the placeholder
+    document.getElementById('trTimeline').innerHTML = '';
+
+    const steps = Array.isArray(data) ? data : (data.steps || [data]);
+    steps.forEach((step, i) => {
+      setTimeout(() => {
+        addThoughtStep(step, i === steps.length - 1);
+        if (i === steps.length - 1) {
+          trAnimating = false;
+          btn.disabled = false;
+          btn.innerHTML = '▶ START REPLAY';
+        }
+      }, i * 600);
+    });
+  } catch(err) {
+    document.getElementById('trTimeline').innerHTML = '';
+    addThoughtStep({ label: 'ERROR', text: 'Could not reach the AI debugger: ' + err.message + '. Make sure you are logged in and the server is running.', type: 'error' }, true);
+    trAnimating = false;
+    btn.disabled = false;
+    btn.innerHTML = '▶ START REPLAY';
+  }
+}
+
 function resetReplay() {
   trAnimating = false;
   document.getElementById('trTimeline').innerHTML = '';
+  document.getElementById('trLiveLabel').style.display = 'none';
+  const btn = document.getElementById('trStartBtn');
+  if (btn) { btn.disabled = false; btn.innerHTML = '▶ START REPLAY'; }
 }
 
-/* ══════════════════════════════════════════
-   FEATURE 2 — SEARCH
-══════════════════════════════════════════ */
-const SEARCH_MOCK = [
-  { icon:'💡', title:'Big O notation explained with examples', mode:'EXPLAIN' },
-  { icon:'🐛', title:'Python list index out of range bug fix', mode:'DEBUG' },
-  { icon:'⚡', title:'Optimizing nested loops to O(n log n)', mode:'OPTIMIZE' },
-  { icon:'🎓', title:'React useEffect interview questions', mode:'INTERVIEW' },
-  { icon:'📐', title:'Flask REST API with SQLite setup', mode:'GENERAL' },
-  { icon:'🔢', title:'Binary search implementation in Python', mode:'DSA' },
-  { icon:'🌐', title:'Async/await JavaScript event loop', mode:'EXPLAIN' },
-];
-
-function doSearch(q) {
-  const container = document.getElementById('searchResults');
-  const results = q.trim() ? SEARCH_MOCK.filter(r => r.title.toLowerCase().includes(q.toLowerCase())) : SEARCH_MOCK;
-  container.innerHTML = results.length
-    ? results.map(r => `<div class="search-result"><span class="sr-icon">${r.icon}</span><span class="sr-title">${r.title}</span><span class="sr-mode">${r.mode}</span></div>`).join('')
-    : '<div style="padding:20px;text-align:center;font-family:var(--mono);font-size:12px;color:var(--text-3);">No results found.</div>';
-}
-
-/* ══════════════════════════════════════════
-   FEATURE — BOOKMARKS
-══════════════════════════════════════════ */
-function loadBookmarks() {
-  const btn = event.target;
-  btn.innerHTML = '<span class="spinner"></span> LOADING...';
-  btn.disabled = true;
-  setTimeout(() => { btn.innerHTML = '↻ LOAD FROM SERVER'; btn.disabled = false; }, 1500);
-}
-
-/* ══════════════════════════════════════════
-   FEATURE — COMPLEXITY ANALYZER
-══════════════════════════════════════════ */
-const CX_EXAMPLES = [
-  { time:'O(n²)', space:'O(1)', explain:'The two nested for loops each iterate up to n times, resulting in n × n = n² operations. The space complexity is O(1) because only a constant amount of extra variables are used regardless of input size.' },
-  { time:'O(n log n)', space:'O(n)', explain:'The algorithm divides the input in half each time (log n) and processes each element at each level (n), giving O(n log n). The space is O(n) for the auxiliary array.' },
-  { time:'O(n)', space:'O(n)', explain:'A single loop iterates through each element once. The hash map stores up to n elements, making both time and space O(n).' },
-];
-
-function analyzeComplexity() {
-  const code = document.getElementById('cxCode').value.trim();
-  if (!code) return;
-  const output = document.getElementById('cxOutput');
-  output.style.display = 'none';
-  const btn = event.target;
-  btn.innerHTML = '<span class="spinner"></span> ANALYZING...';
-  btn.disabled = true;
-  setTimeout(() => {
-    const ex = CX_EXAMPLES[Math.floor(Math.random() * CX_EXAMPLES.length)];
-    document.getElementById('cxTime').textContent = ex.time;
-    document.getElementById('cxSpace').textContent = ex.space;
-    document.getElementById('cxExplain').textContent = ex.explain;
-    output.style.display = 'block';
-    btn.innerHTML = '📊 ANALYZE COMPLEXITY';
-    btn.disabled = false;
-  }, 1400);
-}
-
-/* ══════════════════════════════════════════
-   FEATURE 3 — CODE BATTLE
-══════════════════════════════════════════ */
+/* CODE BATTLE - REAL MULTIPLAYER */
 let baInterval=null, baSeconds=300, baRunning=false;
-let baTypeSpeeds=[{count:0,time:Date.now()},{count:0,time:Date.now()}];
+let baBattleId=null, baBattleProblem='';
+let baOpponentPollInterval=null, baOpponentCodePollInterval=null;
 
-function startBattle() {
-  baRunning = true;
-  document.getElementById('baStartBtn').style.display = 'none';
-  document.getElementById('baEndBtn').style.display = '';
-  baInterval = setInterval(() => {
+function showToast(msg, isError) {
+  var old=document.getElementById('baToast'); if(old)old.remove();
+  var t=document.createElement('div'); t.id='baToast'; t.textContent=msg;
+  var bg=isError?'rgba(255,107,43,0.15)':'rgba(0,255,224,0.1)';
+  var bdr=isError?'rgba(255,107,43,0.4)':'rgba(0,255,224,0.4)';
+  var col=isError?'var(--fire)':'var(--plasma)';
+  t.style.cssText='position:fixed;bottom:28px;left:50%;transform:translateX(-50%);padding:11px 24px;border-radius:30px;font-family:var(--display);font-size:9px;letter-spacing:2px;z-index:9999;pointer-events:none;background:'+bg+';border:1px solid '+bdr+';color:'+col+';';
+  document.body.appendChild(t);
+  setTimeout(function(){t.style.opacity='0';setTimeout(function(){t.remove();},400);},3000);
+}
+
+async function createBattle() {
+  try {
+    var res=await fetch('/battle/create',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+    var data=await res.json();
+    if(data.error){showToast(data.error,true);return;}
+    baBattleId=data.battle_id; baBattleProblem=data.problem;
+    document.getElementById('baMyId').textContent=baBattleId;
+    document.getElementById('baWaitRoom').style.display='';
+    showToast('Battle #'+baBattleId+' created! Share this ID with your opponent.');
+    baOpponentPollInterval=setInterval(async function(){
+      try{
+        var r=await fetch('/battle/status/'+baBattleId);
+        var d=await r.json();
+        if(d.players>=2||d.status==='active'){
+          clearInterval(baOpponentPollInterval);
+          showToast('Opponent joined! Battle starting...');
+          setTimeout(startBattleArena,800);
+        }
+      }catch(e){}
+    },2000);
+  }catch(e){showToast('Could not create battle. Is the server running?',true);}
+}
+
+async function joinBattle() {
+  var idVal=document.getElementById('baJoinInput').value.trim();
+  if(!idVal){showToast('Enter a Battle ID first.',true);return;}
+  try{
+    var res=await fetch('/battle/join',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({battle_id:parseInt(idVal)})});
+    var data=await res.json();
+    if(data.error){showToast(data.error,true);return;}
+    baBattleId=data.battle_id; baBattleProblem=data.problem;
+    showToast('Joined Battle #'+baBattleId+' — starting!');
+    setTimeout(startBattleArena,800);
+  }catch(e){showToast('Could not join. Check the ID and try again.',true);}
+}
+
+function copyBattleId(){
+  if(baBattleId){navigator.clipboard.writeText(String(baBattleId)).catch(function(){});showToast('Battle ID '+baBattleId+' copied!');}
+}
+
+function startBattleArena(){
+  document.getElementById('baLobby').style.display='none';
+  document.getElementById('baArena').style.display='';
+  document.getElementById('baActiveBattleId').textContent=baBattleId;
+  document.getElementById('baProblemText').textContent=baBattleProblem;
+  baRunning=true; baSeconds=300;
+  baInterval=setInterval(function(){
     baSeconds--;
-    const m=String(Math.floor(baSeconds/60)).padStart(2,'0');
-    const s=String(baSeconds%60).padStart(2,'0');
-    const timer=document.getElementById('baTimer');
-    timer.textContent=`${m}:${s}`;
-    if(baSeconds<60) timer.classList.add('warning');
-    if(baSeconds<=0) endBattle();
+    var m=String(Math.floor(baSeconds/60)).padStart(2,'0');
+    var s=String(baSeconds%60).padStart(2,'0');
+    var timer=document.getElementById('baTimer');
+    timer.textContent=m+':'+s;
+    if(baSeconds<60)timer.classList.add('warning');
+    if(baSeconds<=0)endBattle();
   },1000);
-  analyzeLoop();
+  baOpponentCodePollInterval=setInterval(pollOpponentCode,2500);
+  setInterval(pushMyCode,3000);
 }
 
-function endBattle() {
-  clearInterval(baInterval); baRunning=false;
-  document.getElementById('baStartBtn').style.display='';
-  document.getElementById('baEndBtn').style.display='none';
-  baSeconds=300; document.getElementById('baTimer').textContent='05:00';
-  document.getElementById('baTimer').classList.remove('warning');
-  judgeCode(document.getElementById('baEditor1').value, document.getElementById('baEditor2').value);
+async function pushMyCode(){
+  if(!baRunning||!baBattleId)return;
+  var code=document.getElementById('baMyEditor').value;
+  await fetch('/battle/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({battle_id:baBattleId,code:code})}).catch(function(){});
 }
 
-function analyzeBattle(player) {
-  const code=document.getElementById(`baEditor${player}`).value;
-  const lines=code.split('\n').filter(l=>l.trim()).length;
-  const chars=code.replace(/\s/g,'').length;
-  document.getElementById(`baLines${player}`).textContent=lines;
-  document.getElementById(`baChars${player}`).textContent=chars;
-  const now=Date.now(), spd=baTypeSpeeds[player-1];
-  const elapsed=(now-spd.time)/1000;
-  document.getElementById(`baSpeed${player}`).textContent=Math.max(0,Math.round((chars-spd.count)/Math.max(elapsed,0.1)))+'/s';
-  spd.count=chars; spd.time=now;
-  const hasDoc=code.includes('"""')||code.includes("'''");
-  const hasFn=code.includes('def ')||code.includes('function ');
-  const hasCmt=code.includes('#')||code.includes('//');
-  const ss=(hasDoc?2:0)+(hasFn?1:0)+(hasCmt?1:0);
-  document.getElementById(`baStyle${player}`).textContent=['–','⭐','⭐⭐','⭐⭐⭐','💎'][Math.min(ss,4)];
-  const score=lines*5+chars*0.5+(ss*20);
-  document.getElementById(`baScore${player}`).textContent=Math.round(score)+' pts';
-  const s1=parseFloat(document.getElementById('baScore1').textContent)||0;
-  const s2=parseFloat(document.getElementById('baScore2').textContent)||0;
-  document.getElementById('baP1').classList.toggle('winning',s1>s2);
-  document.getElementById('baP2').classList.toggle('winning',s2>s1);
-  document.getElementById('baP1').classList.toggle('losing',s1<s2);
-  document.getElementById('baP2').classList.toggle('losing',s2<s1);
+async function pollOpponentCode(){
+  if(!baBattleId)return;
+  try{
+    var r=await fetch('/battle/status/'+baBattleId);
+    var d=await r.json();
+    var opp=d.opponent_code||'';
+    document.getElementById('baOppView').textContent=opp||'Waiting for opponent to type...';
+    updateMetrics('Opp',opp);
+  }catch(e){}
 }
 
-let judgeIdx=0;
-const JUDGE_COMMENTS=[
-  p=>`Player 1 leads with a ${p.l1>p.l2?'more':'less'} concise solution. Player 2's style is ${p.s2>p.s1?'better':'weaker'}. Still close.`,
-  p=>`Player 1: ${p.c1} chars vs Player 2: ${p.c2}. ${p.c1<p.c2?'Brevity advantage: P1.':'More thorough: P2.'}`,
-  p=>`${p.s1===p.s2?'Tied on style.':p.s1>p.s2?'P1 wins on code style.':'P2 wins on style.'} Whoever handles edge cases first pulls ahead.`,
-];
+function updateMetrics(who,code){
+  var lines=code.split('\n').filter(function(l){return l.trim().length>0;}).length;
+  var chars=code.replace(/\s/g,'').length;
+  document.getElementById('ba'+who+'Lines').textContent=lines;
+  document.getElementById('ba'+who+'Chars').textContent=chars;
+  var hasFn=code.indexOf('def ')!==-1||code.indexOf('function ')!==-1;
+  var hasCmt=code.indexOf('#')!==-1||code.indexOf('//')!==-1;
+  var ss=(hasFn?1:0)+(hasCmt?1:0);
+  var stars=['-','*','**','***'];
+  document.getElementById('ba'+who+'Style').textContent=stars[Math.min(ss,3)];
+  document.getElementById('ba'+who+'Score').textContent=Math.round(lines*5+chars*0.5+ss*20)+' pts';
+}
 
-function analyzeLoop() {
-  if(!baRunning) return;
-  setTimeout(()=>{ const c1=document.getElementById('baEditor1').value, c2=document.getElementById('baEditor2').value; if(c1.trim()||c2.trim()) liveJudge(c1,c2); analyzeLoop(); },4000);
+function onMyCodeChange(){updateMetrics('My',document.getElementById('baMyEditor').value);}
+
+async function endBattle(){
+  clearInterval(baInterval);clearInterval(baOpponentCodePollInterval);
+  baRunning=false;
+  var btn=document.getElementById('baEndBtn');
+  btn.disabled=true;btn.textContent='Judging...';
+  document.getElementById('baJudgeText').textContent='AI is scoring both solutions...';
+  var myCode=document.getElementById('baMyEditor').value;
+  var oppCode=document.getElementById('baOppView').textContent;
+  if(oppCode==='Waiting for opponent to type...')oppCode='';
+  try{
+    var res=await fetch('/battle/judge',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({battle_id:baBattleId,code1:myCode,code2:oppCode,problem:baBattleProblem,player1:'You',player2:'Opponent'})
+    });
+    var d=await res.json();
+    var winner=d.winner==='player1'?'YOU WIN':d.winner==='player2'?'OPPONENT WINS':'TIE';
+    var wc=d.winner==='player1'?'var(--plasma)':d.winner==='player2'?'var(--nova)':'var(--gold)';
+    document.getElementById('baJudgeText').innerHTML=
+      '<span style="font-family:var(--display);font-size:15px;color:'+wc+';font-weight:800;">WINNER: '+winner+'</span><br><br>'+
+      '<span style="color:var(--text-2);">'+(d.verdict||'')+'</span><br><br>'+
+      '<span style="color:var(--plasma);">You: '+(d.p1_score||0)+'/100</span>  '+
+      '<span style="color:var(--nova);">Opponent: '+(d.p2_score||0)+'/100</span><br>'+
+      '<span style="color:var(--text-3);font-size:10px;">'+(d.p1_feedback||'')+'</span>';
+  }catch(e){
+    document.getElementById('baJudgeText').textContent='Judging failed. Check your connection.';
+  }
+  btn.disabled=false;btn.textContent='JUDGE NOW';
 }
-function liveJudge(c1,c2) {
-  const s1=parseFloat(document.getElementById('baScore1').textContent)||0;
-  const s2=parseFloat(document.getElementById('baScore2').textContent)||0;
-  const p={l1:c1.split('\n').length,l2:c2.split('\n').length,c1:c1.replace(/\s/g,'').length,c2:c2.replace(/\s/g,'').length,s1,s2};
-  document.getElementById('baJudgeText').textContent=JUDGE_COMMENTS[judgeIdx++%JUDGE_COMMENTS.length](p);
-}
-function judgeCode(c1,c2) {
-  const s1=parseFloat(document.getElementById('baScore1').textContent)||0;
-  const s2=parseFloat(document.getElementById('baScore2').textContent)||0;
-  const winner=s1>s2?'PLAYER 1 ⚡':s2>s1?'PLAYER 2 🔮':'TIE';
-  const color=s1>s2?'var(--plasma)':s2>s1?'var(--nova)':'var(--gold)';
-  document.getElementById('baJudgeText').innerHTML=`<span style="font-family:var(--display);font-size:14px;color:${color};font-weight:800;">🏆 WINNER: ${winner}</span><br><br><span style="color:var(--text-2);">P1: ${Math.round(s1)} pts | P2: ${Math.round(s2)} pts — ${winner==='TIE'?'Perfect tie!':Math.abs(Math.round(s1-s2))+' point margin.'}</span>`;
-}
+
 
 /* ══════════════════════════════════════════
    FEATURE 4 — CODE KARMA
@@ -1234,30 +1193,6 @@ function submitBlind(){
 }
 
     <!-- ══ VOICE CLONE PANE ══ -->
-    <div class="tab-pane" id="pane-voiceclone">
-      <div class="pane-head">
-        <div class="pane-icon-wrap">🎙</div>
-        <div class="pane-title-block">
-          <div class="pane-num">FEATURE 7</div>
-          <div class="pane-title">MY VOICE CLONE</div>
-          <div class="pane-desc">Record your voice and have CodeBuddy speak every AI response in YOUR voice — works in Tamil, Hindi, English and more.</div>
-        </div>
-      </div>
-      <div style="padding:0 20px 20px">
-        <div style="margin-bottom:20px">
-          <div style="font-family:var(--display);font-size:8px;font-weight:700;letter-spacing:2px;color:var(--text-3);margin-bottom:10px">RECORD VOICE SAMPLE</div>
-          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-bottom:12px;line-height:1.8">Read this clearly into your mic:<br><em style="color:var(--text-2)">"The quick brown fox jumps over the lazy dog near the river bank."</em></div>
-          <button onclick="window.VoiceClone&&VoiceClone.open()" style="padding:12px 20px;background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.3);color:#a855f7;font-family:var(--display);font-size:10px;font-weight:700;letter-spacing:2px;cursor:pointer;border-radius:6px;width:100%;transition:all 0.15s">🎙 OPEN VOICE CLONE STUDIO</button>
-        </div>
-        <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);line-height:2;padding:14px;border:1px solid rgba(168,85,247,0.12);border-radius:6px;background:rgba(168,85,247,0.03)">
-          <strong style="color:#a855f7;font-family:var(--display);font-size:8px;letter-spacing:2px">HOW IT WORKS</strong><br><br>
-          1. Record 5–15 seconds of your voice<br>
-          2. AI learns your speech patterns<br>
-          3. Every 🔊 PLAY speaks in YOUR voice<br>
-          4. Works with Tamil, Hindi, English &amp; more
-        </div>
-      </div>
-    </div>
 </script>
 </body>
 </html>
