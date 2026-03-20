@@ -3921,6 +3921,7 @@
               <div onclick="event.stopPropagation();renameChat({{ chat['id'] }})">✏ RENAME</div>
               <div onclick="event.stopPropagation();deleteChat({{ chat['id'] }})">✕ DELETE</div>
               <div onclick="event.stopPropagation();shareChat({{ chat['id'] }})">⟁ SHARE</div>
+              <div onclick="event.stopPropagation();collaborateChat({{ chat['id'] }})" style="color:#a855f7">🤝 COLLABORATE</div>
             </div>
           </div>
         </div>
@@ -4584,7 +4585,7 @@
         return;
       }
 
-      const ttsEP = window._hasVoiceClone ? '/voice_clone/tts' : '/tts';
+      const ttsEP = (window._hasVoiceClone || window._hasCoquiVoice) ? '/voice_clone/tts' : '/tts';
       const clean = text.replace(/```[\s\S]*?```/g,'code block.')
         .replace(/`[^`]+`/g,'code').replace(/#{1,6}\s+/g,'')
         .replace(/\*\*([^*]+)\*\*/g,'$1').replace(/\*([^*]+)\*/g,'$1')
@@ -4595,9 +4596,10 @@
       fetch(ttsEP, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: clean, lang })
+        body: JSON.stringify({ text: clean, lang }),
+        redirect: 'manual'
       })
-      .then(r => r.ok ? r.blob() : Promise.reject(r.status))
+      .then(r => { if (r.type === 'opaqueredirect' || r.status === 0) return Promise.reject('session'); return r.ok ? r.blob() : Promise.reject(r.status); })
       .then(blob => {
         const url = URL.createObjectURL(blob);
         const audio = new Audio(url);
@@ -4626,8 +4628,14 @@
       const emp = document.getElementById('emptyState');
       if (emp) emp.remove();
       chatBox.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-3);font-family:var(--display);font-size:9px;letter-spacing:2px;">LOADING SESSION...</div>';
-      fetch('/load_messages/' + id)
-        .then(r => r.json())
+      fetch('/load_messages/' + id, { redirect: 'manual' })
+        .then(r => {
+          if (r.type === 'opaqueredirect' || r.status === 302 || r.status === 0) {
+            window.location.href = '/login'; return Promise.reject('expired');
+          }
+          if (!r.ok) return Promise.reject('error ' + r.status);
+          return r.json();
+        })
         .then(data => {
           chatBox.innerHTML = '';
           const msgs = data.messages || data;
@@ -4654,7 +4662,7 @@
         });
     }
     function newChat() {
-      fetch('/new_chat', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({mode: document.getElementById('mode').value}) })
+      fetch('/new_chat', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({mode: document.getElementById('mode').value}), redirect: 'manual' })
         .then(r => r.json())
         .then(d => {
           const id = d.chat_id || d.id;
@@ -4735,7 +4743,7 @@
 
     function quickAsk(text) {
       if (!currentChatId) {
-        fetch('/new_chat', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({mode: document.getElementById('mode').value}) })
+        fetch('/new_chat', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({mode: document.getElementById('mode').value}), redirect: 'manual' })
           .then(r => r.json())
           .then(d => {
             const id = d.chat_id || d.id;
@@ -4787,7 +4795,7 @@
       chatBox.appendChild(botRow); scrollDown();
       setProgress(0); const t0 = Date.now();
       try {
-        const res = await fetch('/chat', { method: 'POST', body: fd });
+        const res = await fetch('/chat', { method: 'POST', body: fd, redirect: 'manual' });
         if (!res.ok) {
           // Handle rate limit (429) specially — show countdown
           if (res.status === 429) {
@@ -4850,7 +4858,8 @@
         if (_shouldSpeak) {
           if (window.CBVoice && typeof window.CBVoice.stop === 'function') window.CBVoice.stop();
           else if (window.speechSynthesis) window.speechSynthesis.cancel();
-          setTimeout(() => speakText(full), 150);
+          // Small delay then speak - only if still on this page
+          setTimeout(() => { if (document.getElementById('chatBox')) speakText(full); }, 300);
         }
       } catch (err) { bContent.innerHTML = `<span style="color:var(--fire)">⚠ Network error: ${err.message}. Please try again.</span>`; }
       isStreaming = false; sendBtn.disabled = false; setTimeout(() => setProgress(0), 1500);
@@ -4987,6 +4996,39 @@
     function renameChat(id) { const n = prompt('ENTER NEW SESSION NAME:'); if (!n) return; fetch('/rename_chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: id, title: n }) }).then(() => location.reload()); }
     function deleteChat(id) { if (!confirm('TERMINATE SESSION?')) return; fetch('/delete_chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: id }) }).then(() => location.reload()); }
     function shareChat(id) { fetch('/share_chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: id }) }).then(r => r.json()).then(d => alert('SHARE URL: ' + d.share_url)); }
+
+    function collaborateChat(id) {
+      fetch('/collab/create', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({chat_id: id}) })
+        .then(r => r.json()).then(d => {
+          if (d.error) { alert('Error: ' + d.error); return; }
+          const url = d.collab_url;
+          const existing = document.getElementById('collabModal');
+          if (existing) existing.remove();
+          const modal = document.createElement('div');
+          modal.id = 'collabModal';
+          modal.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.75)';
+          modal.innerHTML = `<div style="background:#0a0f1e;border:1px solid rgba(168,85,247,0.5);border-radius:16px;padding:32px;width:440px;max-width:92vw;font-family:'Orbitron',monospace;position:relative">
+            <button onclick="document.getElementById('collabModal').remove()" style="position:absolute;top:14px;right:16px;background:none;border:none;color:rgba(255,255,255,0.3);font-size:20px;cursor:pointer">✕</button>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px"><span style="font-size:22px">🤝</span><div><div style="color:#a855f7;font-size:12px;font-weight:700;letter-spacing:2px">COLLABORATE</div><div style="color:rgba(255,255,255,0.4);font-size:10px;margin-top:2px">${d.chat_title}</div></div></div>
+            <div style="font-size:9px;color:rgba(255,255,255,0.3);letter-spacing:1.5px;margin-bottom:8px">SHARE LINK WITH YOUR FRIEND</div>
+            <div style="background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.25);border-radius:8px;padding:12px;font-size:11px;color:#a855f7;word-break:break-all;margin-bottom:14px;font-family:'IBM Plex Mono',monospace">${url}</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+              <button onclick="navigator.clipboard.writeText('${url}');this.textContent='✓ COPIED!';setTimeout(()=>this.textContent='📋 COPY LINK',2000)" style="padding:11px;background:rgba(168,85,247,0.15);border:1px solid rgba(168,85,247,0.4);border-radius:8px;color:#a855f7;font-family:'Orbitron',monospace;font-size:9px;font-weight:700;letter-spacing:1.5px;cursor:pointer">📋 COPY LINK</button>
+              <button onclick="window.open('${url}','_blank')" style="padding:11px;background:rgba(0,255,224,0.08);border:1px solid rgba(0,255,224,0.35);border-radius:8px;color:#00ffe0;font-family:'Orbitron',monospace;font-size:9px;font-weight:700;letter-spacing:1.5px;cursor:pointer">🚀 OPEN SESSION</button>
+            </div>
+            <div style="font-size:10px;color:rgba(255,255,255,0.3);line-height:1.7;text-align:center">Friend opens link → joins your chat → code with AI together<br><span style="color:#a855f7">🎤 Voice call available inside the session</span></div>
+          </div>`;
+          document.body.appendChild(modal);
+          modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+        }).catch(e => {
+          const toast = document.createElement('div');
+          toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(255,107,43,0.15);border:1px solid rgba(255,107,43,0.4);color:#ff6b2b;font-family:var(--display);font-size:9px;font-weight:700;letter-spacing:2px;padding:12px 24px;border-radius:20px;z-index:99999;pointer-events:none;box-shadow:0 4px 24px rgba(0,0,0,0.5)';
+          const emsg = (e && e.message) ? e.message : '';
+          toast.textContent = '⚠ Collab error — run: pip install flask-socketio eventlet then restart python app.py';
+          document.body.appendChild(toast);
+          setTimeout(() => toast.remove(), 7000);
+        });
+    }
 
     /* ═══════════════════════════════════════════════════════════
        ADVANCED INTERVIEW MODE ENGINE
@@ -5472,13 +5514,21 @@ Hints used: ${IV.hintCount} | Skipped: ${IV.skipCount} | Best streak: ${IV.maxSt
     }
 
     function getLang() {
-      // Primary: voice bar selector (cbLangSel); fallback en-US
+      // Priority 1: voice clone detected language (set after recording)
+      if (window._vcDetectedLang && window._hasVoiceClone) {
+        const v = window._vcDetectedLang;
+        return v === 'ta-en' ? 'ta-IN' : v;
+      }
+      // Priority 2: voice bar selector (cbLangSel)
       const v = (document.getElementById('cbLangSel') || { value: 'en-US' }).value;
-      // ta-en (Tanglish) uses Tamil voice for TTS
       return v === 'ta-en' ? 'ta-IN' : v;
     }
     function getLangRaw() {
-      // Returns full code including ta-en (for sending to backend)
+      // Priority 1: voice clone detected language
+      if (window._vcDetectedLang && window._hasVoiceClone) {
+        return window._vcDetectedLang;
+      }
+      // Priority 2: UI selector
       return (document.getElementById('cbLangSel') || { value: 'en-US' }).value;
     }
 
@@ -7458,8 +7508,14 @@ def find_max(arr):
           1. Record 5–15 sec of your voice in any language<br>
           2. AI <strong style="color:#a855f7">detects your language</strong> automatically<br>
           3. Every 🔊 PLAY button speaks the AI answer in <strong style="color:#a855f7">your language</strong><br>
-          4. Works with Tamil, Hindi, Telugu, English &amp; 16 more
+          4. Works with Tamil, Hindi, Telugu, Malayalam, English &amp; 16 more
         </div>
+        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+          <button onclick="VoiceClone.diagnose()" style="padding:7px 12px;background:rgba(0,255,224,0.05);border:1px solid rgba(0,255,224,0.2);border-radius:4px;color:rgba(0,255,224,0.6);font-family:var(--display);font-size:7px;font-weight:700;letter-spacing:1.5px;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='rgba(0,255,224,0.12)'" onmouseout="this.style.background='rgba(0,255,224,0.05)'">🔧 DIAGNOSE VOICE</button>
+          <button onclick="VoiceClone.testTamil()" style="padding:7px 12px;background:rgba(168,85,247,0.05);border:1px solid rgba(168,85,247,0.2);border-radius:4px;color:rgba(168,85,247,0.6);font-family:var(--display);font-size:7px;font-weight:700;letter-spacing:1.5px;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='rgba(168,85,247,0.12)'" onmouseout="this.style.background='rgba(168,85,247,0.05)'">🔊 TEST TAMIL</button>
+          <button onclick="VoiceClone.testMalayalam()" style="padding:7px 12px;background:rgba(168,85,247,0.05);border:1px solid rgba(168,85,247,0.2);border-radius:4px;color:rgba(168,85,247,0.6);font-family:var(--display);font-size:7px;font-weight:700;letter-spacing:1.5px;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='rgba(168,85,247,0.12)'" onmouseout="this.style.background='rgba(168,85,247,0.05)'">🔊 TEST MALAYALAM</button>
+        </div>
+        <div id="vc-diag-result" style="display:none;margin-top:10px;padding:10px 12px;background:rgba(2,4,8,0.8);border:1px solid rgba(0,255,224,0.1);border-radius:4px;font-family:var(--mono);font-size:10px;color:var(--text-2);line-height:1.8;white-space:pre-wrap"></div>
       </div>
 
     </div>
@@ -7487,12 +7543,17 @@ def find_max(arr):
       const st = document.getElementById('vc-profile-status');
       const card = document.getElementById('vc-profile-card');
       const dot = document.getElementById('vc-dot');
-      if (st) st.textContent = 'Checking…';
+      if (st) st.textContent = 'Checking profile…';
       try {
-        const r = await fetch('/voice_clone/status');
-        if (!r.ok) throw new Error('Backend not running');
+        const r = await fetch('/voice_clone/status', { redirect: 'manual' });
+        if (r.type === 'opaqueredirect' || r.status === 0) { if (st) st.textContent = 'Session expired — please refresh.'; return; }
+        if (!r.ok) {
+          if (st) st.textContent = '⚠ Backend not reachable. Start: python app.py';
+          return;
+        }
         const d = await r.json();
         window._hasVoiceClone = !!d.has_profile;
+        window._hasCoquiVoice = !!d.has_profile;
         if (d.has_profile) {
           if (st) st.textContent = '';
           if (card) card.style.display = 'block';
@@ -7528,8 +7589,10 @@ def find_max(arr):
           window._vcDetectedLang = null;
         }
       } catch(e) {
-        if (st) st.textContent = 'Voice analysis needs the Python backend running.';
+        if (st) st.textContent = '⚠ Backend not running. Start: python app.py';
         window._hasVoiceClone = false;
+        window._vcDetectedLang = null;
+        setTimeout(checkStatus, 5000); // auto-retry
       }
     }
 
@@ -7555,7 +7618,8 @@ def find_max(arr):
           _sttRec.interimResults = true;
           _sttRec.maxAlternatives = 1;
           // Start with no lang set — browser auto-detects from speech
-          _sttRec.lang = '';
+          const _uiLang = typeof getLangRaw === 'function' ? getLangRaw() : 'en-US';
+          _sttRec.lang = _uiLang === 'ta-en' ? 'ta-IN' : _uiLang;
           _sttRec.onresult = e => {
             let full = '';
             for (let i = 0; i < e.results.length; i++) {
@@ -7622,10 +7686,12 @@ def find_max(arr):
       const fd = new FormData();
       fd.append('audio', blob, name);
 
-      // Send transcript (from live STT) so backend can detect language from real words
+      // Always send UI language as reliable hint
+      const _uiLangHint = typeof getLangRaw === 'function' ? getLangRaw() : 'en-US';
+      if (_uiLangHint && _uiLangHint !== 'en-US') fd.append('lang_hint', _uiLangHint);
       if (source === 'rec' && _transcript) {
         fd.append('transcript', _transcript);
-        if (_sttLang) fd.append('lang_hint', _sttLang);
+        if (_sttLang && _sttLang !== 'en-US') fd.append('lang_hint', _sttLang);
       }
 
       const recSt = document.getElementById('vc-rec-status');
@@ -7636,7 +7702,7 @@ def find_max(arr):
       if (source === 'upload' && upSt) upSt.textContent = analysingMsg;
 
       try {
-        const r = await fetch('/voice_clone/upload', { method: 'POST', body: fd });
+        const r = await fetch('/voice_clone/upload', { method: 'POST', body: fd, redirect: 'manual' });
         const d = await r.json();
         if (d.error) {
           const msg = '⚠ ' + d.error;
@@ -7653,6 +7719,7 @@ def find_max(arr):
         if (source === 'upload' && upSt) upSt.textContent = successMsg;
 
         window._hasVoiceClone = true;
+        window._hasCoquiVoice = true;
         window._vcDetectedLang = langCode;
 
         // Auto-set the language selector to detected language
@@ -7755,9 +7822,476 @@ def find_max(arr):
     // Auto-check status on page load
     setTimeout(checkStatus, 1800);
 
-    return { open, close, checkStatus, toggleRecord, handleFile, test, deleteProfile };
+    async function diagnose() {
+      const diagEl = document.getElementById('vc-diag-result');
+      if (!diagEl) return;
+      diagEl.style.display = 'block';
+      diagEl.textContent = '🔍 Running diagnostics…';
+      try {
+        const r = await fetch('/tts/diagnose');
+        const d = await r.json();
+        let out = '';
+        out += `gTTS installed: ${d.gtts_installed ? '✅' : '❌'} (v${d.gtts_version || '?'})\n`;
+        out += `click version: ${d.click_version || '?'} ${d.click_version && d.click_version >= '8.1' ? '✅' : '⚠ may conflict'}\n`;
+        out += `Tamil TTS: ${d.test_tamil ? '✅ working' : '❌ BROKEN'} ${d.test_tamil_error ? '→ '+d.test_tamil_error : ''}\n`;
+        out += `Malayalam TTS: ${d.test_malayalam ? '✅ working' : '❌ BROKEN'} ${d.test_malayalam_error ? '→ '+d.test_malayalam_error : ''}\n`;
+        out += `English TTS: ${d.test_english ? '✅ working' : '❌ BROKEN'}\n`;
+        out += `Voice profile: ${d.profile_exists ? '✅ ' + (d.profile_lang_name||'?') : 'none'}\n`;
+        if (!d.test_tamil || !d.test_malayalam) {
+          out += `\n⚠ FIX: pip install click==8.1.8 gtts --upgrade`;
+        }
+        diagEl.textContent = out;
+      } catch(e) {
+        diagEl.textContent = '⚠ Diagnose failed: ' + e.message + '\nMake sure python app.py is running.';
+      }
+    }
+
+    async function testTamil() {
+      const st = document.getElementById('vc-profile-status');
+      if (st) st.textContent = '⏳ Testing Tamil TTS…';
+      try {
+        const r = await fetch('/tts', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({text: 'வணக்கம்! இது தமிழ் குரல் சோதனை. கோட் பட்டி உங்களுக்கு உதவுகிறது.', lang: 'ta-IN'})
+        });
+        if (!r.ok) { if (st) st.textContent = '❌ Tamil TTS failed: HTTP ' + r.status; return; }
+        const blob = await r.blob();
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audio.onended = () => { if (st) st.textContent = '✅ Tamil TTS working!'; URL.revokeObjectURL(url); };
+        audio.play().then(() => { if (st) st.textContent = '🔊 Playing Tamil test…'; }).catch(() => { if (st) st.textContent = '❌ Audio playback failed'; });
+      } catch(e) { if (st) st.textContent = '❌ Tamil test failed: ' + e.message; }
+    }
+
+    async function testMalayalam() {
+      const st = document.getElementById('vc-profile-status');
+      if (st) st.textContent = '⏳ Testing Malayalam TTS…';
+      try {
+        const r = await fetch('/tts', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({text: 'നമസ്കാരം! ഇത് മലയാളം ശബ്ദ പരിശോധനയാണ്. കോഡ് ബഡ്ഡി നിങ്ങളെ സഹായിക്കുന്നു.', lang: 'ml-IN'})
+        });
+        if (!r.ok) { if (st) st.textContent = '❌ Malayalam TTS failed: HTTP ' + r.status; return; }
+        const blob = await r.blob();
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audio.onended = () => { if (st) st.textContent = '✅ Malayalam TTS working!'; URL.revokeObjectURL(url); };
+        audio.play().then(() => { if (st) st.textContent = '🔊 Playing Malayalam test…'; }).catch(() => { if (st) st.textContent = '❌ Audio playback failed'; });
+      } catch(e) { if (st) st.textContent = '❌ Malayalam test failed: ' + e.message; }
+    }
+
+    return { open, close, checkStatus, toggleRecord, handleFile, test, deleteProfile, diagnose, testTamil, testMalayalam };
   })();
   window.VoiceClone = VoiceClone;
   </script>
+
+<!-- ══════════════════════════════════════════════════════════
+     VIDEO ANALYZER PANEL
+══════════════════════════════════════════════════════════ -->
+<style>
+  #videoAnalyzerPanel {
+    display:none;position:fixed;right:0;top:0;bottom:0;
+    width:min(480px,95vw);z-index:9998;
+    background:#060d1a;
+    border-left:1px solid rgba(0,255,224,0.15);
+    flex-direction:column;
+    box-shadow:-10px 0 50px rgba(0,0,0,0.8);
+  }
+  #videoAnalyzerPanel.show { display:flex; }
+  .va-hdr {
+    display:flex;align-items:center;justify-content:space-between;
+    padding:16px 18px;border-bottom:1px solid rgba(0,255,224,0.1);
+    background:rgba(0,255,224,0.025);flex-shrink:0;
+  }
+  .va-hdr-title {
+    font-family:var(--display);font-size:12px;font-weight:800;
+    letter-spacing:3px;color:var(--plasma);display:flex;align-items:center;gap:8px
+  }
+  .va-body { flex:1;overflow-y:auto;padding:18px; }
+  .va-section { margin-bottom:20px; }
+  .va-label {
+    font-family:var(--display);font-size:8px;font-weight:700;
+    letter-spacing:2px;color:var(--text-3);margin-bottom:8px;
+    display:flex;align-items:center;gap:6px;
+  }
+  .va-label::before { content:'';display:inline-block;width:3px;height:12px;border-radius:2px;background:var(--plasma);flex-shrink:0; }
+
+  /* Drop zone */
+  #va-dropzone {
+    border:2px dashed rgba(0,255,224,0.2);border-radius:8px;
+    padding:28px 20px;text-align:center;cursor:pointer;
+    background:rgba(0,255,224,0.015);transition:all 0.2s;
+  }
+  #va-dropzone:hover,#va-dropzone.over {
+    border-color:rgba(0,255,224,0.5);background:rgba(0,255,224,0.05);
+    box-shadow:inset 0 0 20px rgba(0,255,224,0.04);
+  }
+  #va-dropzone .va-drop-icon { font-size:32px;margin-bottom:8px; }
+  #va-dropzone .va-drop-lbl {
+    font-family:var(--display);font-size:9px;font-weight:700;
+    letter-spacing:2px;color:var(--plasma);display:block;margin-bottom:4px;
+  }
+  #va-dropzone .va-drop-sub { font-family:var(--mono);font-size:10px;color:var(--text-3); }
+
+  /* File badge */
+  #va-file-badge {
+    display:none;padding:8px 12px;border:1px solid rgba(0,255,224,0.15);
+    border-radius:4px;background:rgba(0,255,224,0.03);
+    align-items:center;gap:8px;margin-top:8px;
+  }
+  #va-file-badge.show { display:flex; }
+  .va-fname { font-family:var(--mono);font-size:11px;color:var(--plasma);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+  .va-fsize { font-family:var(--display);font-size:8px;color:var(--text-3);flex-shrink:0; }
+  .va-fx { background:none;border:none;color:var(--text-3);cursor:pointer;font-size:14px; }
+  .va-fx:hover { color:var(--fire); }
+
+  /* Question input */
+  #va-question {
+    width:100%;background:rgba(0,255,224,0.03);
+    border:1px solid rgba(0,255,224,0.1);border-radius:4px;
+    color:var(--text);font-family:var(--mono);font-size:12px;
+    padding:10px 12px;outline:none;resize:vertical;min-height:70px;
+    transition:border-color 0.2s;
+  }
+  #va-question:focus { border-color:rgba(0,255,224,0.3); }
+  #va-question::placeholder { color:var(--text-3); }
+
+  /* Analyze button */
+  #va-analyze-btn {
+    width:100%;padding:12px;margin-top:4px;
+    background:rgba(0,255,224,0.08);
+    border:1px solid rgba(0,255,224,0.35);border-radius:6px;
+    color:var(--plasma);font-family:var(--display);font-size:9px;
+    font-weight:700;letter-spacing:2px;cursor:pointer;transition:all 0.2s;
+    display:flex;align-items:center;justify-content:center;gap:8px;
+  }
+  #va-analyze-btn:hover { background:rgba(0,255,224,0.15);box-shadow:0 0 20px rgba(0,255,224,0.2); }
+  #va-analyze-btn:disabled { opacity:0.35;cursor:not-allowed; }
+
+  /* Result */
+  #va-result {
+    display:none;margin-top:14px;padding:14px;
+    border:1px solid rgba(0,255,224,0.1);border-radius:6px;
+    background:rgba(2,4,8,0.8);
+    font-family:var(--mono);font-size:12px;color:var(--text-2);
+    line-height:1.75;white-space:pre-wrap;word-break:break-word;
+    max-height:360px;overflow-y:auto;
+  }
+  #va-result.show { display:block; }
+  #va-result::-webkit-scrollbar { width:3px; }
+  #va-result::-webkit-scrollbar-thumb { background:var(--border-hi); }
+
+  /* Progress bar */
+  #va-progress {
+    display:none;height:2px;border-radius:1px;
+    background:rgba(0,255,224,0.08);overflow:hidden;margin:8px 0;
+  }
+  #va-progress.show { display:block; }
+  #va-progress-fill {
+    height:100%;width:0%;
+    background:linear-gradient(90deg,var(--plasma),var(--nova));
+    transition:width 0.3s;border-radius:1px;animation:va-pulse 1.5s ease infinite;
+  }
+  @keyframes va-pulse { 0%,100%{opacity:1}50%{opacity:0.6} }
+
+  /* How it works list */
+  .va-how-list { font-family:var(--mono);font-size:10.5px;color:var(--text-3);line-height:2.1;padding-left:4px; }
+  .va-how-list li { list-style:none;position:relative;padding-left:16px; }
+  .va-how-list li::before { content:'▸';position:absolute;left:0;color:var(--plasma);opacity:0.6; }
+
+  /* "Send to Chat" button */
+  #va-send-chat-btn {
+    display:none;width:100%;padding:9px;margin-top:8px;
+    background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.3);
+    border-radius:4px;color:var(--nova);font-family:var(--display);
+    font-size:8px;font-weight:700;letter-spacing:2px;cursor:pointer;transition:all 0.2s;
+  }
+  #va-send-chat-btn:hover { background:rgba(168,85,247,0.15); }
+  #va-send-chat-btn.show { display:block; }
+
+  /* Topbar button */
+  #videoAnalyzerBtn {
+    display:flex;align-items:center;gap:5px;padding:0 11px;height:34px;
+    border:1px solid rgba(0,255,224,0.15);background:rgba(0,255,224,0.03);
+    color:rgba(226,244,255,0.4);font-family:var(--display);font-size:8px;
+    font-weight:700;letter-spacing:1.5px;cursor:pointer;border-radius:2px;transition:all 0.2s;
+  }
+  #videoAnalyzerBtn:hover { border-color:rgba(0,255,224,0.45);color:var(--plasma);background:rgba(0,255,224,0.07); }
+  #videoAnalyzerBtn.loaded { border-color:rgba(74,222,128,0.4);color:#4ade80;background:rgba(74,222,128,0.05); }
+</style>
+
+<!-- Topbar button — inject via JS since we can't easily edit the static HTML here -->
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // Add VIDEO button to topbar
+  const fpBtn = document.getElementById('fp-topbtn');
+  if (fpBtn && fpBtn.parentElement) {
+    const btn = document.createElement('button');
+    btn.id = 'videoAnalyzerBtn';
+    btn.title = 'Analyze programming videos';
+    btn.innerHTML = '🎬 VIDEO';
+    btn.onclick = () => VideoAnalyzer.open();
+    fpBtn.insertAdjacentElement('afterend', btn);
+  }
+});
+</script>
+
+<!-- VIDEO ANALYZER PANEL HTML -->
+<div id="videoAnalyzerPanel">
+  <div class="va-hdr">
+    <div class="va-hdr-title">
+      <span>🎬</span> VIDEO ANALYZER
+    </div>
+    <button onclick="VideoAnalyzer.close()" style="background:none;border:none;color:rgba(226,244,255,0.3);font-size:20px;cursor:pointer;line-height:1;padding:0 4px;">✕</button>
+  </div>
+
+  <div class="va-body">
+
+    <!-- Upload -->
+    <div class="va-section">
+      <div class="va-label">UPLOAD VIDEO</div>
+      <div id="va-dropzone"
+        onclick="document.getElementById('va-file-input').click()"
+        ondragover="event.preventDefault();this.classList.add('over')"
+        ondragleave="this.classList.remove('over')"
+        ondrop="VideoAnalyzer.handleDrop(event)">
+        <div class="va-drop-icon">📹</div>
+        <span class="va-drop-lbl">DROP VIDEO OR CLICK TO BROWSE</span>
+        <span class="va-drop-sub">MP4 · WebM · MOV · AVI · Max 100MB</span>
+      </div>
+      <input type="file" id="va-file-input" accept="video/*,.mp4,.webm,.mov,.avi,.ogg"
+        style="display:none" onchange="VideoAnalyzer.handleFile(this)"/>
+      <div id="va-file-badge">
+        <span class="va-fname" id="va-fname">—</span>
+        <span class="va-fsize" id="va-fsize">—</span>
+        <button class="va-fx" onclick="VideoAnalyzer.clearFile()">✕</button>
+      </div>
+    </div>
+
+    <!-- Question -->
+    <div class="va-section">
+      <div class="va-label">YOUR QUESTION (OPTIONAL)</div>
+      <textarea id="va-question" placeholder="Ask anything about this video&#10;e.g. 'What does this Python code do?'&#10;or 'Explain the algorithm shown'&#10;or leave blank for full analysis"></textarea>
+    </div>
+
+    <!-- Analyze button -->
+    <button id="va-analyze-btn" onclick="VideoAnalyzer.analyze()">
+      <span id="va-btn-icon">🔍</span>
+      <span id="va-btn-label">ANALYZE VIDEO</span>
+    </button>
+
+    <!-- Progress -->
+    <div id="va-progress"><div id="va-progress-fill"></div></div>
+    <div id="va-status" style="font-family:var(--display);font-size:8px;color:var(--text-3);letter-spacing:1.5px;margin-top:4px;min-height:14px"></div>
+
+    <!-- Result -->
+    <div id="va-result"></div>
+    <button id="va-send-chat-btn" onclick="VideoAnalyzer.sendToChat()">💬 SEND ANALYSIS TO CHAT</button>
+
+    <!-- How it works -->
+    <div class="va-section" style="margin-top:20px">
+      <div class="va-label">HOW IT WORKS</div>
+      <ul class="va-how-list">
+        <li>Upload any programming tutorial or coding video</li>
+        <li>AI extracts key frames and identifies the content</li>
+        <li>Detects language: Python, JS, React, SQL, etc.</li>
+        <li>Explains code, patterns, and concepts shown</li>
+        <li>Ask specific questions about the video content</li>
+        <li>Non-programming videos are politely declined</li>
+      </ul>
+      <div style="margin-top:10px;padding:8px 10px;background:rgba(0,255,224,0.03);border:1px solid rgba(0,255,224,0.1);border-radius:4px;font-family:var(--mono);font-size:10px;color:rgba(0,255,224,0.5);line-height:1.6">
+        ✅ ffmpeg is auto-detected from your system.<br>
+        Your ffmpeg at <code style="color:var(--plasma)">Downloads\ffmpeg-8.0.1-essentials_build\bin</code> will be used automatically.
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const VideoAnalyzer = (() => {
+  let _file = null;
+  let _lastAnalysis = '';
+  let _progressTimer = null;
+
+  function open() {
+    document.getElementById('videoAnalyzerPanel').classList.add('show');
+  }
+  function close() {
+    document.getElementById('videoAnalyzerPanel').classList.remove('show');
+  }
+
+  function handleDrop(e) {
+    e.preventDefault();
+    document.getElementById('va-dropzone').classList.remove('over');
+    const f = e.dataTransfer?.files[0];
+    if (f) loadFile(f);
+  }
+  function handleFile(input) {
+    const f = input.files[0];
+    if (f) loadFile(f);
+    input.value = '';
+  }
+  function loadFile(file) {
+    // Validate type
+    if (!file.type.startsWith('video/') && !['mp4','webm','mov','avi','ogg'].some(ext => file.name.toLowerCase().endsWith('.'+ext))) {
+      setStatus('⚠ Not a video file. Upload MP4, WebM, MOV, or AVI.'); return;
+    }
+    if (file.size > 100 * 1024 * 1024) {
+      setStatus('⚠ File too large. Max 100MB.'); return;
+    }
+    _file = file;
+    document.getElementById('va-fname').textContent = file.name;
+    document.getElementById('va-fsize').textContent = (file.size / (1024*1024)).toFixed(1) + 'MB';
+    document.getElementById('va-file-badge').classList.add('show');
+    document.getElementById('videoAnalyzerBtn').classList.add('loaded');
+    setStatus('✅ Video loaded — click ANALYZE');
+    // Clear previous result
+    document.getElementById('va-result').textContent = '';
+    document.getElementById('va-result').classList.remove('show');
+    document.getElementById('va-send-chat-btn').classList.remove('show');
+  }
+  function clearFile() {
+    _file = null;
+    document.getElementById('va-file-badge').classList.remove('show');
+    document.getElementById('va-fname').textContent = '—';
+    document.getElementById('va-fsize').textContent = '—';
+    document.getElementById('videoAnalyzerBtn').classList.remove('loaded');
+    setStatus('');
+    document.getElementById('va-result').textContent = '';
+    document.getElementById('va-result').classList.remove('show');
+    document.getElementById('va-send-chat-btn').classList.remove('show');
+  }
+
+  async function analyze() {
+    if (!_file) { setStatus('⚠ Upload a video first'); return; }
+
+    const btn = document.getElementById('va-analyze-btn');
+    const question = document.getElementById('va-question').value.trim();
+    btn.disabled = true;
+    document.getElementById('va-btn-icon').textContent = '⏳';
+    document.getElementById('va-btn-label').textContent = 'ANALYZING…';
+    document.getElementById('va-result').textContent = '';
+    document.getElementById('va-result').classList.remove('show');
+    document.getElementById('va-send-chat-btn').classList.remove('show');
+
+    // Animated progress bar
+    const progDiv = document.getElementById('va-progress');
+    const progFill = document.getElementById('va-progress-fill');
+    progDiv.classList.add('show');
+    progFill.style.width = '0%';
+    let prog = 0;
+    _progressTimer = setInterval(() => {
+      prog = Math.min(prog + 2, 88);
+      progFill.style.width = prog + '%';
+    }, 400);
+
+    setStatus('📤 Uploading video…');
+
+    const fd = new FormData();
+    fd.append('video', _file, _file.name);
+    if (question) fd.append('question', question);
+    if (typeof currentChatId !== 'undefined' && currentChatId) {
+      fd.append('conversation_id', currentChatId);
+    }
+
+    try {
+      const response = await fetch('/analyze_video', { method: 'POST', body: fd, redirect: 'manual' });
+
+      if (response.status === 404) {
+        throw new Error('Route /analyze_video missing — replace app.py with updated version and restart python app.py');
+      }
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Server error ' + response.status);
+      }
+
+      setStatus('🧠 AI analyzing frames…');
+      const resultEl = document.getElementById('va-result');
+      resultEl.innerHTML = '';
+      resultEl.classList.add('show');
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let full = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        full += chunk;
+        // Render markdown as it streams
+        resultEl.innerHTML = typeof marked !== 'undefined' ? marked.parse(full) : full;
+        resultEl.scrollTop = resultEl.scrollHeight;
+        // Enhance code blocks as they appear
+        resultEl.querySelectorAll('pre code:not([data-highlighted])').forEach(block => {
+          try { hljs.highlightElement(block); block.setAttribute('data-highlighted','1'); } catch(e){}
+        });
+      }
+
+      _lastAnalysis = full;
+      clearInterval(_progressTimer);
+      progFill.style.width = '100%';
+      setTimeout(() => { progDiv.classList.remove('show'); progFill.style.width='0%'; }, 1000);
+
+      if (full.trim()) {
+        document.getElementById('va-send-chat-btn').classList.add('show');
+        setStatus('✅ Analysis complete');
+      } else {
+        setStatus('⚠ No response received');
+      }
+
+    } catch(e) {
+      clearInterval(_progressTimer);
+      progDiv.classList.remove('show');
+      if (!e || !e.message || e === 'expired') return;
+      setStatus('⚠ Error: ' + e.message);
+      const isRoute = e.message.includes('404') || e.message.includes('missing');
+      let helpTxt = isRoute
+        ? '<br><br><b style="color:#a855f7">Fix:</b> Use the updated <code>app.py</code> (has <code>/analyze_video</code> route) and run <code>python app.py</code>'
+        : '<br><br>Check <code>python app.py</code> is running and <code>OPENROUTER_API_KEY</code> is set in <code>.env</code>';
+      document.getElementById('va-result').innerHTML =
+        '<span style="color:var(--fire)">⚠ ' + e.message + '</span>' + helpTxt;
+      document.getElementById('va-result').classList.add('show');
+    }
+
+    btn.disabled = false;
+    document.getElementById('va-btn-icon').textContent = '🔍';
+    document.getElementById('va-btn-label').textContent = 'ANALYZE VIDEO';
+  }
+
+  function sendToChat() {
+    if (!_lastAnalysis || typeof currentChatId === 'undefined' || !currentChatId) {
+      if (typeof currentChatId === 'undefined' || !currentChatId) {
+        alert('Initialize a chat session first, then analyze the video again.');
+      }
+      return;
+    }
+    // Add the analysis as a bot message in the current chat
+    const chatBox = document.getElementById('chatBox');
+    if (typeof makeMsgRow === 'function' && chatBox) {
+      const emp = document.getElementById('emptyState');
+      if (emp) emp.remove();
+      const row = makeMsgRow('bot', '');
+      const bc = row.querySelector('.bubble-content');
+      bc.innerHTML = '<strong style="color:var(--plasma);font-family:var(--display);font-size:9px;letter-spacing:2px">📹 VIDEO ANALYSIS</strong><br><br>'
+        + (typeof marked !== 'undefined' ? marked.parse(_lastAnalysis) : _lastAnalysis);
+      chatBox.appendChild(row);
+      if (typeof enhanceCodeBlocks === 'function') enhanceCodeBlocks(row.querySelector('.bubble-forge'));
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+    close();
+  }
+
+  function setStatus(msg) {
+    const el = document.getElementById('va-status');
+    if (el) el.textContent = msg;
+  }
+
+  return { open, close, handleDrop, handleFile, clearFile, analyze, sendToChat };
+})();
+window.VideoAnalyzer = VideoAnalyzer;
+</script>
+
 </body>
 </html>

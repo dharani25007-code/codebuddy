@@ -1,4 +1,4 @@
-# CodeBuddy v4.0 — All Zero-Cost Dependencies
+# CodeBuddy v5.0 — All Zero-Cost Dependencies
 # Install: pip install -r requirements.txt
 
 flask>=3.0.0
@@ -8,10 +8,14 @@ python-dotenv>=1.0.0
 requests>=2.31.0
 gtts>=2.5.0
 
-# CHANGE 10: Redis for persistent rate limiting (optional — falls back to memory if unavailable)
-# Free tier: Upstash Redis (https://upstash.com) — 10k req/day free
+# click>=8.2.1 fixes conflict between gTTS and typer
+click>=8.2.1
+
+# Collab real-time (threading mode — eventlet removed, was causing session bugs)
+flask-socketio>=5.3.6
+
+# Redis for rate limiting (optional — falls back to in-memory if unavailable)
 redis>=5.0.0
 
-# For generating streak card SVGs server-side (already using f-strings, no extra lib needed)
-# Pillow is optional — only if you want PNG icons for PWA manifest
-# Pillow>=10.0.0
+# Video Analyzer frame extraction (optional — text-only mode without it)
+# pip install opencv-python

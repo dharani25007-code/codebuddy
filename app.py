@@ -30,6 +30,11 @@ from flask import (Flask, render_template, request, jsonify,
 from flask_login import (LoginManager, login_user, login_required,
                          logout_user, UserMixin, current_user)
 from flask_bcrypt import Bcrypt
+try:
+    from flask_socketio import SocketIO, emit, join_room, leave_room
+    _SOCKETIO_OK = True
+except ImportError:
+    _SOCKETIO_OK = False
 
 # ================= INIT =================
 
@@ -37,7 +42,37 @@ load_dotenv()
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", secrets.token_hex(32))
+
+# ── STABLE SECRET KEY ─────────────────────────────────────────────────────────
+# FIX: secrets.token_hex(32) generates a NEW key every restart, invalidating
+# all session cookies → "ERROR LOADING SESSION" on every page click.
+# Solution: derive stable key from machine fingerprint, or use SECRET_KEY in .env
+_raw_secret = os.getenv("SECRET_KEY", "")
+if not _raw_secret:
+    import hashlib, platform
+    _fp = platform.node() + platform.machine() + os.path.abspath(__file__)
+    _raw_secret = "cb-" + hashlib.sha256(_fp.encode()).hexdigest()
+app.secret_key = _raw_secret
+
+# ── SESSION CONFIG ─────────────────────────────────────────────────────────────
+app.config.update(
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=False,        # Must be False for http://localhost
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_NAME="codebuddy_session",
+    PERMANENT_SESSION_LIFETIME=86400 * 30,  # 30-day sessions
+)
+
+# ── SOCKETIO: always threading — eventlet is deprecated & breaks sessions ──────
+if _SOCKETIO_OK:
+    socketio = SocketIO(
+        app, cors_allowed_origins="*",
+        async_mode="threading",
+        logger=False, engineio_logger=False,
+    )
+else:
+    socketio = None
+_collab_rooms = {}
 
 # ── Security headers on every response ──
 @app.after_request
@@ -836,7 +871,7 @@ def login():
         conn.close()
 
         if user and bcrypt.check_password_hash(user["password"], password):
-            login_user(User(user["id"], user["username"]))
+            login_user(User(user["id"], user["username"]), remember=True)
             update_streak(user["id"])
             return redirect(url_for("dashboard"))
 
@@ -1878,15 +1913,7 @@ def generate_roadmap():
 @login_required
 @rate_limit(max_calls=30, window=60)
 def translate_response():
-    """Translate English AI response to target language when AI ignored language instruction.
-
-    Called by the frontend when:
-    - Language is non-English (e.g. te-IN, kn-IN, ml-IN)
-    - AI responded in English despite the language instruction
-    - User is in voice mode and needs the audio in the right language
-
-    Returns the translated text for TTS to speak.
-    """
+    """Translate English AI response to target language when AI ignored language instruction."""
     data = request.get_json(silent=True) or {}
     text = (data.get("text") or "").strip()
     lang_code = (data.get("lang") or "en-US").strip()
@@ -1895,46 +1922,70 @@ def translate_response():
         return jsonify({"translated": text})
 
     LANG_NAMES_SHORT = {
-        "ta-IN": "Tamil", "hi-IN": "Hindi", "te-IN": "Telugu",
-        "kn-IN": "Kannada", "ml-IN": "Malayalam", "bn-IN": "Bengali",
-        "mr-IN": "Marathi", "gu-IN": "Gujarati", "pa-IN": "Punjabi",
-        "ta-en": "Tanglish (Tamil words in Roman/English letters, RESPECTFUL tone using 'neenga'/'ungalukku', NEVER casual 'da/bro/machaa/dei')",
+        "ta-IN": "Tamil (தமிழ் script only — unicode characters)",
+        "hi-IN": "Hindi (हिंदी script only — Devanagari unicode)",
+        "te-IN": "Telugu (తెలుగు script only — unicode characters)",
+        "kn-IN": "Kannada (ಕನ್ನಡ script only — unicode characters)",
+        "ml-IN": "Malayalam (മലയാളം script only — unicode characters)",
+        "bn-IN": "Bengali (বাংলা script only — unicode characters)",
+        "mr-IN": "Marathi (मराठी script — Devanagari unicode)",
+        "gu-IN": "Gujarati (ગુજરાતી script only)",
+        "pa-IN": "Punjabi (ਪੰਜਾਬੀ script only — Gurmukhi unicode)",
+        "fr-FR": "French", "de-DE": "German", "es-ES": "Spanish",
+        "ja-JP": "Japanese", "ko-KR": "Korean", "ar-SA": "Arabic",
+        "zh-CN": "Chinese Simplified", "ru-RU": "Russian", "pt-BR": "Portuguese",
+        "ta-en": "Tanglish (Tamil words written in English/Roman letters mixed with English tech terms — NO Tamil unicode script — respectful tone using 'neenga'/'ungalukku')",
     }
     target = LANG_NAMES_SHORT.get(lang_code, "the target language")
 
-    try:
-        headers = {
-            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-            "Content-Type": "application/json",
-        }
-        payload = {
-            "model": MODELS["fast"],
-            "max_tokens": 1500,
-            "temperature": 0.2,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": (
-                        f"You are a translator. Translate the following programming explanation "
-                        f"into {target}. Keep all code examples unchanged. "
-                        f"Only translate the prose/explanation text. "
-                        f"Output ONLY the translation, nothing else."
-                    )
-                },
-                {"role": "user", "content": text[:1500]}
-            ]
-        }
-        resp = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers=headers, json=payload, timeout=(5, 20)
-        )
-        if resp.status_code == 200:
-            translated = resp.json()["choices"][0]["message"]["content"].strip()
-            return jsonify({"translated": translated})
-    except Exception as e:
-        app.logger.warning(f"Translation failed: {e}")
+    system_msg = (
+        f"You are a professional translator specializing in programming content. "
+        f"Translate the following programming explanation into {target}. "
+        f"Rules: Keep ALL code blocks (``` ... ```) and inline code (`code`) UNCHANGED. "
+        f"Only translate the prose/explanation text. "
+        f"Output ONLY the translated text — no preamble, no 'Here is the translation:', nothing extra."
+    )
 
-    return jsonify({"translated": text})  # fallback: return original
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    # Try multiple models — translation is rate-limited frequently
+    models_to_try = [MODELS["fast"]] + [m for m in FREE_FALLBACKS if m != MODELS["fast"]][:3]
+    last_err = "No models available"
+
+    for model in models_to_try:
+        try:
+            payload = {
+                "model": model,
+                "max_tokens": 1800,
+                "temperature": 0.15,
+                "messages": [
+                    {"role": "system", "content": system_msg},
+                    {"role": "user", "content": text[:2000]}
+                ]
+            }
+            resp = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers, json=payload, timeout=(5, 25)
+            )
+            if resp.status_code == 200:
+                translated = resp.json()["choices"][0]["message"]["content"].strip()
+                if translated:
+                    return jsonify({"translated": translated})
+            elif resp.status_code in (429, 503):
+                last_err = f"Model {model} rate limited"
+                continue
+            else:
+                last_err = f"HTTP {resp.status_code}"
+                break
+        except Exception as e:
+            last_err = str(e)
+            continue
+
+    app.logger.warning(f"Translation failed for {lang_code}: {last_err}")
+    return jsonify({"translated": text, "error": last_err})  # fallback: return original
 
 
 # ================= CHANGE 2+3: TTS (gTTS + extended Indic) =================
@@ -2080,11 +2131,44 @@ def _gtts_chunk(text, lang, slow=False):
 
     slow=True gives more natural output for very short English words
     embedded in Indic text (prevents rushed pronunciation).
+    
+    Includes fallback: if Tamil/Malayalam fails (click version conflict),
+    retries with English so audio always plays.
     """
     buf = _io.BytesIO()
-    _gTTS(text=text, lang=lang, slow=slow).write_to_fp(buf)
-    buf.seek(0)
-    return buf.read()
+    try:
+        _gTTS(text=text, lang=lang, slow=slow).write_to_fp(buf)
+        buf.seek(0)
+        data = buf.read()
+        if len(data) < 100:
+            raise ValueError("gTTS returned empty audio")
+        return data
+    except Exception as e:
+        app.logger.warning(f"gTTS failed lang={lang}: {e}")
+        # Fallback 1: try with slow=False if slow caused the issue
+        if slow:
+            try:
+                buf2 = _io.BytesIO()
+                _gTTS(text=text, lang=lang, slow=False).write_to_fp(buf2)
+                buf2.seek(0)
+                data2 = buf2.read()
+                if len(data2) > 100:
+                    return data2
+            except Exception:
+                pass
+        # Fallback 2: if Indic lang fails, try English (at least audio plays)
+        if lang != "en":
+            try:
+                buf3 = _io.BytesIO()
+                _gTTS(text=text, lang="en", slow=False).write_to_fp(buf3)
+                buf3.seek(0)
+                data3 = buf3.read()
+                if len(data3) > 100:
+                    app.logger.warning(f"gTTS: using English fallback for lang={lang}")
+                    return data3
+            except Exception as e2:
+                app.logger.error(f"gTTS English fallback also failed: {e2}")
+        raise
 
 
 @app.route("/tts", methods=["POST"])
@@ -2155,7 +2239,8 @@ def tts():
                 # (1-2 words) so they aren't rushed/clipped between native chunks.
                 # Tanglish: use slow=True so Roman-script Tamil words are spoken clearly
                 # Short English words inside Indic text: slow=True avoids rushed clips
-                use_slow = is_tanglish or (seg_lang == "en" and len(seg_text.split()) <= 3)
+                indic_slow = seg_lang in ("ta", "ml", "kn", "te")
+                use_slow = is_tanglish or indic_slow or (seg_lang == "en" and len(seg_text.split()) <= 3)
                 chunks.append(_gtts_chunk(seg_text, seg_lang, slow=use_slow))
             except Exception as e:
                 # If Kannada-specific chunk fails, try English as fallback for that chunk
@@ -2175,6 +2260,20 @@ def tts():
 
     except Exception as exc:
         app.logger.error(f"TTS error lang={lang_code}: {exc}")
+        # Try plain English as absolute last resort
+        try:
+            fallback_text = _clean_for_tts(raw)[:500]
+            if fallback_text:
+                buf = _io.BytesIO()
+                _gTTS(text=fallback_text, lang="en", slow=False).write_to_fp(buf)
+                buf.seek(0)
+                audio_data = buf.read()
+                if audio_data:
+                    return Response(audio_data, mimetype="audio/mpeg",
+                                    headers={"Cache-Control": "no-cache",
+                                             "X-Lang-Fallback": "en"})
+        except Exception:
+            pass
         return jsonify({"error": f"TTS failed: {str(exc)}"}), 502
 
 # ================= FEATURE 11-16: WORLD-FIRST ROUTES =================
@@ -3357,275 +3456,925 @@ def autocomplete():
         return jsonify({"completions": []})
 
 
+# ================= VIDEO ANALYZER =================
+# Extracts frames from uploaded video, sends to vision-capable AI model,
+# streams back a detailed analysis of the programming content shown.
+
+# Vision-capable free model on OpenRouter
+_VIDEO_MODEL = "google/gemini-flash-1.5"          # Vision + fast + free tier
+_VIDEO_MODEL_FALLBACK = "anthropic/claude-3-haiku" # fallback if Gemini quota hit
+
+def _extract_video_frames(video_path, max_frames=6):
+    """Extract up to max_frames evenly-spaced frames from a video file.
+    Returns list of (frame_index, base64_jpeg_str) tuples.
+    Falls back to empty list if OpenCV not installed.
+    """
+    frames = []
+    try:
+        import cv2
+        cap = cv2.VideoCapture(video_path)
+        total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        if total <= 0:
+            cap.release()
+            return []
+        # Pick evenly spaced indices
+        indices = [int(total * i / max_frames) for i in range(max_frames)]
+        for idx in indices:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+            ret, frame = cap.read()
+            if not ret:
+                continue
+            # Resize to max 640px wide to keep payload small
+            h, w = frame.shape[:2]
+            if w > 640:
+                scale = 640 / w
+                frame = cv2.resize(frame, (640, int(h * scale)))
+            _, buf = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 72])
+            import base64
+            b64 = base64.b64encode(buf.tobytes()).decode('utf-8')
+            frames.append((idx, b64))
+        cap.release()
+    except Exception as e:
+        app.logger.warning(f"Frame extraction failed: {e}")
+    return frames
+
+
+def _video_to_base64_thumbnail(video_path):
+    """Return a single base64 JPEG thumbnail (first keyframe) for fallback."""
+    try:
+        import cv2, base64
+        cap = cv2.VideoCapture(video_path)
+        ret, frame = cap.read()
+        cap.release()
+        if not ret:
+            return None
+        h, w = frame.shape[:2]
+        if w > 640:
+            scale = 640 / w
+            frame = cv2.resize(frame, (640, int(h * scale)))
+        _, buf = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 72])
+        return base64.b64encode(buf.tobytes()).decode('utf-8')
+    except Exception:
+        return None
+
+
+@app.route("/analyze_video", methods=["POST"])
+@login_required
+@rate_limit(max_calls=10, window=60)
+def analyze_video():
+    """Analyze a programming/coding video using a vision AI model.
+
+    Accepts: multipart/form-data with:
+      video          : video file (MP4, WebM, MOV, AVI — max 100MB)
+      question       : optional specific question about the video
+      conversation_id: optional — to save the analysis as a chat message
+
+    Streams back a markdown analysis.
+    """
+    import tempfile, os as _os, base64
+
+    video_file = request.files.get("video")
+    question   = (request.form.get("question") or "").strip()
+    conversation_id = request.form.get("conversation_id", "").strip()
+
+    if not video_file:
+        return jsonify({"error": "No video file uploaded"}), 400
+
+    # Validate file type
+    fname = video_file.filename or "video.mp4"
+    allowed_exts = {".mp4", ".webm", ".mov", ".avi", ".ogv", ".ogg", ".mkv"}
+    ext = os.path.splitext(fname.lower())[1]
+    if ext not in allowed_exts:
+        return jsonify({"error": f"Unsupported format '{ext}'. Use MP4, WebM, MOV, or AVI."}), 400
+
+    # Save to temp file
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
+            video_file.save(tmp)
+            tmp_path = tmp.name
+
+        file_size_mb = os.path.getsize(tmp_path) / (1024 * 1024)
+        if file_size_mb > 100:
+            return jsonify({"error": "File too large. Max 100MB."}), 400
+
+        # Build the analysis prompt
+        default_q = (
+            "Analyze this programming video in detail:\n"
+            "1. What programming language(s) and technologies are shown?\n"
+            "2. What concept or algorithm is being demonstrated?\n"
+            "3. Walk through what the code does step by step.\n"
+            "4. Identify any bugs, inefficiencies, or improvements.\n"
+            "5. What would be a good exercise based on this video?\n"
+            "Be specific about variable names, function names, and logic shown."
+        )
+        prompt = question if question else default_q
+
+        # Try to extract frames with OpenCV
+        frames = _extract_video_frames(tmp_path, max_frames=6)
+        has_frames = len(frames) > 0
+
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://codebuddy.ai",
+            "X-Title": "CodeBuddy Video Analyzer",
+        }
+
+        if has_frames:
+            # Build vision message with extracted frames
+            content_parts = [{"type": "text", "text": prompt + f"\n\n[Video: {fname}, {file_size_mb:.1f}MB, {len(frames)} frames extracted]"}]
+            for i, (frame_idx, b64) in enumerate(frames):
+                content_parts.append({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{b64}",
+                        "detail": "high"
+                    }
+                })
+            messages = [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are CodeBuddy Video Analyzer — an expert programming tutor who analyzes "
+                        "coding tutorial videos frame by frame. You specialize in identifying code, "
+                        "algorithms, bugs, and teaching points from video screenshots. "
+                        "Always provide detailed, practical analysis. Use markdown with code blocks. "
+                        "If the video does not contain programming content, politely say so."
+                    )
+                },
+                {"role": "user", "content": content_parts}
+            ]
+            model_to_use = _VIDEO_MODEL
+        else:
+            # No OpenCV — text-only analysis based on filename + question
+            app.logger.info("analyze_video: OpenCV not available — text-only mode")
+            messages = [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are CodeBuddy Video Analyzer. The user uploaded a programming video "
+                        "but frame extraction is not available (OpenCV not installed). "
+                        "Answer based on the filename and question provided. "
+                        "Suggest installing opencv-python for full video analysis. "
+                        "Use markdown formatting."
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": f"Video filename: {fname}\n\nUser question: {prompt}\n\n"
+                               f"[Note: Frame extraction unavailable — install opencv-python for full analysis]"
+                }
+            ]
+            model_to_use = MODELS["fast"]  # text-only doesn't need vision
+
+        payload = {
+            "model": model_to_use,
+            "stream": True,
+            "max_tokens": 2000,
+            "temperature": 0.4,
+            "messages": messages,
+        }
+
+        def generate():
+            full = ""
+            tried_models = [model_to_use]
+
+            if not has_frames:
+                yield f"⚠️ **Frame extraction unavailable** — install `opencv-python` for full video analysis.\n\n"
+                yield f"**Responding based on filename and your question:**\n\n"
+
+            try:
+                resp = requests.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers=headers, json=payload, stream=True, timeout=(15, 120)
+                )
+
+                # Fallback chain for vision models
+                if resp.status_code in (404, 429, 503) and has_frames:
+                    for fb in [_VIDEO_MODEL_FALLBACK, MODELS["fast"]]:
+                        if fb in tried_models:
+                            continue
+                        tried_models.append(fb)
+                        payload["model"] = fb
+                        resp = requests.post(
+                            "https://openrouter.ai/api/v1/chat/completions",
+                            headers=headers, json=payload, stream=True, timeout=(15, 120)
+                        )
+                        if resp.status_code == 200:
+                            break
+
+                if resp.status_code == 401:
+                    yield "⚠ API key invalid. Check your OPENROUTER_API_KEY in .env"
+                    return
+                if resp.status_code != 200:
+                    yield f"⚠ API Error {resp.status_code}. Try again in a moment."
+                    return
+
+                for line in resp.iter_lines():
+                    if not line:
+                        continue
+                    decoded = line.decode("utf-8", errors="ignore")
+                    if decoded.startswith("data: "):
+                        data = decoded[6:]
+                        if data.strip() == "[DONE]":
+                            break
+                        try:
+                            token = json.loads(data)["choices"][0]["delta"].get("content", "")
+                            full += token
+                            yield token
+                        except (json.JSONDecodeError, KeyError, IndexError):
+                            pass
+
+            except requests.exceptions.Timeout:
+                yield "\n\n⏱ Analysis timed out. Try a shorter video clip."
+            except requests.exceptions.ConnectionError:
+                yield "\n\n🔌 Connection error. Check your internet."
+            except Exception as e:
+                yield f"\n\n⚠ Error: {str(e)}"
+
+            # Save to chat if conversation_id provided
+            if full and conversation_id:
+                try:
+                    save_conn = sqlite3.connect("codebuddy.db")
+                    save_conn.execute(
+                        "INSERT INTO messages(conversation_id,role,content,timestamp) VALUES (?,?,?,?)",
+                        (conversation_id, "assistant", f"**📹 Video Analysis: {fname}**\n\n" + full, datetime.now().isoformat())
+                    )
+                    save_conn.commit()
+                    save_conn.close()
+                except Exception:
+                    pass
+
+        return Response(generate(), mimetype="text/plain")
+
+    except Exception as e:
+        app.logger.error(f"analyze_video error: {e}")
+        return jsonify({"error": f"Server error: {str(e)}"}), 500
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+
+
 # ================= RUN APP =================
 
 
 # ═══════════════════════════════════════════════════
-# VOICE CLONE — Save/retrieve user voice, TTS in user voice
-# ═══════════════════════════════════════════════════
-import os as _vc_os, datetime as _vc_dt, json as _vc_json
+
+# ═══════════════════════════════════════════════════════════════
+# REAL VOICE CLONE — Coqui XTTS-v2
+# Records 10s of user voice → clones it → AI speaks IN YOUR VOICE
+# Falls back to gTTS if XTTS not installed
+# ═══════════════════════════════════════════════════════════════
+
+import os as _vc_os, datetime as _vc_dt, json as _vc_json, threading as _vc_thread
 
 _VOICE_DIR = _vc_os.path.join(_vc_os.path.dirname(_vc_os.path.abspath(__file__)), "voice_profiles")
 _vc_os.makedirs(_VOICE_DIR, exist_ok=True)
 
-def _vc_path(user_id):
-    """Path to raw audio file (kept only for duration check, not played back)."""
-    return _vc_os.path.join(_VOICE_DIR, f"user_{user_id}.webm")
+_xtts_model = None
+_xtts_lock  = _vc_thread.Lock()
+_XTTS_READY = False
+
+def _vc_audio_path(user_id):
+    return _vc_os.path.join(_VOICE_DIR, f"user_{user_id}.wav")
 
 def _vc_meta_path(user_id):
-    """Path to JSON metadata — stores detected language + profile info."""
     return _vc_os.path.join(_VOICE_DIR, f"user_{user_id}.json")
 
+def _load_xtts():
+    """Lazy-load XTTS-v2 model once, keep in memory."""
+    global _xtts_model, _XTTS_READY
+    if _xtts_model is not None:
+        return _xtts_model, True
+    with _xtts_lock:
+        if _xtts_model is not None:
+            return _xtts_model, True
+        try:
+            from TTS.api import TTS as _TTS
+            import torch
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            app.logger.info(f"Loading XTTS-v2 on {device} — this takes ~30s first time...")
+            _xtts_model = _TTS("tts_models/multilingual/multi-dataset/xtts_v2").to(device)
+            _XTTS_READY = True
+            app.logger.info("XTTS-v2 loaded and ready!")
+            return _xtts_model, True
+        except Exception as e:
+            app.logger.warning(f"XTTS-v2 load failed: {e}")
+            return None, False
+
+_XTTS_LANG = {
+    "en-US":"en","en":"en","ta-IN":"ta","ta-en":"ta",
+    "hi-IN":"hi","te-IN":"te","ml-IN":"ml","kn-IN":"kn",
+    "bn-IN":"bn","mr-IN":"mr","fr-FR":"fr","de-DE":"de",
+    "es-ES":"es","ja-JP":"ja","zh-CN":"zh-cn","ko-KR":"ko",
+    "ar-SA":"ar","ru-RU":"ru","pt-BR":"pt","pl-PL":"pl",
+    "nl-NL":"nl","cs-CZ":"cs","hu-HU":"hu","tr-TR":"tr",
+}
+
+def _xtts_speak(text, speaker_wav, lang_code):
+    """Generate WAV bytes using XTTS-v2 with user voice as reference."""
+    model, ok = _load_xtts()
+    if not ok or model is None:
+        return None
+    try:
+        import tempfile
+        lang = _XTTS_LANG.get(lang_code, "en")
+        clean = _clean_for_tts(text)
+        if not clean:
+            return None
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+            out_path = tmp.name
+        model.tts_to_file(text=clean, speaker_wav=speaker_wav,
+                           language=lang, file_path=out_path)
+        with open(out_path, "rb") as f:
+            wav = f.read()
+        _vc_os.unlink(out_path)
+        app.logger.info(f"XTTS-v2 generated {len(wav)//1024}KB wav lang={lang}")
+        return wav
+    except Exception as e:
+        app.logger.error(f"XTTS-v2 speak failed: {e}")
+        return None
+
+def _find_ffmpeg():
+    """Locate ffmpeg binary — returns (path, version_str) or (None, None)."""
+    import shutil, subprocess
+    for candidate in ["ffmpeg", "/usr/bin/ffmpeg", "/usr/local/bin/ffmpeg"]:
+        path = shutil.which(candidate) or (candidate if _vc_os.path.isfile(candidate) else None)
+        if path:
+            try:
+                r = subprocess.run([path, "-version"], capture_output=True, timeout=5)
+                ver = r.stdout.decode("utf-8", errors="ignore").split("\n")[0]
+                return path, ver
+            except Exception:
+                return path, "unknown"
+    return None, None
+
+
+def _to_wav(audio_bytes, mime="audio/webm"):
+    """Convert any audio format to 22050Hz mono WAV for XTTS-v2."""
+    import tempfile, subprocess
+    ext = "webm" if "webm" in mime else "ogg" if "ogg" in mime else "mp3" if "mp3" in mime else "wav"
+    with tempfile.NamedTemporaryFile(suffix=f".{ext}", delete=False) as f:
+        f.write(audio_bytes)
+        in_path = f.name
+    out_path = in_path + "_out.wav"
+    converted = False
+    try:
+        ffmpeg_bin, _ = _find_ffmpeg()
+        if ffmpeg_bin:
+            r = subprocess.run(
+                [ffmpeg_bin, "-y", "-i", in_path, "-ar", "22050", "-ac", "1", out_path],
+                capture_output=True, timeout=30)
+            if r.returncode == 0 and _vc_os.path.exists(out_path):
+                with open(out_path, "rb") as f:
+                    wav = f.read()
+                converted = True
+    except Exception as e:
+        app.logger.warning(f"ffmpeg convert failed: {e}")
+    finally:
+        for p in [in_path, out_path]:
+            if _vc_os.path.exists(p):
+                try: _vc_os.unlink(p)
+                except: pass
+    if converted:
+        return wav
+    # pydub fallback
+    try:
+        from pydub import AudioSegment
+        import io as _bio
+        seg = AudioSegment.from_file(_bio.BytesIO(audio_bytes))
+        seg = seg.set_frame_rate(22050).set_channels(1)
+        buf = _bio.BytesIO()
+        seg.export(buf, format="wav")
+        return buf.getvalue()
+    except Exception:
+        return audio_bytes  # return original as last resort
+
 def _vc_detect_language_from_transcript(transcript):
-    """Detect language from transcribed text.
-    
-    The browser's Web Speech API gives us a transcript of what the user said.
-    We detect language from:
-    1. Unicode script ranges (instant, no API call needed for Indic scripts)
-    2. AI text classifier as fallback for ambiguous/Latin-script languages
-    
-    Returns (lang_code, lang_name)
-    """
+    """Detect language from transcript using Unicode ranges then AI classifier."""
     if not transcript or not transcript.strip():
         return "en-US", "English"
-
     text = transcript.strip()
-
-    # ── Step 1: Script-based detection (instant, 100% accurate for Indic) ──
-    # Unicode block ranges for each script
     script_map = [
-        ('஀', '௿', "ta-IN", "Tamil"),
-        ('ఀ', '౿', "te-IN", "Telugu"),
-        ('ಀ', '೿', "kn-IN", "Kannada"),
-        ('ഀ', 'ൿ', "ml-IN", "Malayalam"),
-        ('ঀ', '৿', "bn-IN", "Bengali"),
-        ('ऀ', 'ॿ', "hi-IN", "Hindi"),   # also Marathi
-        ('਀', '੿', "pa-IN", "Punjabi"),
-        ('઀', '૿', "gu-IN", "Gujarati"),
-        ('؀', 'ۿ', "ar-SA", "Arabic"),
-        ('一', '鿿', "zh-CN", "Chinese"),
-        ('぀', 'ヿ', "ja-JP", "Japanese"),
-        ('가', '힯', "ko-KR", "Korean"),
-        ('Ѐ', 'ӿ', "ru-RU", "Russian"),
+        ('\u0B80','\u0BFF',"ta-IN","Tamil"),
+        ('\u0C00','\u0C7F',"te-IN","Telugu"),
+        ('\u0C80','\u0CFF',"kn-IN","Kannada"),
+        ('\u0D00','\u0D7F',"ml-IN","Malayalam"),
+        ('\u0980','\u09FF',"bn-IN","Bengali"),
+        ('\u0900','\u097F',"hi-IN","Hindi"),
+        ('\u0A80','\u0AFF',"gu-IN","Gujarati"),
+        ('\u0A00','\u0A7F',"pa-IN","Punjabi"),
+        ('\u0600','\u06FF',"ar-SA","Arabic"),
+        ('\u4E00','\u9FFF',"zh-CN","Chinese"),
+        ('\u3040','\u30FF',"ja-JP","Japanese"),
+        ('\uAC00','\uD7AF',"ko-KR","Korean"),
+        ('\u0400','\u04FF',"ru-RU","Russian"),
     ]
     for start, end, code, name in script_map:
         if any(start <= c <= end for c in text):
             return code, name
-
-    # ── Step 2: AI classifier for Latin-script languages ───────────────────
-    # English, Tamil written in Roman (Tanglish), French, German, Spanish, etc.
-    try:
-        headers = {
-            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-            "Content-Type": "application/json"
-        }
-        payload = {
-            "model": MODELS["classifier"],
-            "max_tokens": 30,
-            "temperature": 0,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": (
-                        "Detect the language of the text. "
-                        "Reply ONLY as JSON with keys lang and name. "
-                        "Use BCP47 codes: en-US, ta-en, fr-FR, de-DE, es-ES, pt-BR, ja-JP, ko-KR. "
-                        "Example output: lang=en-US name=English"
-                    )
-                },
-                {"role": "user", "content": text[:300]}
-            ]
-        }
-        resp = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers=headers, json=payload, timeout=(5, 8)
-        )
-        if resp.status_code == 200:
-            raw = resp.json()["choices"][0]["message"]["content"].strip()
-            # Parse "lang=en-US name=English" format
-            lang, name = "en-US", "English"
-            for part in raw.replace(",", " ").split():
-                if part.startswith("lang="):
-                    lang = part[5:].strip().strip('"').strip("'")
-                elif part.startswith("name="):
-                    name = part[5:].strip().strip('"').strip("'")
-            valid = {"en-US","ta-en","fr-FR","de-DE","es-ES","pt-BR","ja-JP","ko-KR"}
-            if lang in valid:
-                return lang, name
-    except Exception as e:
-        app.logger.warning(f"AI language classifier failed: {e}")
-
     return "en-US", "English"
+
 
 @app.route("/voice_clone/status")
 @login_required
 def voice_clone_status():
-    """Check if current user has a voice profile and return detected language."""
     meta_path = _vc_meta_path(current_user.id)
+    audio_path = _vc_audio_path(current_user.id)
+    try:
+        from TTS.api import TTS as _T; xtts_ok = True
+    except ImportError:
+        xtts_ok = False
     if _vc_os.path.exists(meta_path):
         try:
-            with open(meta_path, "r") as f:
+            with open(meta_path) as f:
                 meta = _vc_json.load(f)
+            has_audio = _vc_os.path.exists(audio_path)
+            engine = "xtts_v2" if (has_audio and xtts_ok) else "gtts"
             return jsonify({
                 "has_profile": True,
+                "has_audio": has_audio,
+                "xtts_available": xtts_ok,
+                "tts_engine": engine,
                 "profile_id": f"voice_{current_user.id}",
-                "created_at": meta.get("created_at", ""),
-                "detected_lang": meta.get("detected_lang", "en-US"),
-                "detected_lang_name": meta.get("detected_lang_name", "English"),
+                "created_at": meta.get("created_at",""),
+                "detected_lang": meta.get("detected_lang","en-US"),
+                "detected_lang_name": meta.get("detected_lang_name","English"),
             })
         except Exception:
             pass
-    return jsonify({"has_profile": False})
+    return jsonify({"has_profile": False, "xtts_available": xtts_ok})
 
-@app.route("/voice_clone/delete", methods=["POST"])
-@login_required
-def voice_clone_delete():
-    """Delete the user voice profile — removes both audio and metadata files from disk."""
-    deleted = []
-    for path in [_vc_path(current_user.id), _vc_meta_path(current_user.id)]:
-        if _vc_os.path.exists(path):
-            try:
-                _vc_os.remove(path)
-                deleted.append(_vc_os.path.basename(path))
-            except Exception as e:
-                app.logger.warning(f"Could not delete {path}: {e}")
-    return jsonify({"deleted": True, "files": deleted})
 
 @app.route("/voice_clone/upload", methods=["POST"])
 @login_required
 @rate_limit(max_calls=10, window=60)
 def voice_clone_upload():
-    """Save voice language profile.
-    
-    The browser records audio AND transcribes it via Web Speech API simultaneously.
-    The transcript is sent here for language detection — we detect from the actual
-    words spoken (Unicode script + AI classifier), NOT from audio bytes.
-    
-    When PLAY is pressed, gTTS generates the AI answer in the detected language.
-    """
-    # Get transcript from browser STT (the real language signal)
     transcript = (request.form.get("transcript") or "").strip()
-    lang_hint   = (request.form.get("lang_hint") or "").strip()  # BCP-47 hint from browser STT
-
-    # Audio file is optional — only used to confirm something was recorded
+    lang_hint  = (request.form.get("lang_hint")  or "").strip()
     audio_file = request.files.get("audio")
-    if audio_file:
-        data = audio_file.read()
-        if len(data) < 500:
-            return jsonify({"error": "Recording too short — speak for at least 3 seconds"}), 400
 
-    # ── Detect language ──────────────────────────────────────────────────────
-    # Priority 1: lang_hint from browser (browser already knows the language code)
-    # Priority 2: detect from transcript text
-    # Priority 3: default to English
     LANG_NAMES = {
-        "en-US": "English", "ta-IN": "Tamil", "ta-en": "Tanglish",
-        "hi-IN": "Hindi", "te-IN": "Telugu", "kn-IN": "Kannada",
-        "ml-IN": "Malayalam", "bn-IN": "Bengali", "mr-IN": "Marathi",
-        "pa-IN": "Punjabi", "gu-IN": "Gujarati", "fr-FR": "French",
-        "de-DE": "German", "es-ES": "Spanish", "ja-JP": "Japanese",
-        "zh-CN": "Chinese", "ko-KR": "Korean", "ar-SA": "Arabic",
-        "ru-RU": "Russian", "pt-BR": "Portuguese",
+        "en-US":"English","ta-IN":"Tamil","ta-en":"Tanglish",
+        "hi-IN":"Hindi","te-IN":"Telugu","kn-IN":"Kannada",
+        "ml-IN":"Malayalam","bn-IN":"Bengali","mr-IN":"Marathi",
+        "pa-IN":"Punjabi","gu-IN":"Gujarati","fr-FR":"French",
+        "de-DE":"German","es-ES":"Spanish","ja-JP":"Japanese",
+        "zh-CN":"Chinese","ko-KR":"Korean","ar-SA":"Arabic",
+        "ru-RU":"Russian","pt-BR":"Portuguese",
     }
 
-    if lang_hint and lang_hint in LANG_NAMES:
-        detected_lang = lang_hint
-        detected_lang_name = LANG_NAMES[lang_hint]
+    # Detect language — non-English UI hint is most reliable
+    if lang_hint and lang_hint in LANG_NAMES and lang_hint != "en-US":
+        detected_lang, detected_lang_name = lang_hint, LANG_NAMES[lang_hint]
     elif transcript:
         detected_lang, detected_lang_name = _vc_detect_language_from_transcript(transcript)
+        if detected_lang == "en-US" and lang_hint in LANG_NAMES:
+            detected_lang, detected_lang_name = lang_hint, LANG_NAMES[lang_hint]
+    elif lang_hint in LANG_NAMES:
+        detected_lang, detected_lang_name = lang_hint, LANG_NAMES[lang_hint]
     else:
         detected_lang, detected_lang_name = "en-US", "English"
 
-    # Save metadata JSON — this is what drives all TTS output
+    # Save voice sample as WAV for XTTS-v2
+    audio_saved = False
+    try:
+        from TTS.api import TTS as _T; xtts_ok = True
+    except ImportError:
+        xtts_ok = False
+
+    if audio_file:
+        raw = audio_file.read()
+        if len(raw) < 500:
+            return jsonify({"error": "Recording too short — speak at least 5 seconds"}), 400
+        mime = audio_file.content_type or "audio/webm"
+        wav = _to_wav(raw, mime)
+        if wav:
+            with open(_vc_audio_path(current_user.id), "wb") as f:
+                f.write(wav)
+            audio_saved = True
+            app.logger.info(f"Voice sample saved: {len(wav)//1024}KB WAV")
+
+    engine = "xtts_v2" if (audio_saved and xtts_ok) else "gtts"
     meta = {
         "detected_lang": detected_lang,
         "detected_lang_name": detected_lang_name,
-        "transcript": transcript[:200],  # store snippet for debug
+        "transcript": transcript[:200],
         "created_at": _vc_dt.datetime.now().isoformat(),
         "profile_id": f"voice_{current_user.id}",
+        "tts_engine": engine,
+        "audio_saved": audio_saved,
     }
     with open(_vc_meta_path(current_user.id), "w") as f:
         _vc_json.dump(meta, f)
 
+    eng_label = "XTTS-v2 (your real voice)" if engine == "xtts_v2" else "Google TTS"
     return jsonify({
         "profile_id": f"voice_{current_user.id}",
         "status": "active",
         "detected_lang": detected_lang,
         "detected_lang_name": detected_lang_name,
-        "message": f"Language detected: {detected_lang_name}. All PLAY buttons will now speak AI answers in {detected_lang_name}."
+        "tts_engine": engine,
+        "audio_saved": audio_saved,
+        "message": f"Language: {detected_lang_name} | Engine: {eng_label} | PLAY will speak in your voice."
     })
+
+
+@app.route("/voice_clone/delete", methods=["POST"])
+@login_required
+def voice_clone_delete():
+    deleted = []
+    for path in [_vc_audio_path(current_user.id), _vc_meta_path(current_user.id)]:
+        if _vc_os.path.exists(path):
+            try: _vc_os.remove(path); deleted.append(_vc_os.path.basename(path))
+            except Exception as e: app.logger.warning(f"Delete failed {path}: {e}")
+    return jsonify({"deleted": True, "files": deleted})
+
 
 @app.route("/voice_clone/tts", methods=["POST"])
 @login_required
 @rate_limit(max_calls=60, window=60)
 def voice_clone_tts():
-    """Generate TTS using the user\'s detected voice language.
-    
-    Flow:
-    1. User records voice → language detected → saved in JSON profile
-    2. When PLAY is pressed → this route reads the saved language
-    3. Generates gTTS audio in that detected language with the correct AI answer text
-    4. Falls back to the selected UI language if no profile exists
-    
-    The user\'s voice is ANALYSED (language detected), NOT played back.
-    The output is always the correct AI answer in the correct language.
-    """
-    if not _GTTS_OK:
-        return jsonify({"error": "gTTS not installed. Run: pip install gtts"}), 503
-
-    req_data = request.get_json(silent=True) or {}
-    raw = (req_data.get("text") or "").strip()[:2000]
-    ui_lang = (req_data.get("lang") or "en-US").strip()
-
+    """Generate TTS — XTTS-v2 (real voice) if available, else gTTS."""
+    req_data  = request.get_json(silent=True) or {}
+    raw       = (req_data.get("text") or "").strip()[:2000]
+    ui_lang   = (req_data.get("lang") or "en-US").strip()
     if not raw:
         return jsonify({"error": "No text provided"}), 400
 
-    # ── Determine which language to speak in ─────────────────────────────────
-    # Priority 1: user\'s detected voice language (from profile)
-    # Priority 2: current UI language selection
-    lang_code = ui_lang  # default to UI selection
-    meta_path = _vc_meta_path(current_user.id)
+    # Read profile
+    lang_code   = ui_lang
+    audio_path  = _vc_audio_path(current_user.id)
+    tts_engine  = "gtts"
+    meta_path   = _vc_meta_path(current_user.id)
+
     if _vc_os.path.exists(meta_path):
         try:
-            with open(meta_path, "r") as f:
+            with open(meta_path) as f:
                 meta = _vc_json.load(f)
-            profile_lang = meta.get("detected_lang", "").strip()
+            profile_lang = meta.get("detected_lang","").strip()
+            tts_engine   = meta.get("tts_engine","gtts")
             if profile_lang:
-                lang_code = profile_lang  # use detected voice language
+                lang_code = profile_lang if profile_lang != "en-US" else (ui_lang if ui_lang != "en-US" else profile_lang)
         except Exception:
             pass
 
-    # ── Generate TTS in the detected/selected language ────────────────────────
-    text = _clean_for_tts(raw)
-    if not text:
-        return jsonify({"error": "Text empty after cleaning"}), 400
+    # ── XTTS-v2: real voice clone ─────────────────────────────────────────
+    if tts_engine == "xtts_v2" and _vc_os.path.exists(audio_path):
+        wav = _xtts_speak(raw, audio_path, lang_code)
+        if wav:
+            return Response(wav, mimetype="audio/wav",
+                            headers={"Cache-Control":"no-cache","X-TTS-Engine":"xtts_v2","X-Lang":lang_code})
+        app.logger.warning("XTTS-v2 failed — falling back to gTTS")
 
-    gtts_lang = TTS_LANG_MAP.get(lang_code)
-    if not gtts_lang:
-        # Fallback to UI lang if detected lang not in TTS map
-        gtts_lang = TTS_LANG_MAP.get(ui_lang, "en")
-
+    # ── gTTS fallback ─────────────────────────────────────────────────────
+    if not _GTTS_OK:
+        return jsonify({"error": "No TTS engine. Run: pip install gtts"}), 503
+    text      = _clean_for_tts(raw)
+    gtts_lang = TTS_LANG_MAP.get(lang_code, TTS_LANG_MAP.get(ui_lang, "en"))
     is_tanglish = (lang_code == "ta-en")
     try:
-        segments = _smart_split(text, gtts_lang, is_tanglish=is_tanglish)
+        segs   = _smart_split(text, gtts_lang, is_tanglish=is_tanglish)
         chunks = []
-        for seg_lang, seg_text in segments:
-            if not seg_text.strip():
-                continue
+        for sl, st in segs:
+            if not st.strip(): continue
             try:
-                use_slow = is_tanglish or (seg_lang == "en" and len(seg_text.split()) <= 3)
-                chunks.append(_gtts_chunk(seg_text, seg_lang, slow=use_slow))
+                slow = sl in ("ta","ml","kn","te") or is_tanglish or (sl=="en" and len(st.split())<=3)
+                chunks.append(_gtts_chunk(st, sl, slow=slow))
             except Exception as e:
-                app.logger.warning(f"voice_clone TTS chunk failed lang={seg_lang}: {e}")
+                app.logger.warning(f"gTTS chunk failed lang={sl}: {e}")
         if not chunks:
             return jsonify({"error": "TTS generation failed"}), 502
         return Response(b"".join(chunks), mimetype="audio/mpeg",
-                        headers={"Cache-Control": "no-cache",
-                                 "X-Detected-Lang": lang_code})
+                        headers={"Cache-Control":"no-cache","X-TTS-Engine":"gtts","X-Lang":lang_code})
     except Exception as exc:
-        app.logger.error(f"voice_clone TTS error: {exc}")
         return jsonify({"error": f"TTS failed: {str(exc)}"}), 502
 
 
+# ── /coqui/* aliases → /voice_clone/* ────────────────────────────────────────
+@app.route("/coqui/status")
+@login_required
+def coqui_status_alias():
+    return voice_clone_status()
+
+@app.route("/coqui/upload", methods=["POST"])
+@login_required
+@rate_limit(max_calls=10, window=60)
+def coqui_upload_alias():
+    return voice_clone_upload()
+
+@app.route("/coqui/delete", methods=["POST"])
+@login_required
+def coqui_delete_alias():
+    return voice_clone_delete()
+
+@app.route("/coqui/tts", methods=["POST"])
+@login_required
+@rate_limit(max_calls=60, window=60)
+def coqui_tts_alias():
+    return voice_clone_tts()
+
+
+@app.route("/tts/diagnose")
+@login_required
+def tts_diagnose():
+    import sys, io as _diagio
+    results = {
+        "gtts_installed": False, "xtts_installed": False,
+        "profile_exists": False, "audio_saved": False,
+        "python_version": sys.version,
+        "test_english": False, "test_tamil": False, "test_malayalam": False,
+        "click_version": "?"
+    }
+    try:
+        import click; results["click_version"] = click.__version__
+    except Exception:
+        pass
+    try:
+        import gtts
+        results["gtts_installed"] = True
+        results["gtts_version"] = getattr(gtts, "__version__", "?")
+        for lang, key, sample in [
+            ("en",  "test_english",   "Hello CodeBuddy voice test."),
+            ("ta",  "test_tamil",     "வணக்கம் கோட் பட்டி சோதனை"),
+            ("ml",  "test_malayalam", "നമസ്കാരം കോഡ് ബഡ്ഡി"),
+        ]:
+            try:
+                buf = _diagio.BytesIO()
+                gtts.gTTS(text=sample, lang=lang, slow=False).write_to_fp(buf)
+                results[key] = len(buf.getvalue()) > 100
+            except Exception as e:
+                results[key] = False
+                results[key + "_error"] = str(e)
+    except ImportError as e:
+        results["gtts_error"] = str(e)
+    try:
+        from TTS.api import TTS as _T
+        import torch
+        results["xtts_installed"] = True
+        results["xtts_device"] = "cuda" if torch.cuda.is_available() else "cpu"
+        results["xtts_model_loaded"] = _XTTS_READY
+    except Exception as e:
+        results["xtts_error"] = str(e)
+    meta_path  = _vc_meta_path(current_user.id)
+    audio_path = _vc_audio_path(current_user.id)
+    results["profile_exists"] = _vc_os.path.exists(meta_path)
+    results["audio_saved"]    = _vc_os.path.exists(audio_path)
+    if results["profile_exists"]:
+        try:
+            with open(meta_path) as f:
+                meta = _vc_json.load(f)
+            results["profile_lang"]      = meta.get("detected_lang")
+            results["profile_lang_name"] = meta.get("detected_lang_name")
+            results["tts_engine"]        = meta.get("tts_engine", "gtts")
+            if results["audio_saved"]:
+                results["audio_size_kb"] = _vc_os.path.getsize(audio_path) // 1024
+        except Exception:
+            pass
+    return jsonify(results)
+
+
+
+@app.route("/collab_chat", methods=["POST"])
+@login_required
+@rate_limit(max_calls=50, window=60)
+def collab_chat():
+    """Chat for collab — membership check instead of ownership check."""
+    user_message    = request.form.get("message", "").strip()
+    conversation_id = request.form.get("conversation_id")
+    mode            = request.form.get("mode", "general")
+    lang_code       = request.form.get("lang", "en-US")
+    room_code       = request.form.get("room_code", "")
+
+    if not user_message:
+        return Response("Please enter a message.", mimetype="text/plain")
+
+    if room_code:
+        room = _collab_rooms.get(room_code)
+        if not room:
+            return Response("⚠ Collab session expired. Please create a new session.", mimetype="text/plain")
+        # Auto-add member if they joined via link
+        if current_user.username not in room.get("members", []):
+            room["members"].append(current_user.username)
+        conversation_id = str(room["chat_id"])
+
+    if not conversation_id:
+        return Response("⚠ No conversation linked. Initialize a session first.", mimetype="text/plain")
+
+    conn = sqlite3.connect("codebuddy.db")
+    conn.row_factory = sqlite3.Row
+    convo = conn.execute("SELECT id FROM conversations WHERE id=?", (conversation_id,)).fetchone()
+    conn.close()
+    if not convo:
+        return Response("⚠ Chat not found. It may have been deleted.", mimetype="text/plain")
+
+    conn = sqlite3.connect("codebuddy.db")
+    conn.execute("INSERT INTO messages(conversation_id,role,content,timestamp) VALUES (?,?,?,?)",
+                 (conversation_id, "user", user_message, datetime.now().isoformat()))
+    conn.execute("UPDATE conversations SET updated_at=? WHERE id=?",
+                 (datetime.now().isoformat(), conversation_id))
+    conn.commit()
+    conn.close()
+
+    system_prompt  = SYSTEM_PROMPTS.get(mode, SYSTEM_PROMPTS["general"]) + _RESPECTFUL_TONE
+    history        = get_conversation_history(conversation_id, limit=16)
+    api_messages   = [{"role": "system", "content": system_prompt}] + history
+    selected_model = get_model_for_mode(mode, lang_code)
+
+    hdrs = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://codebuddy.ai",
+        "X-Title": "CodeBuddy Collab",
+    }
+    payload = {
+        "model": selected_model,
+        "stream": True,
+        "max_tokens": 2000,
+        "temperature": 0.7,
+        "messages": api_messages,
+    }
+
+    def generate():
+        full = ""
+        try:
+            resp = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=hdrs, json=payload, stream=True, timeout=(10, 90)
+            )
+            if resp.status_code != 200:
+                tried = {payload["model"]}
+                for fb in FREE_FALLBACKS:
+                    if fb in tried:
+                        continue
+                    tried.add(fb)
+                    payload["model"] = fb
+                    resp = requests.post(
+                        "https://openrouter.ai/api/v1/chat/completions",
+                        headers=hdrs, json=payload, stream=True, timeout=(10, 90)
+                    )
+                    if resp.status_code == 200:
+                        break
+                else:
+                    yield f"⚠ API Error {resp.status_code}. All models unavailable — try again."
+                    return
+
+            for line in resp.iter_lines():
+                if line:
+                    dec = line.decode("utf-8", errors="ignore")
+                    if dec.startswith("data: "):
+                        d = dec[6:]
+                        if d.strip() == "[DONE]":
+                            break
+                        try:
+                            token = json.loads(d)["choices"][0]["delta"].get("content", "")
+                            token = _filter_response(token)
+                            full += token
+                            yield token
+                        except (json.JSONDecodeError, KeyError, IndexError):
+                            pass
+
+        except requests.exceptions.ConnectTimeout:
+            yield "\n\n⏱ Could not connect to AI service. Check your internet."
+        except requests.exceptions.ReadTimeout:
+            if full:
+                yield "\n\n⚠ Response cut short."
+            else:
+                yield "\n\n⏱ AI timed out. Please try again."
+        except requests.exceptions.ConnectionError:
+            yield "\n\n🔌 Connection lost. Check your internet."
+        except Exception as e:
+            yield f"\n\n⚠ Error: {str(e)}"
+
+        if full:
+            full = _filter_response(full)
+            sc = sqlite3.connect("codebuddy.db")
+            sc.execute(
+                "INSERT INTO messages(conversation_id,role,content,timestamp) VALUES (?,?,?,?)",
+                (conversation_id, "assistant", full, datetime.now().isoformat())
+            )
+            sc.commit()
+            sc.close()
+
+    return Response(generate(), mimetype="text/plain")
+
+# COLLABORATE — Real-time coding sessions + WebRTC voice calls
+# ═══════════════════════════════════════════════════════════════
+
+import random as _random, string as _string
+
+@app.route("/collab/create", methods=["POST"])
+@login_required
+def collab_create():
+    data = request.get_json(silent=True) or {}
+    chat_id = data.get("chat_id")
+    if not chat_id:
+        return jsonify({"error": "No chat_id provided"}), 400
+    conn = sqlite3.connect("codebuddy.db")
+    conn.row_factory = sqlite3.Row
+    chat = conn.execute(
+        "SELECT id, title FROM conversations WHERE id=? AND user_id=?",
+        (chat_id, current_user.id)
+    ).fetchone()
+    conn.close()
+    if not chat:
+        return jsonify({"error": "Chat not found"}), 404
+    room_code = ''.join(_random.choices(_string.ascii_lowercase + _string.digits, k=8))
+    _collab_rooms[room_code] = {
+        "chat_id": chat_id,
+        "chat_title": chat["title"] or "Untitled",
+        "host": current_user.username,
+        "host_id": current_user.id,
+        "members": [current_user.username],
+    }
+    collab_url = url_for("collab_page", room_code=room_code, _external=True)
+    return jsonify({"room_code": room_code, "collab_url": collab_url, "chat_title": chat["title"] or "Untitled"})
+
+
+@app.route("/collab/<room_code>")
+@login_required
+def collab_page(room_code):
+    room = _collab_rooms.get(room_code)
+    if not room:
+        return "<h2 style='font-family:monospace;color:#ff6b2b;padding:40px'>Session expired. <a href='/'>Go back</a></h2>", 404
+    if current_user.username not in room["members"]:
+        room["members"].append(current_user.username)
+    conn = sqlite3.connect("codebuddy.db")
+    conn.row_factory = sqlite3.Row
+    messages = conn.execute(
+        "SELECT role, content FROM messages WHERE conversation_id=? ORDER BY id ASC",
+        (room["chat_id"],)
+    ).fetchall()
+    conn.close()
+    chat_id = room["chat_id"]
+    return render_template("collab.html",
+        room_code=room_code, room=room,
+        messages=[{"role": m["role"], "content": m["content"]} for m in messages],
+        username=current_user.username, chat_id=chat_id)
+
+
+@app.route("/collab/<room_code>/end", methods=["POST"])
+@login_required
+def collab_end(room_code):
+    room = _collab_rooms.get(room_code)
+    if not room:
+        return jsonify({"error": "Room not found"}), 404
+    if room["host_id"] != current_user.id:
+        return jsonify({"error": "Only host can end"}), 403
+    _collab_rooms.pop(room_code, None)
+    if socketio:
+        socketio.emit("session_ended", {"message": "Host ended the session"}, room=room_code)
+    return jsonify({"ended": True})
+
+
+# ── SocketIO events ──
+if _SOCKETIO_OK and socketio:
+    @socketio.on("join_collab")
+    def on_join(data):
+        room_code = data.get("room_code"); username = data.get("username")
+        if not room_code or not username: return
+        join_room(room_code)
+        room = _collab_rooms.get(room_code, {})
+        emit("user_joined", {"username": username, "members": room.get("members", []), "message": f"{username} joined"}, room=room_code)
+
+    @socketio.on("leave_collab")
+    def on_leave(data):
+        room_code = data.get("room_code"); username = data.get("username")
+        if not room_code: return
+        leave_room(room_code)
+        room = _collab_rooms.get(room_code, {})
+        if username in room.get("members", []): room["members"].remove(username)
+        emit("user_left", {"username": username, "members": room.get("members", []), "message": f"{username} left"}, room=room_code)
+
+    @socketio.on("collab_message")
+    def on_msg(data):
+        room_code = data.get("room_code")
+        if room_code: emit("new_message", data, room=room_code)
+
+    @socketio.on("collab_typing")
+    def on_typing(data):
+        room_code = data.get("room_code")
+        if room_code: emit("user_typing", data, room=room_code, include_self=False)
+
+    @socketio.on("webrtc_signal")
+    def on_webrtc(data):
+        room_code = data.get("room_code")
+        if room_code: emit("webrtc_signal", data, room=room_code, include_self=False)
+
+    @socketio.on("voice_state")
+    def on_voice(data):
+        room_code = data.get("room_code")
+        if room_code: emit("voice_state_update", data, room=room_code)
+
 if __name__ == "__main__":
-    app.run(debug=True, host="127.0.0.1", port=5000)
+    # CRITICAL: use_reloader=False stops Flask restarting with a new random
+    # secret_key when files change, which invalidates all session cookies.
+    _kw = dict(host="127.0.0.1", port=5000, debug=True, use_reloader=False)
+    if _SOCKETIO_OK and socketio:
+        socketio.run(app, **_kw)
+    else:
+        app.run(**_kw)
