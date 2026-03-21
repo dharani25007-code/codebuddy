@@ -55,12 +55,16 @@ if not _raw_secret:
 app.secret_key = _raw_secret
 
 # ── SESSION CONFIG ─────────────────────────────────────────────────────────────
+from datetime import timedelta
 app.config.update(
     SESSION_COOKIE_SAMESITE="Lax",
     SESSION_COOKIE_SECURE=False,        # Must be False for http://localhost
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_NAME="codebuddy_session",
     PERMANENT_SESSION_LIFETIME=86400 * 30,  # 30-day sessions
+    REMEMBER_COOKIE_DURATION=timedelta(days=7),   # remember-me cookie lasts 7 days
+    REMEMBER_COOKIE_HTTPONLY=True,
+    REMEMBER_COOKIE_SAMESITE="Lax",
 )
 
 # ── SOCKETIO: always threading — eventlet is deprecated & breaks sessions ──────
@@ -861,9 +865,15 @@ def register():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    # Already logged in → go straight to dashboard, don't show login page
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard"))
     if request.method == "POST":
         username = request.form["username"].strip()
         password = request.form["password"]
+        # Only set a persistent remember-me cookie if the user explicitly checked
+        # the "Remember me" box. Without this, the session ends when the browser closes.
+        remember_me = request.form.get("remember_me") == "on"
 
         conn = sqlite3.connect("codebuddy.db")
         conn.row_factory = sqlite3.Row
@@ -871,7 +881,7 @@ def login():
         conn.close()
 
         if user and bcrypt.check_password_hash(user["password"], password):
-            login_user(User(user["id"], user["username"]), remember=True)
+            login_user(User(user["id"], user["username"]), remember=remember_me)
             update_streak(user["id"])
             return redirect(url_for("dashboard"))
 
@@ -881,8 +891,10 @@ def login():
 @app.route("/logout")
 @login_required
 def logout():
-    logout_user()
+    # Clear session data FIRST, then call logout_user() which removes the
+    # remember-me cookie. This order ensures full session termination.
     session.clear()
+    logout_user()
     return redirect(url_for("login"))
 
 @app.route("/")
@@ -1249,6 +1261,7 @@ def get_bookmarks():
 PISTON_ENDPOINTS = [
     "https://emkc.org/api/v2/piston/execute",
     "https://api.piston.rs/api/v2/execute",
+    "https://piston.rodentshire.com/api/v2/execute",
 ]
 PISTON_API = PISTON_ENDPOINTS[0]  # backward-compat alias
 
@@ -1670,7 +1683,9 @@ def chat():
     else:
         # Language instruction goes FIRST — LLMs are far more reliable when
         # the language mandate is at the beginning of the system prompt, not appended.
-        system_prompt = lang_instruction + SYSTEM_PROMPTS.get(mode, SYSTEM_PROMPTS["general"]) + _RESPECTFUL_TONE + memory_context
+        # lang_instruction at END — LLMs obey the LAST instruction they see
+        _base = SYSTEM_PROMPTS.get(mode, SYSTEM_PROMPTS["general"]) + _RESPECTFUL_TONE + memory_context
+        system_prompt = _base + ("\n\n" + lang_instruction if lang_instruction else "")
         if mode == "debug":
             bump_stat(current_user.id, "debug_count")
         elif mode == "optimize":
@@ -1710,6 +1725,20 @@ def chat():
         else:
             api_messages.append({"role": "user", "content": reminder_prefix + user_message})
 
+    # Prime model with assistant seed in target language — it continues in that language
+    INDIC_SEED = {
+        "ta-IN":"சரி, தமிழில் விளக்குகிறேன்:","hi-IN":"ठीक है, हिंदी में:",
+        "te-IN":"సరే, తెలుగులో:","kn-IN":"ಸರಿ, ಕನ್ನಡದಲ್ಲಿ:",
+        "ml-IN":"ശരി, മലയാളത്തിൽ:","bn-IN":"ঠিক আছে, বাংলায়:",
+        "mr-IN":"ठीक आहे, मराठीत:","ta-en":"Seri, Tanglish-la:",
+        "fr-FR":"D'accord, en français:","de-DE":"Gut, auf Deutsch:",
+        "es-ES":"De acuerdo, en español:","ja-JP":"わかりました：",
+        "zh-CN":"好的，用中文：","ko-KR":"알겠습니다:",
+        "ar-SA":"حسناً:","ru-RU":"Хорошо:","pt-BR":"Certo:",
+    }
+    if lang_code in INDIC_SEED:
+        api_messages.append({"role":"assistant","content":INDIC_SEED[lang_code]})
+
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
@@ -1728,7 +1757,7 @@ def chat():
         "model": selected_model,
         "stream": True,
         "max_tokens": 2000,
-        "temperature": 0.7,
+        "temperature": (0.1 if lang_code not in ("en-US", "", None) else 0.7),
         "messages": api_messages
     }
 
@@ -1808,14 +1837,44 @@ def chat():
         if stream_buf:
             yield _filter_response(stream_buf)
         if full:
-            full = _filter_response(full)   # final pass on complete response
-            save_conn = sqlite3.connect("codebuddy.db")
+            full = _filter_response(full)
+            # Auto-translate: if AI replied in English despite non-English selection
+            if lang_code not in ("en-US","",None):
+                _ranges={"ta-IN":(0x0B80,0x0BFF),"hi-IN":(0x0900,0x097F),
+                    "te-IN":(0x0C00,0x0C7F),"kn-IN":(0x0C80,0x0CFF),
+                    "ml-IN":(0x0D00,0x0D7F),"bn-IN":(0x0980,0x09FF),"mr-IN":(0x0900,0x097F)}
+                _lo,_hi=_ranges.get(lang_code,(0,0))
+                _english=(_lo==0) or not any(_lo<=ord(c)<=_hi for c in full[:300])
+                if _english:
+                    _tn={"ta-IN":"Tamil (தமிழ் unicode)","hi-IN":"Hindi (हिंदी)",
+                        "te-IN":"Telugu (తెలుగు)","kn-IN":"Kannada (ಕನ್ನಡ)",
+                        "ml-IN":"Malayalam (മലയാളം)","bn-IN":"Bengali (বাংলা)",
+                        "mr-IN":"Marathi (मराठी)","ta-en":"Tanglish (Tamil in Roman letters)",
+                        "fr-FR":"French","de-DE":"German","es-ES":"Spanish",
+                        "ja-JP":"Japanese","zh-CN":"Chinese","ko-KR":"Korean",
+                        "ar-SA":"Arabic","ru-RU":"Russian","pt-BR":"Portuguese"}
+                    _tl=_tn.get(lang_code,lang_code)
+                    try:
+                        _th={"Authorization":f"Bearer {OPENROUTER_API_KEY}","Content-Type":"application/json"}
+                        _tp={"model":MODELS.get("indic",MODELS["fast"]),"max_tokens":3000,"temperature":0.1,
+                            "messages":[{"role":"system","content":(
+                                f"Translate into {_tl}. Keep code blocks unchanged. Translate prose only. Output only translation."
+                            )},{"role":"user","content":full[:3000]}]}
+                        for _m in [MODELS.get("indic",MODELS["fast"]),MODELS["fast"]]+FREE_FALLBACKS[:2]:
+                            _tp["model"]=_m
+                            _tr=requests.post("https://openrouter.ai/api/v1/chat/completions",
+                                headers=_th,json=_tp,timeout=(5,30))
+                            if _tr.status_code==200:
+                                _t=_tr.json()["choices"][0]["message"]["content"].strip()
+                                if _t and len(_t)>10:
+                                    yield "\n\n"+_t;full=_t;break
+                    except Exception as _e:
+                        app.logger.warning(f"Auto-translate: {_e}")
+            save_conn=sqlite3.connect("codebuddy.db")
             save_conn.execute(
                 "INSERT INTO messages(conversation_id,role,content,timestamp) VALUES (?,?,?,?)",
-                (conversation_id, "assistant", full, datetime.now().isoformat())
-            )
-            save_conn.commit()
-            save_conn.close()
+                (conversation_id,"assistant",full,datetime.now().isoformat()))
+            save_conn.commit();save_conn.close()
 
     return Response(generate(), mimetype="text/plain")
 

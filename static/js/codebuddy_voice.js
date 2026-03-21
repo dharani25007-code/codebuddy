@@ -749,16 +749,23 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
     'en-US': 'en-US',
   };
 
+  // ── _speakViaGTTS: internal helper — sends text+lang to gTTS backend ────────
+  // Called by speak() for normal path AND by auto-translate callback.
   function _speakViaGTTS(text, activeLang) {
+    // ── If voice clone is active, use the detected language from the profile ──
+    // window._vcDetectedLang is set by VoiceClone after upload/checkStatus.
+    // The backend also reads it from the JSON profile as a safety net,
+    // but we send it explicitly here so it's always correct.
     const _detNonEn = window._vcDetectedLang && window._vcDetectedLang !== 'en-US';
     const effectiveLang = ((window._hasCoquiVoice || window._hasVoiceClone) && _detNonEn)
       ? window._vcDetectedLang : activeLang;
+
     const ttsLang = LANG_TO_TTS[effectiveLang] || effectiveLang;
 
-    // Stop everything first — prevents double-voice and stale audio
-    if (_pendingController) { try { _pendingController.abort(); } catch(e){} _pendingController = null; }
-    if (_currentAudio) { try { _currentAudio.pause(); _currentAudio.src = ''; } catch(e){} _currentAudio = null; }
-    if (STATE.synth) { try { STATE.synth.cancel(); } catch(e){} }
+    // ── CRITICAL: kill browser TTS immediately before starting gTTS ──────────
+    // Without this, any queued/running speechSynthesis utterance keeps playing
+    // alongside the gTTS audio, causing the double-voice (male+female) bug.
+    if (STATE.synth) STATE.synth.cancel();
     STATE.currentUtterance = null;
 
     setStatus('SPEAKING', 'speaking');
@@ -767,70 +774,60 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
     addHistory('TTS', '[' + effectiveLang + '] ' + text.slice(0, 80) + '...');
 
     const isTanglish = (effectiveLang === 'ta-en');
-    const effectiveRate = isTanglish
-      ? Math.min(STATE.rate, 0.85)
-      : Math.min(Math.max(STATE.rate, 0.5), 2.0);
-    const endpoint = (window._hasCoquiVoice || window._hasVoiceClone)
-      ? '/voice_clone/tts' : '/tts';
+    const effectiveRate = isTanglish ? Math.min(STATE.rate, 0.85) : Math.min(Math.max(STATE.rate, 0.5), 2.0);
 
+    if (_pendingController) { try { _pendingController.abort(); } catch(e){} }
     _pendingController = new AbortController();
-    fetch(endpoint, {
+    fetch((window._hasCoquiVoice || window._hasVoiceClone) ? '/voice_clone/tts' : '/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, lang: ttsLang }),
+      body: JSON.stringify({ text: text, lang: ttsLang }),
       signal: _pendingController.signal,
-      redirect: 'manual',
+      redirect: 'manual'  // CRITICAL: prevent 302 login redirect from causing page navigation
     })
     .then(res => {
-      if (res.type === 'opaqueredirect' || res.status === 302 || res.status === 0)
-        throw new Error('Session expired — please refresh the page');
-      if (!res.ok)
-        return res.json().catch(() => ({})).then(err => {
-          throw new Error(err.error || 'TTS HTTP ' + res.status);
-        });
+      // If redirected to login (session expired), fail silently - don't navigate away
+      if (res.type === 'opaqueredirect' || res.status === 0) {
+        throw new Error('Session expired - please refresh');
+      }
+      if (!res.ok) return res.json().catch(() => ({})).then(err => { throw new Error(err.error || 'TTS error ' + res.status); });
       return res.blob();
     })
     .then(blob => {
-      if (!blob || blob.size < 50) throw new Error('Empty audio response from server');
-      if (STATE.synth) { try { STATE.synth.cancel(); } catch(e){} }
-      if (_currentAudio) { try { _currentAudio.pause(); _currentAudio.src = ''; } catch(e){} _currentAudio = null; }
-
+      // Cancel browser TTS again in case it started while fetch was in flight
+      if (STATE.synth) STATE.synth.cancel();
       const url = URL.createObjectURL(blob);
-      const audio = new Audio();
-      audio.preload = 'auto';
-      audio.volume = Math.min(Math.max(STATE.volume, 0), 1);
-      audio.playbackRate = effectiveRate;
-      audio.onended = () => {
+      if (_currentAudio) { try { _currentAudio.pause(); _currentAudio.src = ''; } catch(e){} _currentAudio = null; }
+      _currentAudio = new Audio(url);
+      _currentAudio.volume = STATE.volume;
+      _currentAudio.playbackRate = effectiveRate;
+      _currentAudio.onended = () => {
         STATE.isSpeaking = false; setStatus('IDLE', 'idle');
         animateWaveformSpeak(false); URL.revokeObjectURL(url); _currentAudio = null;
         if (typeof STATE.onSpeakEnd === 'function') { STATE.onSpeakEnd(); STATE.onSpeakEnd = null; }
       };
-      audio.onerror = () => {
+      _currentAudio.onerror = () => {
         STATE.isSpeaking = false; setStatus('IDLE', 'idle');
-        animateWaveformSpeak(false); URL.revokeObjectURL(url); _currentAudio = null;
+        animateWaveformSpeak(false); _currentAudio = null;
         if (typeof STATE.onSpeakEnd === 'function') { STATE.onSpeakEnd(); STATE.onSpeakEnd = null; }
       };
-      _currentAudio = audio;
       _pendingController = null;
-      audio.src = url;
-      audio.load();
-      const p = audio.play();
-      if (p) p.then(() => {
+      const _pp = _currentAudio.play();
+      if (_pp) _pp.then(() => {
         if (typeof STATE.onSpeakStart === 'function') { STATE.onSpeakStart(); STATE.onSpeakStart = null; }
       }).catch(err => {
-        // Autoplay blocked — user must interact with page first
         STATE.isSpeaking = false; setStatus('IDLE', 'idle');
-        animateWaveformSpeak(false); URL.revokeObjectURL(url); _currentAudio = null;
-        setTranscript('⚠ Click 🔊 PLAY to hear audio (autoplay blocked by browser)', 'cmd');
+        animateWaveformSpeak(false); _currentAudio = null;
+        setTranscript('⚠ Click 🔊 PLAY to hear audio (autoplay blocked)', 'cmd');
         if (typeof STATE.onSpeakEnd === 'function') { STATE.onSpeakEnd(); STATE.onSpeakEnd = null; }
       });
     })
     .catch(err => {
-      if (err && err.name === 'AbortError') return;
+      if (err && err.name === 'AbortError') return; // intentionally cancelled, don't fall back
+      console.warn('CBVoice: gTTS failed (' + err.message + ') — no browser TTS fallback (prevents double voice)');
       STATE.isSpeaking = false; setStatus('IDLE', 'idle');
       animateWaveformSpeak(false);
-      setTranscript('⚠ Voice error: ' + (err.message || err), 'cmd');
-      if (typeof STATE.onSpeakEnd === 'function') { STATE.onSpeakEnd(); STATE.onSpeakEnd = null; }
+      // Do NOT call speakBrowser() here — it plays female voice over gTTS = double voice bug
     });
   }
 
@@ -1135,7 +1132,11 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
     const micBtn = document.getElementById('cbMicBtn');
     indicator.style.display = 'block';
     micBtn.classList.add('wake');
-    speak('CodeBuddy activated. What would you like to code?');
+    const _wLang = STATE.currentLang;
+    const _wMsg = (LANGS[_wLang] && LANGS[_wLang].greet)
+      ? LANGS[_wLang].greet
+      : 'CodeBuddy activated. What would you like to code?';
+    speak(_wMsg, _wLang);
     setTranscript('🎯 Wake word detected — I\'m listening!', 'cmd');
     setTimeout(() => {
       STATE.wakeWordActive = false;
@@ -1389,7 +1390,10 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
       // Recognition uses Tamil for Tanglish (user speaks Tamil, AI replies in Tanglish)
       const recogLang = (lang === 'ta-en') ? 'ta-IN' : lang;
       if (STATE.recognition) STATE.recognition.lang = recogLang;
-      // Don't auto-speak on language change (prevents unwanted TTS requests)
+      // Speak greeting in newly selected language
+      if (LANGS[lang] && LANGS[lang].greet) {
+        setTimeout(() => speak(LANGS[lang].greet, lang), 400);
+      }
       addHistory('LANG', (LANGS[lang] ? LANGS[lang].name : lang) + ' selected');
       // Show hint in transcript
       const hints = {

@@ -2,11 +2,64 @@
 <html lang="en">
 
 <head>
+<script>
+/* Global session-expiry handler — intercepts ALL fetch calls */
+(function(){
+  const _orig = window.fetch.bind(window);
+  window.fetch = function(url, opts){
+    if(typeof url === 'string' && url.startsWith('/')){
+      opts = Object.assign({}, opts);
+      if(!opts.redirect) opts.redirect = 'manual';
+    }
+    return _orig(url, opts).then(function(res){
+      if((res.type==='opaqueredirect'||res.status===302||res.status===0) &&
+         typeof url==='string' && url.startsWith('/') &&
+         !url.includes('/tts') && !url.includes('/voice_clone/tts') &&
+         !url.includes('/login')){
+        window.location.href = '/login';
+        return Promise.reject(new Error('session_expired'));
+      }
+      return res;
+    });
+  };
+})();
+</script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#00ffe0">
   <title>CodeBuddy</title>
-  <link rel="manifest" href="/manifest.json">
+  <script>
+/* Pyodide — runs Python in browser when Piston server unreachable */
+window._pyReady = false; window._pyLoading = false; window._pyCBs = [];
+function _loadPy() {
+  return new Promise((res, rej) => {
+    if (window._pyReady) { res(window._py); return; }
+    window._pyCBs.push({res, rej});
+    if (window._pyLoading) return;
+    window._pyLoading = true;
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/pyodide/v0.25.1/full/pyodide.js';
+    s.onload = async () => {
+      try {
+        window._py = await globalThis.loadPyodide({indexURL:'https://cdn.jsdelivr.net/pyodide/v0.25.1/full/'});
+        window._pyReady = true;
+        window._pyCBs.forEach(c => c.res(window._py)); window._pyCBs = [];
+      } catch(e) { window._pyCBs.forEach(c => c.rej(e)); window._pyCBs = []; }
+    };
+    s.onerror = () => { window._pyCBs.forEach(c => c.rej(new Error('Pyodide load failed'))); window._pyCBs = []; };
+    document.head.appendChild(s);
+  });
+}
+async function runPython(code) {
+  const py = await _loadPy();
+  let out = '';
+  py.setStdout({ batched: s => { out += s + '\n'; } });
+  py.setStderr({ batched: s => { out += s + '\n'; } });
+  try { await py.runPythonAsync(code); return { output: out.trim() || '(no output)', exit_code: 0 }; }
+  catch(e) { return { output: (out ? out + '\n' : '') + e.message, exit_code: 1 }; }
+}
+</script>
+<link rel="manifest" href="/manifest.json">
   <link
     href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Exo+2:wght@200;300;400;600&display=swap"
     rel="stylesheet">
@@ -4001,7 +4054,7 @@
             <a class="udrop-item" href="/leaderboard" target="_blank"><span class="udrop-icon">🏆</span> LEADERBOARD</a>
             <div class="udrop-item" onclick="typeof CBVoice!=='undefined'&&CBVoice.installPWA()"><span class="udrop-icon">📲</span> INSTALL APP</div>
             <div class="udrop-divider"></div>
-            <a class="udrop-item logout" href="/logout"><span class="udrop-icon">⏻</span> TERMINATE SESSION</a>
+            <a class="udrop-item logout" href="/logout" onclick="sessionStorage.clear();localStorage.clear();"><span class="udrop-icon">⏻</span> TERMINATE SESSION</a>
           </div>
         </div>
       </div>
@@ -4410,7 +4463,18 @@
         content.innerHTML = `<div class="run-console"><span class="con-info" style="opacity:0.5">⚙ Running ${displayLang.toUpperCase()}…</span></div>`;
         fetch('/run_code', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, language: displayLang }) })
           .then(r => r.json())
-          .then(data => {
+          .then(async data => {
+            // If Piston returned DNS error for Python, use Pyodide
+            if (data.exit_code === -1 && data.output &&
+                (data.output.includes('NameResolutionError') || data.output.includes('unavailable')) &&
+                (displayLang === 'python' || displayLang === 'py')) {
+              content.innerHTML = '<div class="run-console"><span class="con-info" style="opacity:0.6">⚙ Loading Python runtime in browser…</span></div>';
+              try {
+                const r = await runPython(code);
+                renderRunOutput({output:r.output, exit_code:r.exit_code}, 'python (browser)', content, btn);
+              } catch(e) { renderRunOutput(data, displayLang, content, btn); }
+              return;
+            }
             if (data.runtime_missing) {
               if (displayLang === 'javascript' || displayLang === 'js') { runInBrowser(code, content, btn); return; }
               btn.textContent = '▶ RUN'; btn.classList.remove('running', 'run-active');
@@ -4428,9 +4492,22 @@
             }
             renderRunOutput(data, displayLang, content, btn);
           })
-          .catch(() => {
-            if (normLang === 'javascript' || normLang === '') { runInBrowser(code, content, btn); }
-            else { content.innerHTML = `<div class="run-console"><span class="con-err">🔴 Server unreachable. Make sure CodeBuddy is running.</span></div>`; btn.classList.remove('running'); btn.classList.add('run-active'); btn.textContent = '■ CLOSE'; }
+          .catch(async () => {
+            if (normLang === 'javascript' || normLang === '') {
+              runInBrowser(code, content, btn);
+            } else if (normLang === 'python' || normLang === 'py') {
+              content.innerHTML = '<div class="run-console"><span class="con-info" style="opacity:0.6">⚙ Loading Python runtime in browser (Piston unreachable)…</span></div>';
+              try {
+                const r = await runPython(code);
+                renderRunOutput({output:r.output, exit_code:r.exit_code, language:'python'}, 'python (browser)', content, btn);
+              } catch(e) {
+                content.innerHTML = '<div class="run-console"><span class="con-err">🔴 Code server unreachable + browser Python failed. Check internet.</span></div>';
+                btn.classList.remove('running'); btn.classList.add('run-active'); btn.textContent = '■ CLOSE';
+              }
+            } else {
+              content.innerHTML = '<div class="run-console"><span class="con-err">🔌 Code server unreachable. HTML/CSS/JS runs in browser always. For ' + normLang.toUpperCase() + ' check internet.</span></div>';
+              btn.classList.remove('running'); btn.classList.add('run-active'); btn.textContent = '■ CLOSE';
+            }
           });
       lastCodeBlock = code;
     }
@@ -4630,10 +4707,10 @@
       chatBox.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-3);font-family:var(--display);font-size:9px;letter-spacing:2px;">LOADING SESSION...</div>';
       fetch('/load_messages/' + id, { redirect: 'manual' })
         .then(r => {
-          if (r.type === 'opaqueredirect' || r.status === 302 || r.status === 0) {
-            window.location.href = '/login'; return Promise.reject('expired');
+          if(r.type==='opaqueredirect'||r.status===302||r.status===0){
+            window.location.href='/login'; return Promise.reject('expired');
           }
-          if (!r.ok) return Promise.reject('error ' + r.status);
+          if(!r.ok) return Promise.reject('err_'+r.status);
           return r.json();
         })
         .then(data => {
@@ -4663,7 +4740,13 @@
     }
     function newChat() {
       fetch('/new_chat', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({mode: document.getElementById('mode').value}), redirect: 'manual' })
-        .then(r => r.json())
+        .then(r => {
+          if(r.type==='opaqueredirect'||r.status===302||r.status===0){
+            window.location.href='/login'; return Promise.reject('session_expired');
+          }
+          if(!r.ok) return Promise.reject('error_'+r.status);
+          return r.json();
+        })
         .then(d => {
           const id = d.chat_id || d.id;
           if (!id) { location.reload(); return; }
@@ -4703,7 +4786,11 @@
           }
           document.getElementById('message').focus();
         })
-        .catch(() => location.reload());
+        .catch(err => {
+          if(err && err.message === 'session_expired') return;
+          if(err === 'session_expired') return; // already redirecting
+          location.reload();
+        });
     }
 
     /* SEND */
@@ -4796,6 +4883,9 @@
       setProgress(0); const t0 = Date.now();
       try {
         const res = await fetch('/chat', { method: 'POST', body: fd, redirect: 'manual' });
+        if(res.type==='opaqueredirect'||res.status===302||res.status===0){
+          window.location.href='/login'; return;
+        }
         if (!res.ok) {
           // Handle rate limit (429) specially — show countdown
           if (res.status === 429) {
@@ -8196,7 +8286,7 @@ const VideoAnalyzer = (() => {
     }
 
     try {
-      const response = await fetch('/analyze_video', { method: 'POST', body: fd, redirect: 'manual' });
+      const response = await fetch('/analyze_video', { method: 'POST', body: fd });
 
       if (response.status === 404) {
         throw new Error('Route /analyze_video missing — replace app.py with updated version and restart python app.py');
@@ -8244,7 +8334,6 @@ const VideoAnalyzer = (() => {
     } catch(e) {
       clearInterval(_progressTimer);
       progDiv.classList.remove('show');
-      if (!e || !e.message || e === 'expired') return;
       setStatus('⚠ Error: ' + e.message);
       const isRoute = e.message.includes('404') || e.message.includes('missing');
       let helpTxt = isRoute
