@@ -1,15 +1,22 @@
 """CodeBuddy – AI-powered programming assistant backend.
    ╔══════════════════════════════════════════════════════════╗
-   ║  v5.0 — 6 WORLD-FIRST FEATURES ADDED                   ║
-   ║  Previous v4.0 features (1-10) preserved intact        ║
+   ║  v9.0 — 3 MORE WORLD-FIRST FEATURES ADDED              ║
+   ║  All v8.0 features (11-25) preserved intact            ║
    ║                                                          ║
-   ║  NEW — WORLD FIRST:                                     ║
-   ║  11. Thought Replay Debugger (AI reasoning visible)     ║
-   ║  12. Voice-to-Voice Coding Loop (speak → fix → speak)  ║
-   ║  13. Live Code Battle (AI-judged real-time duel)        ║
-   ║  14. Code Karma System (help = community currency)      ║
-   ║  15. Replay My Learning (shareable journey timeline)    ║
-   ║  16. Blind Code Review (anonymous, bias-free feedback)  ║
+   ║  EXISTING WORLD-FIRSTS (v5–v8):                        ║
+   ║  11-16: Thought Replay, Voice Loop, Battle, Karma,     ║
+   ║         Learning Replay, Blind Review                   ║
+   ║  17-19: Mood Engine, Dead Code, Code DNA               ║
+   ║  20-22: Bug Prophecy, Time Machine, Cognitive Load     ║
+   ║  23-25: Rubber Duck+, Changelog, Calibrator            ║
+   ║                                                          ║
+   ║  NEW — WORLD FIRST (v9.0):                             ║
+   ║  26. Error Autopsy (probabilistic root-cause ranking   ║
+   ║      + diagnosis tree before fixing any error)          ║
+   ║  27. Pair Naming Assistant (name quality scoring +     ║
+   ║      reverse check: does this name match the body?)    ║
+   ║  28. Focus Zone Detector (when do YOU code best?       ║
+   ║      peak window analytics from session timestamps)    ║
    ╚══════════════════════════════════════════════════════════╝
 """
 import json
@@ -58,7 +65,9 @@ app.secret_key = _raw_secret
 from datetime import timedelta
 app.config.update(
     SESSION_COOKIE_SAMESITE="Lax",
-    SESSION_COOKIE_SECURE=False,        # Must be False for http://localhost
+    # Auto-detect: True when HTTPS env var is set (production), False for localhost dev.
+    # Set  COOKIE_SECURE=true  in your production .env — never ship False on HTTPS.
+    SESSION_COOKIE_SECURE=os.getenv("COOKIE_SECURE", "false").lower() == "true",
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_NAME="codebuddy_session",
     PERMANENT_SESSION_LIFETIME=86400 * 30,  # 30-day sessions
@@ -76,7 +85,67 @@ if _SOCKETIO_OK:
     )
 else:
     socketio = None
-_collab_rooms = {}
+_collab_rooms = {}   # in-memory cache for fast SocketIO lookups (populated from DB on access)
+
+def _init_collab_table():
+    """Persist collab room metadata in SQLite so sessions survive restarts."""
+    conn = sqlite3.connect("codebuddy.db")
+    conn.execute("""CREATE TABLE IF NOT EXISTS collab_rooms(
+        room_code TEXT PRIMARY KEY,
+        chat_id   INTEGER NOT NULL,
+        chat_title TEXT DEFAULT 'Untitled',
+        host      TEXT NOT NULL,
+        host_id   INTEGER NOT NULL,
+        members   TEXT DEFAULT '[]',
+        created_at TEXT DEFAULT (datetime('now'))
+    )""")
+    conn.commit()
+    conn.close()
+
+_init_collab_table()
+
+def _room_load(room_code):
+    """Load a room from SQLite into the in-memory cache and return it (or None)."""
+    if room_code in _collab_rooms:
+        return _collab_rooms[room_code]
+    conn = sqlite3.connect("codebuddy.db")
+    conn.row_factory = sqlite3.Row
+    row = conn.execute("SELECT * FROM collab_rooms WHERE room_code=?", (room_code,)).fetchone()
+    conn.close()
+    if not row:
+        return None
+    room = {
+        "chat_id":    row["chat_id"],
+        "chat_title": row["chat_title"],
+        "host":       row["host"],
+        "host_id":    row["host_id"],
+        "members":    json.loads(row["members"] or "[]"),
+    }
+    _collab_rooms[room_code] = room
+    return room
+
+def _room_save(room_code, room):
+    """Persist room state back to SQLite."""
+    conn = sqlite3.connect("codebuddy.db")
+    conn.execute("""
+        INSERT INTO collab_rooms(room_code, chat_id, chat_title, host, host_id, members)
+        VALUES (?,?,?,?,?,?)
+        ON CONFLICT(room_code) DO UPDATE SET members=excluded.members
+    """, (
+        room_code, room["chat_id"], room["chat_title"],
+        room["host"], room["host_id"], json.dumps(room["members"])
+    ))
+    conn.commit()
+    conn.close()
+    _collab_rooms[room_code] = room
+
+def _room_delete(room_code):
+    """Remove room from SQLite and memory cache."""
+    _collab_rooms.pop(room_code, None)
+    conn = sqlite3.connect("codebuddy.db")
+    conn.execute("DELETE FROM collab_rooms WHERE room_code=?", (room_code,))
+    conn.commit()
+    conn.close()
 
 # ── Security headers on every response ──
 @app.after_request
@@ -220,6 +289,114 @@ def init_db():
         UNIQUE(user_id, key)
     )""")
 
+    # FIX 5: Share tokens — random token per shared chat prevents ID enumeration
+    c.execute("""CREATE TABLE IF NOT EXISTS share_tokens(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        token TEXT UNIQUE NOT NULL,
+        conversation_id INTEGER NOT NULL,
+        created_at TEXT DEFAULT (datetime('now'))
+    )""")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_share_tokens_token ON share_tokens(token)")
+
+    # FEATURE 17: Code Mood — per-user emotional state signals
+    c.execute("""CREATE TABLE IF NOT EXISTS mood_signals(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        conversation_id INTEGER NOT NULL,
+        mood TEXT NOT NULL,          -- 'frustrated' | 'confused' | 'confident' | 'neutral'
+        score REAL DEFAULT 0.0,      -- 0.0 (calm) → 1.0 (peak frustration)
+        detected_at TEXT DEFAULT (datetime('now'))
+    )""")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_mood_user ON mood_signals(user_id)")
+
+    # FEATURE 19: Code DNA — per-user coding style profile
+    c.execute("""CREATE TABLE IF NOT EXISTS code_dna(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER UNIQUE NOT NULL,
+        profile TEXT DEFAULT '{}',   -- JSON blob of style traits
+        sample_count INTEGER DEFAULT 0,
+        updated_at TEXT DEFAULT (datetime('now'))
+    )""")
+
+    # FEATURE 23: Rubber Duck+ — per-session duck mode state
+    c.execute("""CREATE TABLE IF NOT EXISTS duck_sessions(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        conversation_id INTEGER NOT NULL,
+        active INTEGER DEFAULT 1,
+        problem_statement TEXT DEFAULT '',
+        turn_count INTEGER DEFAULT 0,
+        started_at TEXT DEFAULT (datetime('now')),
+        UNIQUE(user_id, conversation_id)
+    )""")
+
+    # FEATURE 24: Personal Changelog — auto-generated learning diaries
+    c.execute("""CREATE TABLE IF NOT EXISTS changelogs(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        date TEXT NOT NULL,          -- YYYY-MM-DD
+        entry TEXT NOT NULL,         -- markdown diary entry
+        topics TEXT DEFAULT '[]',    -- JSON list of topic tags
+        generated_at TEXT DEFAULT (datetime('now')),
+        UNIQUE(user_id, date)
+    )""")
+
+    # FEATURE 25: Confidence Calibrator — question/answer/score records
+    c.execute("""CREATE TABLE IF NOT EXISTS confidence_records(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        topic TEXT NOT NULL,
+        self_rating INTEGER DEFAULT 5,     -- user's claimed confidence 1-10
+        actual_score INTEGER DEFAULT 0,    -- score from quiz 0-100
+        gap INTEGER DEFAULT 0,             -- actual_score - (self_rating*10)
+        questions TEXT DEFAULT '[]',       -- JSON quiz questions
+        answers TEXT DEFAULT '[]',         -- JSON user answers
+        created_at TEXT DEFAULT (datetime('now'))
+    )""")
+
+    # FEATURE 26: Error Autopsy — cached diagnosis trees per error
+    c.execute("""CREATE TABLE IF NOT EXISTS error_autopsies(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        error_hash TEXT NOT NULL,
+        error_text TEXT,
+        language TEXT,
+        diagnosis TEXT,   -- JSON: {causes, tree, verdict, fix}
+        created_at TEXT DEFAULT (datetime('now'))
+    )""")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_autopsy_user ON error_autopsies(user_id)")
+
+    # FEATURE 27: Pair Naming — history of naming suggestions per user
+    c.execute("""CREATE TABLE IF NOT EXISTS naming_history(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        original_name TEXT,
+        suggestions TEXT DEFAULT '[]',   -- JSON [{name,score,reasoning}]
+        code_snippet TEXT,
+        mode TEXT DEFAULT 'suggest',     -- 'suggest' | 'reverse'
+        created_at TEXT DEFAULT (datetime('now'))
+    )""")
+
+    # FEATURE 28: Focus Zone — per-session analytics for peak time detection
+    c.execute("""CREATE TABLE IF NOT EXISTS focus_sessions(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        session_date TEXT,        -- YYYY-MM-DD
+        hour_of_day INTEGER,      -- 0-23
+        day_of_week INTEGER,      -- 0=Mon 6=Sun
+        message_count INTEGER DEFAULT 0,
+        bugs_fixed INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now')),
+        UNIQUE(user_id, session_date, hour_of_day)
+    )""")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_focus_user ON focus_sessions(user_id)")
+    # MIGRATION: add unique constraint to focus_sessions if not present (fixes duplicate row bug)
+    # SQLite can't ALTER TABLE ADD CONSTRAINT, so we use a unique index instead —
+    # this enforces uniqueness on existing DBs created before this fix.
+    c.execute("""CREATE UNIQUE INDEX IF NOT EXISTS
+        idx_focus_unique ON focus_sessions(user_id, session_date, hour_of_day)
+    """)
+
     conn.commit()
 
     # ── MIGRATIONS ──
@@ -263,12 +440,27 @@ _ALLOWED_STAT_FIELDS = frozenset({
 })
 
 def bump_stat(user_id, field, amount=1):
-    """Securely increment a stat column using a whitelist."""
+    """Securely increment a stat column using a whitelist.
+
+    Uses a thread-local SQLite connection so we reuse one connection per
+    thread rather than opening (and immediately closing) a brand-new
+    connection for every single stat increment.  This eliminates hundreds
+    of short-lived sqlite3.connect() calls on busy endpoints.
+    """
     if field not in _ALLOWED_STAT_FIELDS:
         app.logger.warning(f"bump_stat: rejected unknown field '{field}'")
         return
+    import threading as _threading
+    _tl = getattr(bump_stat, "_tl", None)
+    if _tl is None:
+        bump_stat._tl = _threading.local()
+        _tl = bump_stat._tl
+    conn = getattr(_tl, "conn", None)
+    if conn is None:
+        conn = sqlite3.connect("codebuddy.db", check_same_thread=False)
+        conn.execute("PRAGMA journal_mode=WAL")
+        _tl.conn = conn
     # Safe because field is whitelisted — not user-supplied
-    conn = sqlite3.connect("codebuddy.db")
     conn.execute(f"""
         INSERT INTO user_stats(user_id, {field}, last_active)
         VALUES (?, ?, datetime('now'))
@@ -277,7 +469,6 @@ def bump_stat(user_id, field, amount=1):
             last_active = datetime('now')
     """, (user_id, amount, amount))
     conn.commit()
-    conn.close()
 
 def update_streak(user_id):
     """Update daily streak — call once per day per user."""
@@ -505,8 +696,9 @@ FREE_FALLBACKS = [
     "qwen/qwen3-coder:free",
     "mistralai/mistral-small-3.1-24b-instruct:free",
     "google/gemma-3-27b-it:free",
-    "openai/gpt-oss-20b:free",
-    "openrouter/free",  # last resort: OpenRouter auto-picks any working free model
+    # NOTE: "openai/gpt-oss-20b:free" removed — unverified model ID on OpenRouter free tier
+    "deepseek/deepseek-r1:free",          # Strong reasoning model, confirmed free
+    "openrouter/auto",                     # Last resort: OpenRouter picks any working free model
 ]
 
 def get_model_for_mode(mode, lang_code="en-US"):
@@ -882,6 +1074,7 @@ def login():
 
         if user and bcrypt.check_password_hash(user["password"], password):
             login_user(User(user["id"], user["username"]), remember=remember_me)
+            session.permanent = True
             update_streak(user["id"])
             return redirect(url_for("dashboard"))
 
@@ -1207,19 +1400,65 @@ def pin_chat():
 @app.route("/share_chat", methods=["POST"])
 @login_required
 def share_chat():
-    data = request.json
-    return jsonify({"share_url": f"/public_chat/{data['chat_id']}"})
+    """Generate a random share token for a chat and return its public URL.
 
-@app.route("/public_chat/<int:chat_id>")
-def public_chat(chat_id):
+    The token is stored in share_tokens so the public URL cannot be guessed
+    by enumerating sequential integer IDs.
+    """
+    data = request.json or {}
+    chat_id = data.get("chat_id")
+    if not chat_id:
+        return jsonify({"error": "chat_id required"}), 400
+
+    # Verify ownership before issuing a share link
     conn = sqlite3.connect("codebuddy.db")
     conn.row_factory = sqlite3.Row
+    owned = conn.execute(
+        "SELECT id FROM conversations WHERE id=? AND user_id=?",
+        (chat_id, current_user.id)
+    ).fetchone()
+    if not owned:
+        conn.close()
+        return jsonify({"error": "Chat not found"}), 404
+
+    # Re-use an existing token if the user already shared this chat
+    existing = conn.execute(
+        "SELECT token FROM share_tokens WHERE conversation_id=?", (chat_id,)
+    ).fetchone()
+    if existing:
+        token = existing["token"]
+    else:
+        token = secrets.token_urlsafe(24)   # 192 bits — effectively unguessable
+        conn.execute(
+            "INSERT INTO share_tokens(token, conversation_id) VALUES (?,?)",
+            (token, chat_id)
+        )
+        conn.commit()
+    conn.close()
+    return jsonify({"share_url": f"/public_chat/{token}"})
+
+
+@app.route("/public_chat/<token>")
+def public_chat(token):
+    """Public read-only view of a shared chat, accessed via an unguessable token."""
+    conn = sqlite3.connect("codebuddy.db")
+    conn.row_factory = sqlite3.Row
+
+    row = conn.execute(
+        "SELECT conversation_id FROM share_tokens WHERE token=?", (token,)
+    ).fetchone()
+    if not row:
+        conn.close()
+        return "Shared chat not found or link has expired.", 404
+
+    chat_id = row["conversation_id"]
     messages = conn.execute(
         "SELECT role, content, timestamp FROM messages WHERE conversation_id=? ORDER BY id ASC",
         (chat_id,)
     ).fetchall()
     convo = conn.execute("SELECT title FROM conversations WHERE id=?", (chat_id,)).fetchone()
     conn.close()
+
     if not messages:
         return "Chat not found", 404
     return render_template("public_chat.html",
@@ -1612,7 +1851,9 @@ def chat():
         return Response("Chat not found.", mimetype="text/plain")
 
     if mode not in ("interview", "roadmap"):
-        if not is_programming_related(user_message):
+        # Skip filter for non-English — filter cannot understand Tamil/Hindi etc.
+        _skip_filter = lang_code not in ("en-US", "", None)
+        if not _skip_filter and not is_programming_related(user_message):
             return Response(
                 "🚫 CodeBuddy is a programming-only assistant.\n\n"
                 "I can only help with: code, algorithms, debugging, software development, "
@@ -1657,6 +1898,17 @@ def chat():
     # CHANGE 5: Inject persistent memory into system prompt
     memory_context = build_memory_context(current_user.id)
 
+    # FEATURE 17: Detect developer mood from current message + history
+    _recent_hist = get_conversation_history(conversation_id, limit=6)
+    _mood_data   = _detect_mood(user_message, _recent_hist)
+    _save_mood(current_user.id, conversation_id, _mood_data["mood"], _mood_data["score"])
+
+    # FEATURE 23: Check if Rubber Duck+ Mode is active — overrides all system prompts
+    _duck_active, _duck_problem = _is_duck_active(current_user.id, conversation_id)
+
+    # FEATURE 19: Load Code DNA profile for style-matched responses
+    _dna_profile = _get_dna_profile(current_user.id)
+
     if mode == "interview":
         topic = session.get(f"topic_{conversation_id}")
         if not topic:
@@ -1685,6 +1937,10 @@ def chat():
         # the language mandate is at the beginning of the system prompt, not appended.
         # lang_instruction at END — LLMs obey the LAST instruction they see
         _base = SYSTEM_PROMPTS.get(mode, SYSTEM_PROMPTS["general"]) + _RESPECTFUL_TONE + memory_context
+        # Apply mood patch (Feature 17) — adapts tone/depth based on emotion signals
+        _base = _mood_system_patch(_base, _mood_data)
+        # Apply DNA patch (Feature 19) — style-matches code examples to user's own patterns
+        _base = _dna_system_patch(_base, _dna_profile)
         system_prompt = _base + ("\n\n" + lang_instruction if lang_instruction else "")
         if mode == "debug":
             bump_stat(current_user.id, "debug_count")
@@ -1692,6 +1948,15 @@ def chat():
             bump_stat(current_user.id, "optimize_count")
 
     bump_stat(current_user.id, "total_messages")
+
+    # FEATURE 28: Record timestamp for Focus Zone analytics
+    _record_focus_session(current_user.id, conversation_id)
+
+    # FEATURE 23: If Rubber Duck+ Mode is active, override system prompt entirely
+    if _duck_active:
+        system_prompt = _DUCK_SYSTEM.format(
+            problem=_duck_problem or user_message
+        )
 
     history = get_conversation_history(conversation_id, limit=16)
     api_messages = [{"role": "system", "content": system_prompt}]
@@ -1714,7 +1979,17 @@ def chat():
         "mr-IN": "⚠️ IMPORTANT: मराठी लिपीत मात्र उत्तर द्या. User ला 'तुम्ही' किंवा 'मित्रा' म्हणा — कधीही 'अरे' उद्धटपणे नाही. इंग्रजीत नाही. आत्ता उत्तर द्या: ",
         "gu-IN": "⚠️ IMPORTANT: ગુજરાતી લિપિમાં માત્ર જવાબ આપો. User ને 'આપ' અથવા 'મિત્ર' કહો — ક્યારેય 'અરે' અસભ્ય રીતે નહીં. અંગ્રેજીમાં નહીં. હવે જવાબ આપો: ",
         "pa-IN": "⚠️ IMPORTANT: ਪੰਜਾਬੀ ਲਿਪੀ ਵਿੱਚ ਹੀ ਜਵਾਬ ਦਿਓ। User ਨੂੰ 'ਤੁਸੀਂ' ਜਾਂ 'ਯਾਰ' ਕਹੋ — ਕਦੇ 'ਓਏ' ਬੇਅਦਬੀ ਨਾਲ ਨਹੀਂ। ਅੰਗਰੇਜ਼ੀ ਵਿੱਚ ਨਹੀਂ। ਹੁਣ ਜਵਾਬ ਦਿਓ: ",
-        "ta-en": "⚠️ IMPORTANT: Reply in Tanglish ONLY (Tamil words in Roman letters + English tech words). RESPECTFUL tone — say 'neenga'/'ungalukku'/'paarunga'. NEVER casual 'da/bro/machaa/dei/ey'. Example: 'Neenga kekkura question-ku solren — indha function-la loop irukku, paarunga'. NO pure English. NO Tamil unicode. Answer: ",
+        "ta-en": "⚠️ Reply in Tanglish ONLY (Tamil in Roman letters + English tech). Respectful: neenga/ungalukku. NO pure English. NO Tamil unicode. Answer: ",
+        "fr-FR": "⚠️ Réponds UNIQUEMENT en français. Pas d'anglais. Réponds maintenant: ",
+        "de-DE": "⚠️ Antworte NUR auf Deutsch. Kein Englisch. Antworte jetzt: ",
+        "es-ES": "⚠️ Responde SOLO en español. Sin inglés. Responde ahora: ",
+        "ja-JP": "⚠️ 日本語のみで答えてください。英語禁止。今すぐ答えてください：",
+        "zh-CN": "⚠️ 只用中文回答。不用英语。现在回答：",
+        "ko-KR": "⚠️ 한국어로만 답하세요. 영어 금지. 지금 답하세요: ",
+        "ar-SA": "⚠️ أجب باللغة العربية فقط. لا إنجليزية. أجب الآن: ",
+        "ru-RU": "⚠️ Отвечай ТОЛЬКО на русском. Без английского. Отвечай сейчас: ",
+        "pt-BR": "⚠️ Responda SOMENTE em português. Sem inglês. Responda agora: ",
+        "it-IT": "⚠️ Rispondi SOLO in italiano. Senza inglese. Rispondi ora: ",
     }
     reminder_prefix = INDIC_REMINDER.get(lang_code)
     if reminder_prefix:
@@ -1734,7 +2009,9 @@ def chat():
         "fr-FR":"D'accord, en français:","de-DE":"Gut, auf Deutsch:",
         "es-ES":"De acuerdo, en español:","ja-JP":"わかりました：",
         "zh-CN":"好的，用中文：","ko-KR":"알겠습니다:",
-        "ar-SA":"حسناً:","ru-RU":"Хорошо:","pt-BR":"Certo:",
+        "ar-SA":"حسناً، سأشرح باللغة العربية:","ru-RU":"Хорошо, объясню на русском:",
+        "pt-BR":"Certo, vou explicar em português:","it-IT":"Bene, spiegherò in italiano:",
+        "pa-IN":"ਠੀਕ ਹੈ, ਪੰਜਾਬੀ ਵਿੱਚ ਦੱਸਦਾ ਹਾਂ:","gu-IN":"ઠીક છે, ગુજરાતીમાં સમજાવું છું:",
     }
     if lang_code in INDIC_SEED:
         api_messages.append({"role":"assistant","content":INDIC_SEED[lang_code]})
@@ -1836,13 +2113,22 @@ def chat():
 
         if stream_buf:
             yield _filter_response(stream_buf)
+        # FEATURE 17: Append mood nudge after response if user is frustrated
+        if _mood_data.get("nudge"):
+            yield _mood_data["nudge"]
         if full:
             full = _filter_response(full)
             # Auto-translate: if AI replied in English despite non-English selection
             if lang_code not in ("en-US","",None):
-                _ranges={"ta-IN":(0x0B80,0x0BFF),"hi-IN":(0x0900,0x097F),
+                _ranges={
+                    "ta-IN":(0x0B80,0x0BFF),"hi-IN":(0x0900,0x097F),
                     "te-IN":(0x0C00,0x0C7F),"kn-IN":(0x0C80,0x0CFF),
-                    "ml-IN":(0x0D00,0x0D7F),"bn-IN":(0x0980,0x09FF),"mr-IN":(0x0900,0x097F)}
+                    "ml-IN":(0x0D00,0x0D7F),"bn-IN":(0x0980,0x09FF),
+                    "mr-IN":(0x0900,0x097F),"pa-IN":(0x0A00,0x0A7F),
+                    "gu-IN":(0x0A80,0x0AFF),"ja-JP":(0x3040,0x30FF),
+                    "zh-CN":(0x4E00,0x9FFF),"ko-KR":(0xAC00,0xD7FF),
+                    "ar-SA":(0x0600,0x06FF),"ru-RU":(0x0400,0x04FF),
+                }
                 _lo,_hi=_ranges.get(lang_code,(0,0))
                 _english=(_lo==0) or not any(_lo<=ord(c)<=_hi for c in full[:300])
                 if _english:
@@ -1867,7 +2153,8 @@ def chat():
                             if _tr.status_code==200:
                                 _t=_tr.json()["choices"][0]["message"]["content"].strip()
                                 if _t and len(_t)>10:
-                                    yield "\n\n"+_t;full=_t;break
+                                    yield "\n\n---TRANSLATION---\n"+_t
+                                    full=_t;break
                     except Exception as _e:
                         app.logger.warning(f"Auto-translate: {_e}")
             save_conn=sqlite3.connect("codebuddy.db")
@@ -2602,6 +2889,10 @@ def battle_join():
     if not battle:
         conn.close()
         return jsonify({"error": "Battle not found or already started"}), 404
+
+    if battle["creator_id"] == current_user.id:
+        conn.close()
+        return jsonify({"error": "You cannot join your own battle — share the ID with another player!"}), 400
 
     try:
         conn.execute(
@@ -4213,12 +4504,13 @@ def collab_chat():
         return Response("Please enter a message.", mimetype="text/plain")
 
     if room_code:
-        room = _collab_rooms.get(room_code)
+        room = _room_load(room_code)
         if not room:
             return Response("⚠ Collab session expired. Please create a new session.", mimetype="text/plain")
         # Auto-add member if they joined via link
         if current_user.username not in room.get("members", []):
             room["members"].append(current_user.username)
+            _room_save(room_code, room)
         conversation_id = str(room["chat_id"])
 
     if not conversation_id:
@@ -4343,13 +4635,14 @@ def collab_create():
     if not chat:
         return jsonify({"error": "Chat not found"}), 404
     room_code = ''.join(_random.choices(_string.ascii_lowercase + _string.digits, k=8))
-    _collab_rooms[room_code] = {
-        "chat_id": chat_id,
+    room = {
+        "chat_id":    chat_id,
         "chat_title": chat["title"] or "Untitled",
-        "host": current_user.username,
-        "host_id": current_user.id,
-        "members": [current_user.username],
+        "host":       current_user.username,
+        "host_id":    current_user.id,
+        "members":    [current_user.username],
     }
+    _room_save(room_code, room)
     collab_url = url_for("collab_page", room_code=room_code, _external=True)
     return jsonify({"room_code": room_code, "collab_url": collab_url, "chat_title": chat["title"] or "Untitled"})
 
@@ -4357,11 +4650,12 @@ def collab_create():
 @app.route("/collab/<room_code>")
 @login_required
 def collab_page(room_code):
-    room = _collab_rooms.get(room_code)
+    room = _room_load(room_code)
     if not room:
         return "<h2 style='font-family:monospace;color:#ff6b2b;padding:40px'>Session expired. <a href='/'>Go back</a></h2>", 404
     if current_user.username not in room["members"]:
         room["members"].append(current_user.username)
+        _room_save(room_code, room)
     conn = sqlite3.connect("codebuddy.db")
     conn.row_factory = sqlite3.Row
     messages = conn.execute(
@@ -4379,12 +4673,12 @@ def collab_page(room_code):
 @app.route("/collab/<room_code>/end", methods=["POST"])
 @login_required
 def collab_end(room_code):
-    room = _collab_rooms.get(room_code)
+    room = _room_load(room_code)
     if not room:
         return jsonify({"error": "Room not found"}), 404
     if room["host_id"] != current_user.id:
         return jsonify({"error": "Only host can end"}), 403
-    _collab_rooms.pop(room_code, None)
+    _room_delete(room_code)
     if socketio:
         socketio.emit("session_ended", {"message": "Host ended the session"}, room=room_code)
     return jsonify({"ended": True})
@@ -4397,7 +4691,7 @@ if _SOCKETIO_OK and socketio:
         room_code = data.get("room_code"); username = data.get("username")
         if not room_code or not username: return
         join_room(room_code)
-        room = _collab_rooms.get(room_code, {})
+        room = _room_load(room_code) or {}
         emit("user_joined", {"username": username, "members": room.get("members", []), "message": f"{username} joined"}, room=room_code)
 
     @socketio.on("leave_collab")
@@ -4405,9 +4699,12 @@ if _SOCKETIO_OK and socketio:
         room_code = data.get("room_code"); username = data.get("username")
         if not room_code: return
         leave_room(room_code)
-        room = _collab_rooms.get(room_code, {})
-        if username in room.get("members", []): room["members"].remove(username)
-        emit("user_left", {"username": username, "members": room.get("members", []), "message": f"{username} left"}, room=room_code)
+        room = _room_load(room_code)
+        if room:
+            if username in room.get("members", []):
+                room["members"].remove(username)
+                _room_save(room_code, room)
+        emit("user_left", {"username": username, "members": (room or {}).get("members", []), "message": f"{username} left"}, room=room_code)
 
     @socketio.on("collab_message")
     def on_msg(data):
@@ -4428,6 +4725,2145 @@ if _SOCKETIO_OK and socketio:
     def on_voice(data):
         room_code = data.get("room_code")
         if room_code: emit("voice_state_update", data, room=room_code)
+
+
+
+# ═══════════════════════════════════════════════════════════════
+# FEATURE 17 — CODE MOOD ENGINE
+# World-first: Detects developer emotional state from message
+# patterns (typos, repetition, frustration words, message length)
+# and automatically adapts AI tone + explanation depth.
+# No coding AI has ever done real-time emotion-aware adaptation.
+# ═══════════════════════════════════════════════════════════════
+
+_FRUSTRATION_SIGNALS = [
+    # Explicit frustration words
+    r"\b(wtf|damn|ugh|argh|ffs|shit|crap|broken|hate|stupid|useless|garbage)\b",
+    # Repeated punctuation (!!!, ???)
+    r"[!?]{2,}",
+    # ALL CAPS words (shouting)
+    r"\b[A-Z]{4,}\b",
+    # "still not working", "again", "still broken"
+    r"\b(still|again|keeps?|always|never\s+works?)\b",
+    # Very short angry messages
+]
+
+_CONFUSION_SIGNALS = [
+    r"\b(don'?t\s+understand|confused|lost|what\s+does|why\s+does|how\s+does|huh|idk|no\s+idea)\b",
+    r"\?{2,}",    # Multiple question marks
+    r"\b(what|why|how)\b.*\?",
+]
+
+_CONFIDENCE_SIGNALS = [
+    r"\b(thank|thanks|got\s+it|works?|fixed|solved|perfect|great|awesome|understood)\b",
+    r"\b(can\s+you\s+also|next|now\s+let'?s|what\s+about)\b",
+]
+
+
+def _detect_mood(message: str, recent_messages: list) -> dict:
+    """Analyse the current message + recent history to detect developer mood.
+
+    Returns:
+        {"mood": str, "score": float, "nudge": str, "depth_shift": int}
+        depth_shift: -1 = simplify, 0 = same, +1 = go deeper
+    """
+    msg_lower = message.lower()
+    frustration = 0.0
+    confusion   = 0.0
+    confidence  = 0.0
+
+    # Signal scoring on current message
+    for pat in _FRUSTRATION_SIGNALS:
+        if re.search(pat, msg_lower):
+            frustration += 0.3
+    for pat in _CONFUSION_SIGNALS:
+        if re.search(pat, msg_lower):
+            confusion += 0.3
+    for pat in _CONFIDENCE_SIGNALS:
+        if re.search(pat, msg_lower):
+            confidence += 0.4
+
+    # Very short messages after a long exchange = impatience
+    if len(message.split()) <= 4 and len(recent_messages) > 4:
+        frustration += 0.2
+
+    # Repeated question on same topic = confusion persisting
+    if recent_messages:
+        last_user_msgs = [m["content"].lower() for m in recent_messages if m["role"] == "user"][-3:]
+        for prev in last_user_msgs:
+            common = set(msg_lower.split()) & set(prev.split()) - {"the", "a", "is", "my", "i"}
+            if len(common) >= 3:
+                confusion += 0.2
+                break
+
+    # Typo density (simple heuristic: very short words clustered)
+    words = message.split()
+    tiny = sum(1 for w in words if len(w) <= 2 and w.isalpha())
+    if len(words) > 5 and tiny / len(words) > 0.35:
+        frustration += 0.15
+
+    # Normalise
+    frustration = min(frustration, 1.0)
+    confusion   = min(confusion,   1.0)
+    confidence  = min(confidence,  1.0)
+
+    if confidence > 0.4:
+        mood = "confident"
+        nudge = ""
+        depth_shift = 1    # they're getting it — go a bit deeper
+    elif frustration > 0.5:
+        mood = "frustrated"
+        nudge = "\n\n💙 *Hang in there — bugs are just puzzles in disguise. Let\'s crack this together.*"
+        depth_shift = -1   # simplify, be warmer
+    elif confusion > 0.4:
+        mood = "confused"
+        nudge = ""
+        depth_shift = -1   # simplify and add more examples
+    else:
+        mood = "neutral"
+        nudge = ""
+        depth_shift = 0
+
+    score = max(frustration, confusion, confidence)
+    return {"mood": mood, "score": round(score, 2), "nudge": nudge, "depth_shift": depth_shift}
+
+
+def _mood_system_patch(base_prompt: str, mood_data: dict) -> str:
+    """Patch the system prompt based on detected mood."""
+    depth = mood_data["depth_shift"]
+    mood  = mood_data["mood"]
+
+    patch = ""
+    if mood == "frustrated":
+        patch = (
+            "\n\nMOOD ALERT — USER IS FRUSTRATED: "
+            "Be extra warm, calm, and reassuring. "
+            "Skip theory — go straight to the fix. "
+            "Use very short sentences. "
+            "Start your response with empathy before the solution."
+        )
+    elif mood == "confused":
+        patch = (
+            "\n\nMOOD ALERT — USER IS CONFUSED: "
+            "Simplify everything. Use a real-world analogy first. "
+            "Break into tiny numbered steps. "
+            "Add a beginner-friendly example. "
+            "Avoid jargon entirely."
+        )
+    elif mood == "confident":
+        patch = (
+            "\n\nMOOD SIGNAL — USER IS CONFIDENT: "
+            "They\'re progressing well — you can go slightly deeper, "
+            "mention edge cases, and skip basic explanations."
+        )
+
+    return base_prompt + patch
+
+
+def _save_mood(user_id, conversation_id, mood, score):
+    """Persist mood signal to DB for analytics."""
+    try:
+        conn = sqlite3.connect("codebuddy.db")
+        conn.execute(
+            "INSERT INTO mood_signals(user_id, conversation_id, mood, score) VALUES (?,?,?,?)",
+            (user_id, conversation_id, mood, score)
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+
+@app.route("/mood/history")
+@login_required
+def mood_history():
+    """Return recent mood signals for the current user — used by the frontend
+    to render a mood sparkline on the profile/stats page."""
+    conn = sqlite3.connect("codebuddy.db")
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute("""
+        SELECT mood, score, detected_at
+        FROM mood_signals
+        WHERE user_id=?
+        ORDER BY id DESC LIMIT 50
+    """, (current_user.id,)).fetchall()
+    conn.close()
+
+    # Summarise counts
+    counts = {"frustrated": 0, "confused": 0, "confident": 0, "neutral": 0}
+    for r in rows:
+        counts[r["mood"]] = counts.get(r["mood"], 0) + 1
+
+    return jsonify({
+        "recent": [dict(r) for r in rows],
+        "summary": counts,
+        "dominant_mood": max(counts, key=counts.get) if rows else "neutral",
+    })
+
+
+# ═══════════════════════════════════════════════════════════════
+# FEATURE 18 — DEAD CODE ARCHAEOLOGIST
+# World-first: AI doesn't just FLAG unreachable code —
+# it explains WHY each piece is dead (wrong condition, shadowed
+# variable, unreachable branch) and returns a call-graph JSON
+# so the frontend can render a visual "burial map".
+# ═══════════════════════════════════════════════════════════════
+
+@app.route("/dead_code", methods=["POST"])
+@login_required
+@rate_limit(max_calls=15, window=60)
+def dead_code_archaeologist():
+    """Analyse a file for dead/unreachable code and return a call-graph + burial map.
+
+    Input JSON:
+      code     : full source code (up to 8000 chars)
+      language : programming language name
+
+    Returns JSON:
+      dead_blocks : list of {label, start_line, end_line, reason, severity}
+      call_graph  : list of {caller, callee} edges
+      summary     : one-paragraph plain-English burial report
+      total_dead_lines : int
+    """
+    data     = request.get_json(silent=True) or {}
+    code     = (data.get("code") or "").strip()[:8000]
+    language = (data.get("language") or "python").strip()
+
+    if not code:
+        return jsonify({"error": "No code provided"}), 400
+
+    system_prompt = """You are the Dead Code Archaeologist — a world-class static analysis AI.
+
+Your job: analyse source code and produce a JSON report with TWO sections.
+
+Return ONLY a raw JSON object (no markdown, no extra text):
+
+{
+  "dead_blocks": [
+    {
+      "label": "function or block name",
+      "start_line": <int>,
+      "end_line": <int>,
+      "reason": "Plain English: WHY is this dead? (e.g. 'This branch can never be reached because X is always > 0 at this point', 'This function is defined but never called anywhere in the file', 'Shadowed by a redefinition on line N')",
+      "severity": "zombie" | "ghost" | "fossil",
+      "fix": "One-line suggestion to either remove or revive this code"
+    }
+  ],
+  "call_graph": [
+    {"caller": "function_name_or_module", "callee": "function_name"},
+    ...
+  ],
+  "summary": "2-3 sentence plain-English burial report: how much dead code, what patterns caused it, what to do.",
+  "total_dead_lines": <int>
+}
+
+Severity levels:
+- zombie : code that RUNS but has no effect (result always discarded / condition always same)
+- ghost  : code that is defined but NEVER called or reachable
+- fossil : old/commented-like code left from a previous version, now superseded
+
+call_graph must include ALL function calls you can detect — both live and dead nodes.
+If no dead code found, return empty dead_blocks array with a positive summary."""
+
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": MODELS["code"],
+        "max_tokens": 2000,
+        "temperature": 0.1,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user",   "content": f"Language: {language}\n\nCode:\n```{language}\n{code}\n```"},
+        ],
+    }
+
+    models_to_try = [MODELS["code"], MODELS["fast"]] + FREE_FALLBACKS[:3]
+    last_err = "Unknown"
+
+    for model in models_to_try:
+        try:
+            payload["model"] = model
+            resp = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers, json=payload, timeout=35
+            )
+            if resp.status_code not in (200, 201):
+                last_err = f"HTTP {resp.status_code}"
+                continue
+            raw = resp.json()["choices"][0]["message"]["content"].strip()
+            raw = re.sub(r"```json|```", "", raw).strip()
+            result = json.loads(raw)
+
+            # Guarantee required keys exist
+            result.setdefault("dead_blocks", [])
+            result.setdefault("call_graph", [])
+            result.setdefault("summary", "Analysis complete.")
+            result.setdefault("total_dead_lines", sum(
+                max(0, b.get("end_line", 0) - b.get("start_line", 0) + 1)
+                for b in result["dead_blocks"]
+            ))
+            return jsonify(result)
+
+        except (requests.RequestException, json.JSONDecodeError, KeyError, ValueError) as exc:
+            last_err = str(exc)
+            continue
+
+    return jsonify({
+        "error": f"Analysis failed: {last_err}",
+        "dead_blocks": [], "call_graph": [], "summary": "", "total_dead_lines": 0
+    }), 503
+
+
+# ═══════════════════════════════════════════════════════════════
+# FEATURE 19 — CODE DNA FINGERPRINTING
+# World-first: Builds a personal coding style profile from ALL
+# of a user's past code samples. AI responses are then
+# style-matched to the user's OWN DNA — indentation, naming
+# conventions, preferred patterns, recurring mistakes.
+# No AI coding assistant has ever auto-adapted to personal style
+# extracted from conversation history.
+# ═══════════════════════════════════════════════════════════════
+
+def _extract_code_samples(user_id: int, limit: int = 30) -> list:
+    """Pull recent code blocks from the user's message history."""
+    conn = sqlite3.connect("codebuddy.db")
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute("""
+        SELECT m.content FROM messages m
+        JOIN conversations c ON m.conversation_id = c.id
+        WHERE c.user_id = ? AND m.role = 'user'
+        ORDER BY m.id DESC LIMIT 200
+    """, (user_id,)).fetchall()
+    conn.close()
+
+    samples = []
+    for row in rows:
+        content = row["content"]
+        # Extract fenced code blocks
+        blocks = re.findall(r"```[\w]*\n?([\s\S]+?)```", content)
+        samples.extend(blocks)
+        if len(samples) >= limit:
+            break
+    return samples[:limit]
+
+
+def _build_dna_profile(user_id: int) -> dict:
+    """Analyse code samples and build/update the user's Code DNA profile.
+    Returns the profile dict (also saved to DB).
+    """
+    samples = _extract_code_samples(user_id)
+    if not samples:
+        return {}
+
+    combined = "\n\n---SAMPLE---\n\n".join(samples[:15])
+
+    system_prompt = """You are a coding style analyst. Given several code samples from one developer,
+extract their personal coding DNA. Return ONLY a raw JSON object (no markdown):
+
+{
+  "indent_style": "spaces" | "tabs",
+  "indent_size": <int>,
+  "naming_convention": "snake_case" | "camelCase" | "PascalCase" | "mixed",
+  "prefers_verbose": true | false,
+  "common_patterns": ["list comprehensions", "ternary expressions", ...],
+  "common_mistakes": ["off-by-one in loops", "missing null checks", ...],
+  "preferred_languages": ["python", "javascript", ...],
+  "comment_style": "heavy" | "moderate" | "minimal" | "none",
+  "error_handling": "try-except heavy" | "minimal" | "none observed",
+  "style_summary": "2-sentence plain English summary of this developer's coding personality"
+}
+
+Be specific and honest. If a pattern is unclear, omit that key rather than guessing."""
+
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": MODELS["fast"],
+        "max_tokens": 500,
+        "temperature": 0.2,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user",   "content": f"Code samples:\n\n{combined[:4000]}"},
+        ],
+    }
+
+    try:
+        resp = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=headers, json=payload, timeout=25
+        )
+        raw = resp.json()["choices"][0]["message"]["content"].strip()
+        raw = re.sub(r"```json|```", "", raw).strip()
+        profile = json.loads(raw)
+    except Exception as exc:
+        app.logger.warning(f"DNA build failed for user {user_id}: {exc}")
+        return {}
+
+    # Persist to DB
+    try:
+        conn = sqlite3.connect("codebuddy.db")
+        conn.execute("""
+            INSERT INTO code_dna(user_id, profile, sample_count, updated_at)
+            VALUES (?, ?, ?, datetime('now'))
+            ON CONFLICT(user_id) DO UPDATE SET
+                profile = excluded.profile,
+                sample_count = excluded.sample_count,
+                updated_at = excluded.updated_at
+        """, (user_id, json.dumps(profile), len(samples)))
+        conn.commit()
+        conn.close()
+    except Exception as exc:
+        app.logger.warning(f"DNA DB save failed: {exc}")
+
+    return profile
+
+
+def _get_dna_profile(user_id: int) -> dict:
+    """Return cached DNA profile from DB, or empty dict if none yet."""
+    try:
+        conn = sqlite3.connect("codebuddy.db")
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT profile, sample_count, updated_at FROM code_dna WHERE user_id=?",
+            (user_id,)
+        ).fetchone()
+        conn.close()
+        if row:
+            return {
+                **json.loads(row["profile"] or "{}"),
+                "_sample_count": row["sample_count"],
+                "_updated_at": row["updated_at"],
+            }
+    except Exception:
+        pass
+    return {}
+
+
+def _dna_system_patch(base_prompt: str, profile: dict) -> str:
+    """Inject the user's Code DNA into the system prompt so AI matches their style."""
+    if not profile:
+        return base_prompt
+
+    traits = []
+    if profile.get("indent_style") and profile.get("indent_size"):
+        traits.append(f"use {profile['indent_size']}-{profile['indent_style']} indentation")
+    if profile.get("naming_convention"):
+        traits.append(f"use {profile['naming_convention']} naming")
+    if profile.get("comment_style") == "heavy":
+        traits.append("add detailed inline comments (this user loves comments)")
+    elif profile.get("comment_style") == "minimal":
+        traits.append("keep comments minimal (user prefers clean code)")
+    if profile.get("prefers_verbose") is True:
+        traits.append("be explicit and verbose — this user prefers clarity over brevity")
+    if profile.get("error_handling") == "try-except heavy":
+        traits.append("always wrap risky code in try-except blocks")
+    if profile.get("common_patterns"):
+        patterns = ", ".join(profile["common_patterns"][:3])
+        traits.append(f"prefer these patterns when natural: {patterns}")
+
+    if not traits:
+        return base_prompt
+
+    dna_instruction = (
+        "\n\nCODE DNA — MATCH THIS USER'S PERSONAL CODING STYLE:\n"
+        "When writing code examples, " + "; ".join(traits) + ". "
+        "Do not explain these style choices — just apply them silently."
+    )
+    return base_prompt + dna_instruction
+
+
+@app.route("/dna/build", methods=["POST"])
+@login_required
+@rate_limit(max_calls=5, window=60)
+def dna_build():
+    """Trigger a fresh Code DNA analysis from the user's conversation history.
+
+    Returns the new profile immediately.
+    """
+    profile = _build_dna_profile(current_user.id)
+    if not profile:
+        return jsonify({"error": "Not enough code samples yet. Paste some code in chat first!"}), 400
+    return jsonify({"profile": profile, "status": "built"})
+
+
+@app.route("/dna/me")
+@login_required
+def dna_me():
+    """Return the current user's Code DNA profile."""
+    profile = _get_dna_profile(current_user.id)
+    if not profile:
+        return jsonify({"profile": None, "message": "No DNA profile yet — paste some code in chat to build one!"})
+    return jsonify({"profile": profile})
+
+
+@app.route("/dna/patch_preview", methods=["POST"])
+@login_required
+def dna_patch_preview():
+    """Preview what the DNA style patch looks like for the user — useful for the UI
+    to show 'Your coding style is being applied' confirmation badge."""
+    profile = _get_dna_profile(current_user.id)
+    if not profile:
+        return jsonify({"active": False, "traits": []})
+
+    traits = []
+    if profile.get("indent_style"):
+        traits.append(f"{profile.get('indent_size', 4)}-{profile['indent_style']} indent")
+    if profile.get("naming_convention"):
+        traits.append(profile["naming_convention"])
+    if profile.get("comment_style"):
+        traits.append(f"{profile['comment_style']} comments")
+    if profile.get("prefers_verbose") is True:
+        traits.append("verbose style")
+    if profile.get("error_handling") and "heavy" in profile["error_handling"]:
+        traits.append("try-except blocks")
+
+    return jsonify({
+        "active": bool(traits),
+        "traits": traits,
+        "summary": profile.get("style_summary", ""),
+        "sample_count": profile.get("_sample_count", 0),
+        "updated_at": profile.get("_updated_at", ""),
+    })
+
+# ═══════════════════════════════════════════════════════════════
+# FEATURE 20 — BUG PROPHECY ENGINE
+# World-first: Scans the user's OWN historical bug fixes (past
+# debug sessions stored in their conversation history) to build
+# a personal bug fingerprint, then analyses NEW code to predict
+# which lines are likely to cause the SAME class of bugs the user
+# has personally struggled with before.
+#
+# Unlike static analysis (which is generic), this is temporal and
+# personalised — "you have written this pattern 4 times and fixed
+# a NullPointerError in it 3 times. Line 27 will break the same
+# way." No coding AI does this anywhere in the world.
+# ═══════════════════════════════════════════════════════════════
+
+def _init_prophecy_table():
+    conn = sqlite3.connect("codebuddy.db")
+    conn.execute("""CREATE TABLE IF NOT EXISTS bug_fingerprints(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER UNIQUE,
+        fingerprint TEXT,   -- JSON: list of {pattern, bug_type, count, example_fix}
+        updated_at TEXT
+    )""")
+    conn.commit()
+    conn.close()
+
+_init_prophecy_table()
+
+
+def _collect_user_bug_history(user_id: int) -> str:
+    """Pull past debug-mode conversations to build the user's bug fingerprint."""
+    conn = sqlite3.connect("codebuddy.db")
+    conn.row_factory = sqlite3.Row
+    # Fetch messages from conversations that were in 'debug' mode
+    rows = conn.execute("""
+        SELECT m.content, m.role
+        FROM messages m
+        JOIN conversations c ON m.conversation_id = c.id
+        WHERE c.user_id = ? AND c.mode = 'debug'
+        ORDER BY m.id DESC LIMIT 120
+    """, (user_id,)).fetchall()
+    conn.close()
+
+    if not rows:
+        return ""
+
+    # Build a compact representation: user code → assistant fix pairs
+    pairs = []
+    buf = {"user": "", "assistant": ""}
+    for row in reversed(rows):
+        if row["role"] == "user":
+            buf["user"] = row["content"][:400]
+        elif row["role"] == "assistant" and buf["user"]:
+            pairs.append(f"USER CODE:\n{buf['user']}\nFIX:\n{row['content'][:400]}")
+            buf = {"user": "", "assistant": ""}
+        if len(pairs) >= 15:
+            break
+
+    return "\n\n---\n\n".join(pairs)
+
+
+@app.route("/prophecy/build", methods=["POST"])
+@login_required
+@rate_limit(max_calls=5, window=60)
+def prophecy_build():
+    """Build / refresh the user's personal bug fingerprint from their debug history.
+
+    Returns JSON:
+      patterns : list of {pattern, bug_type, count, example_fix}
+      summary  : plain English description of the user's bug personality
+    """
+    history = _collect_user_bug_history(current_user.id)
+    if not history:
+        return jsonify({
+            "patterns": [],
+            "summary": "No debug history yet. Use Debug mode a few times and come back.",
+        })
+
+    system_prompt = """You are a Bug Prophecy Analyst. Given a developer's history of bugs and fixes,
+extract their personal bug fingerprint — the recurring mistake patterns unique to this person.
+
+Return ONLY a raw JSON object (no markdown):
+{
+  "patterns": [
+    {
+      "pattern": "short code pattern or habit that causes bugs (e.g. 'off-by-one in slice indices', 'forgetting to handle None return values')",
+      "bug_type": "category (e.g. IndexError, NullPointer, LogicError, TypeError, RaceCondition)",
+      "count": <estimated number of times seen in history>,
+      "example_fix": "one sentence: what the fix always looks like",
+      "risk_keywords": ["list", "of", "code", "words", "that", "trigger", "this", "pattern"]
+    }
+  ],
+  "summary": "2-sentence plain English description of this developer's personal bug personality",
+  "dominant_weakness": "the single most common mistake category"
+}
+
+Be specific and honest. If a pattern only appears once, omit it. Focus on RECURRING patterns."""
+
+    headers = {"Authorization": f"Bearer {OPENROUTER_API_KEY}", "Content-Type": "application/json"}
+    payload = {
+        "model": MODELS["fast"],
+        "max_tokens": 800,
+        "temperature": 0.2,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user",   "content": f"Debug history:\n\n{history[:5000]}"},
+        ],
+    }
+
+    for model in [MODELS["fast"]] + FREE_FALLBACKS[:2]:
+        try:
+            payload["model"] = model
+            resp = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers, json=payload, timeout=25
+            )
+            if resp.status_code != 200:
+                continue
+            raw = resp.json()["choices"][0]["message"]["content"].strip()
+            raw = re.sub(r"```json|```", "", raw).strip()
+            result = json.loads(raw)
+
+            # Persist fingerprint
+            conn = sqlite3.connect("codebuddy.db")
+            conn.execute("""
+                INSERT INTO bug_fingerprints(user_id, fingerprint, updated_at)
+                VALUES (?,?,datetime('now'))
+                ON CONFLICT(user_id) DO UPDATE SET
+                    fingerprint=excluded.fingerprint,
+                    updated_at=excluded.updated_at
+            """, (current_user.id, json.dumps(result)))
+            conn.commit()
+            conn.close()
+
+            return jsonify(result)
+        except (requests.RequestException, json.JSONDecodeError, KeyError, ValueError) as exc:
+            app.logger.warning(f"prophecy_build model={model} err={exc}")
+            continue
+
+    return jsonify({"error": "AI unavailable — try again shortly."}), 503
+
+
+@app.route("/prophecy/predict", methods=["POST"])
+@login_required
+@rate_limit(max_calls=15, window=60)
+def prophecy_predict():
+    """Predict which lines in new code will trigger the user's personal bug patterns.
+
+    Input JSON:
+      code     : source code to analyse (up to 6000 chars)
+      language : programming language
+
+    Returns JSON:
+      predictions : list of {line, code_snippet, matched_pattern, bug_type,
+                              probability, explanation, suggested_fix}
+      prophecy_score : 0-100 overall risk score for this file
+      safe           : true if no personal patterns detected
+    """
+    data     = request.get_json(silent=True) or {}
+    code     = (data.get("code") or "").strip()[:6000]
+    language = (data.get("language") or "python").strip()
+
+    if not code:
+        return jsonify({"error": "No code provided"}), 400
+
+    # Load personal fingerprint
+    conn = sqlite3.connect("codebuddy.db")
+    conn.row_factory = sqlite3.Row
+    row = conn.execute(
+        "SELECT fingerprint FROM bug_fingerprints WHERE user_id=?", (current_user.id,)
+    ).fetchone()
+    conn.close()
+
+    if not row:
+        return jsonify({
+            "predictions": [],
+            "prophecy_score": 0,
+            "safe": True,
+            "message": "Run /prophecy/build first to create your personal bug fingerprint.",
+        })
+
+    try:
+        fingerprint = json.loads(row["fingerprint"])
+    except (json.JSONDecodeError, TypeError):
+        return jsonify({"error": "Corrupted fingerprint — please rebuild."}), 500
+
+    patterns_text = json.dumps(fingerprint.get("patterns", []), indent=2)
+
+    system_prompt = f"""You are the Bug Prophecy Engine. You have been given:
+1. A developer's PERSONAL bug fingerprint (their recurring mistake patterns from history)
+2. A new piece of code they just wrote
+
+Your job: scan the new code line-by-line and predict which specific lines are likely to trigger
+the same bugs this developer has personally struggled with before.
+
+PERSONAL BUG FINGERPRINT:
+{patterns_text}
+
+Return ONLY a raw JSON object (no markdown):
+{{
+  "predictions": [
+    {{
+      "line": <int — line number>,
+      "code_snippet": "the exact problematic line or expression",
+      "matched_pattern": "which pattern from the fingerprint this matches",
+      "bug_type": "e.g. IndexError, NullPointer, etc.",
+      "probability": <0.0-1.0 — how confident you are this will break>,
+      "explanation": "1-2 sentences: WHY this specific line matches their historical weakness",
+      "suggested_fix": "concrete one-line fix or guard"
+    }}
+  ],
+  "prophecy_score": <0-100 overall risk for this file>,
+  "dominant_risk": "the biggest risk in this file in one sentence"
+}}
+
+Only flag lines that genuinely match the fingerprint patterns. If nothing matches, return empty predictions and score 0."""
+
+    headers = {"Authorization": f"Bearer {OPENROUTER_API_KEY}", "Content-Type": "application/json"}
+    payload = {
+        "model": MODELS["code"],
+        "max_tokens": 1200,
+        "temperature": 0.15,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user",   "content": f"Language: {language}\n\nNew code to analyse:\n```{language}\n{code}\n```"},
+        ],
+    }
+
+    for model in [MODELS["code"], MODELS["fast"]] + FREE_FALLBACKS[:2]:
+        try:
+            payload["model"] = model
+            resp = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers, json=payload, timeout=30
+            )
+            if resp.status_code != 200:
+                continue
+            raw = resp.json()["choices"][0]["message"]["content"].strip()
+            raw = re.sub(r"```json|```", "", raw).strip()
+            result = json.loads(raw)
+            result["safe"] = len(result.get("predictions", [])) == 0
+            return jsonify(result)
+        except (requests.RequestException, json.JSONDecodeError, KeyError, ValueError) as exc:
+            app.logger.warning(f"prophecy_predict model={model} err={exc}")
+            continue
+
+    return jsonify({"error": "AI unavailable — try again shortly."}), 503
+
+
+@app.route("/prophecy/me")
+@login_required
+def prophecy_me():
+    """Return the current user's saved bug fingerprint summary."""
+    conn = sqlite3.connect("codebuddy.db")
+    conn.row_factory = sqlite3.Row
+    row = conn.execute(
+        "SELECT fingerprint, updated_at FROM bug_fingerprints WHERE user_id=?",
+        (current_user.id,)
+    ).fetchone()
+    conn.close()
+    if not row:
+        return jsonify({"has_fingerprint": False})
+    try:
+        data = json.loads(row["fingerprint"])
+        data["has_fingerprint"] = True
+        data["updated_at"] = row["updated_at"]
+        return jsonify(data)
+    except (json.JSONDecodeError, TypeError):
+        return jsonify({"has_fingerprint": False})
+
+
+# ═══════════════════════════════════════════════════════════════
+# FEATURE 21 — PAIR PROGRAMMER TIME MACHINE
+# World-first: Given any piece of final code (with no git history),
+# the AI reverse-engineers the FULL likely edit timeline — what the
+# code probably looked like at each stage, what problem each change
+# solved, and what the developer was thinking at each step.
+#
+# This is the inverse of a diff tool. Instead of showing what
+# changed, it reconstructs WHY and HOW the code arrived at its
+# current form. Invaluable for understanding inherited codebases,
+# onboarding, and code review. No tool does this anywhere.
+# ═══════════════════════════════════════════════════════════════
+
+@app.route("/time_machine", methods=["POST"])
+@login_required
+@rate_limit(max_calls=10, window=60)
+def time_machine():
+    """Reverse-engineer the full edit history of a piece of code with no git.
+
+    Input JSON:
+      code     : final source code (up to 5000 chars)
+      language : programming language
+      context  : optional — what this code is supposed to do
+
+    Returns JSON:
+      timeline : list of stages in chronological order (earliest first):
+        {
+          stage       : int (1 = first commit, N = current),
+          label       : "First draft" | "Added error handling" | etc.,
+          code        : what the code probably looked like at this stage,
+          thought     : what the developer was thinking / what problem they hit,
+          change_desc : what changed from the previous stage,
+          lines_added : estimated lines added,
+          lines_removed : estimated lines removed
+        }
+      story    : 2-3 sentence narrative of the full coding journey
+      key_insight : the single most interesting architectural decision made
+    """
+    data     = request.get_json(silent=True) or {}
+    code     = (data.get("code") or "").strip()[:5000]
+    language = (data.get("language") or "python").strip()
+    context  = (data.get("context") or "").strip()[:300]
+
+    if not code:
+        return jsonify({"error": "No code provided"}), 400
+
+    context_line = f"\nContext (what this code does): {context}" if context else ""
+
+    system_prompt = """You are the Pair Programmer Time Machine — a world-class code historian.
+
+Given a final piece of code, reverse-engineer the most likely FULL edit history.
+Think like a senior developer who wrote this code from scratch. What did it look like at each stage?
+
+Return ONLY a raw JSON object (no markdown, no extra text):
+{
+  "timeline": [
+    {
+      "stage": 1,
+      "label": "short descriptive label (e.g. 'First draft', 'Added loop', 'Fixed off-by-one')",
+      "code": "what the code most likely looked like at this stage — actual plausible code",
+      "thought": "what the developer was thinking or what bug they just hit (first person, past tense)",
+      "change_desc": "what changed from previous stage (for stage 1: 'Initial version')",
+      "lines_added": <int>,
+      "lines_removed": <int>
+    }
+  ],
+  "story": "2-3 sentence narrative of the full coding journey from blank file to current code",
+  "key_insight": "the single most interesting design decision or refactor in this history"
+}
+
+Rules:
+- 4 to 7 stages total (not too few, not too many)
+- Stage 1 must be a minimal working version (not the final — a plausible first attempt)
+- Each stage must show real, runnable code — not descriptions or pseudocode
+- The final stage must match the provided code exactly
+- Make "thought" authentic — real developer frustrations and aha moments
+- Be specific about variable names, function signatures, and logic at each stage"""
+
+    headers = {"Authorization": f"Bearer {OPENROUTER_API_KEY}", "Content-Type": "application/json"}
+    payload = {
+        "model": MODELS["code"],
+        "max_tokens": 3000,
+        "temperature": 0.5,   # slightly creative — we're reconstructing plausible history
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user",   "content": f"Language: {language}{context_line}\n\nFinal code:\n```{language}\n{code}\n```"},
+        ],
+    }
+
+    for model in [MODELS["code"], MODELS["fast"]] + FREE_FALLBACKS[:2]:
+        try:
+            payload["model"] = model
+            resp = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers, json=payload, timeout=40
+            )
+            if resp.status_code != 200:
+                continue
+            raw = resp.json()["choices"][0]["message"]["content"].strip()
+            raw = re.sub(r"```json|```", "", raw).strip()
+            result = json.loads(raw)
+
+            # Validate structure
+            if "timeline" not in result or not isinstance(result["timeline"], list):
+                continue
+
+            return jsonify(result)
+        except (requests.RequestException, json.JSONDecodeError, KeyError, ValueError) as exc:
+            app.logger.warning(f"time_machine model={model} err={exc}")
+            continue
+
+    return jsonify({"error": "AI unavailable — try again shortly."}), 503
+
+
+# ═══════════════════════════════════════════════════════════════
+# FEATURE 22 — COGNITIVE LOAD SCORER
+# World-first: Measures how hard a piece of code is for a HUMAN
+# BRAIN to read — not McCabe cyclomatic complexity (which counts
+# branches), but true cognitive load: how many things must be
+# held in working memory simultaneously, tracking state across
+# lines, nested abstractions, and ambiguous naming.
+#
+# Returns a per-function heatmap so the frontend can visualise
+# which exact functions are "brain overload zones" vs easy reads.
+# Outputs concrete refactor suggestions targeted at cognitive
+# relief, not just code golf. Nothing like this exists anywhere.
+# ═══════════════════════════════════════════════════════════════
+
+@app.route("/cognitive_load", methods=["POST"])
+@login_required
+@rate_limit(max_calls=15, window=60)
+def cognitive_load():
+    """Score the cognitive load of a piece of code on a human-readable scale.
+
+    Input JSON:
+      code     : source code (up to 8000 chars)
+      language : programming language
+
+    Returns JSON:
+      overall_score    : 0-100 (0 = effortless to read, 100 = brain overload)
+      overall_label    : "Easy" | "Moderate" | "Heavy" | "Overload"
+      functions        : per-function breakdown list:
+        {
+          name          : function/method name (or "top-level"),
+          start_line    : int,
+          end_line      : int,
+          score         : 0-100,
+          label         : "Easy" | "Moderate" | "Heavy" | "Overload",
+          load_factors  : list of what drives up the score
+                          e.g. ["7 variables in scope simultaneously",
+                                "3 levels of nesting", "ambiguous name 'data'"]
+          relief        : one concrete refactor to cut the score by ≥20 points
+        }
+      worst_function   : name of the hardest function to read
+      top_relief       : the single most impactful change to reduce load across the whole file
+      cognitive_story  : 2-sentence plain-English explanation of where the brain pain comes from
+    """
+    data     = request.get_json(silent=True) or {}
+    code     = (data.get("code") or "").strip()[:8000]
+    language = (data.get("language") or "python").strip()
+
+    if not code:
+        return jsonify({"error": "No code provided"}), 400
+
+    system_prompt = """You are a Cognitive Load Analysis Engine specialising in human-readable code metrics.
+
+Your scoring is based on these cognitive load drivers (each adds to the score):
+- Working memory pressure: how many variables/objects must be tracked simultaneously
+- Nesting depth: each level of nesting adds ~10 points
+- Abstraction jumps: switching between high/low level in one function adds ~8 points
+- Ambiguous naming: short or generic names (data, tmp, x, result) add ~5 points each
+- Implicit state: mutations of outer-scope variables add ~12 points
+- Long functions: >20 lines that could be split add ~5 points per 10 extra lines
+- Mixed concerns: a function doing IO + computation + formatting adds ~15 points
+
+Score scale:
+  0-25  : Easy — any developer can read this in one pass
+  26-50 : Moderate — needs careful reading, some tracking required
+  51-75 : Heavy — tiring to read, likely to introduce bugs during modification
+  76-100: Overload — genuine brain pain, high modification risk
+
+Return ONLY a raw JSON object (no markdown):
+{
+  "overall_score": <int 0-100>,
+  "overall_label": "Easy" | "Moderate" | "Heavy" | "Overload",
+  "functions": [
+    {
+      "name": "function or method name, or 'module-level' for top-level code",
+      "start_line": <int>,
+      "end_line": <int>,
+      "score": <int 0-100>,
+      "label": "Easy" | "Moderate" | "Heavy" | "Overload",
+      "load_factors": ["specific factor 1", "specific factor 2"],
+      "relief": "one concrete refactor suggestion that would drop the score significantly"
+    }
+  ],
+  "worst_function": "name of highest-scoring function",
+  "top_relief": "the single most impactful refactor for the whole file",
+  "cognitive_story": "2 sentences: where does the brain pain come from and why does it matter?"
+}
+
+Be specific — name actual variables, lines, and patterns. Do not give generic advice."""
+
+    headers = {"Authorization": f"Bearer {OPENROUTER_API_KEY}", "Content-Type": "application/json"}
+    payload = {
+        "model": MODELS["code"],
+        "max_tokens": 1800,
+        "temperature": 0.15,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user",   "content": f"Language: {language}\n\nCode:\n```{language}\n{code}\n```"},
+        ],
+    }
+
+    for model in [MODELS["code"], MODELS["fast"]] + FREE_FALLBACKS[:2]:
+        try:
+            payload["model"] = model
+            resp = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers, json=payload, timeout=30
+            )
+            if resp.status_code != 200:
+                continue
+            raw = resp.json()["choices"][0]["message"]["content"].strip()
+            raw = re.sub(r"```json|```", "", raw).strip()
+            result = json.loads(raw)
+
+            # Attach a colour hint for frontend heatmap rendering
+            label_colours = {
+                "Easy":     "#22c55e",   # green
+                "Moderate": "#f59e0b",   # amber
+                "Heavy":    "#ef4444",   # red
+                "Overload": "#7c3aed",   # purple
+            }
+            result["overall_colour"] = label_colours.get(result.get("overall_label", ""), "#94a3b8")
+            for fn in result.get("functions", []):
+                fn["colour"] = label_colours.get(fn.get("label", ""), "#94a3b8")
+
+            return jsonify(result)
+        except (requests.RequestException, json.JSONDecodeError, KeyError, ValueError) as exc:
+            app.logger.warning(f"cognitive_load model={model} err={exc}")
+            continue
+
+    return jsonify({"error": "AI unavailable — try again shortly."}), 503
+
+
+
+# ═══════════════════════════════════════════════════════════════
+# FEATURE 23 — RUBBER DUCK+ MODE
+# World-first: The AI REFUSES to give answers. It only asks
+# Socratic questions to guide the developer to the solution
+# themselves. Activating "Duck Mode" on a conversation makes the
+# AI a pure thinking partner — never a solution provider.
+#
+# Studies show explaining a problem out loud (rubber ducking) is
+# the fastest path to solving it. No coding AI has ever done this
+# deliberately — they all rush to give answers.
+# ═══════════════════════════════════════════════════════════════
+
+_DUCK_SYSTEM = """You are CodeBuddy in RUBBER DUCK+ MODE.
+
+Your ONE and ONLY job is to help the developer think through their problem themselves.
+
+ABSOLUTE RULES — violate none of these:
+❌ NEVER give the answer, solution, or fixed code directly
+❌ NEVER say "Here is how you fix it" or "The problem is X"
+❌ NEVER write code that solves their problem
+✅ ONLY ask short, pointed Socratic questions (1-2 per turn)
+✅ Guide them to notice the problem themselves through questioning
+✅ If they're stuck, ask simpler questions — break it down further
+✅ Be warm and encouraging — this is about building their skills
+
+QUESTION EXAMPLES (use this style):
+- "What do you expect line 7 to return?"
+- "What is the value of `result` before the loop starts?"
+- "Have you tried printing `x` right before that line?"
+- "What would happen if the list were empty?"
+- "Which part are you most unsure about?"
+
+When they solve it themselves, celebrate! Say something like:
+"You figured it out! 🎉 What was the key insight?"
+
+Current problem: {problem}"""
+
+
+@app.route("/duck/start", methods=["POST"])
+@login_required
+def duck_start():
+    """Activate Rubber Duck+ Mode for a conversation.
+
+    Input JSON:
+      conversation_id : the chat to put in duck mode
+      problem         : what the user is stuck on (optional)
+    """
+    data = request.get_json(silent=True) or {}
+    conversation_id = data.get("conversation_id")
+    problem = (data.get("problem") or "").strip()[:500]
+
+    if not conversation_id:
+        return jsonify({"error": "conversation_id required"}), 400
+
+    conn = sqlite3.connect("codebuddy.db")
+    conn.row_factory = sqlite3.Row
+    convo = conn.execute(
+        "SELECT id FROM conversations WHERE id=? AND user_id=?",
+        (conversation_id, current_user.id)
+    ).fetchone()
+    if not convo:
+        conn.close()
+        return jsonify({"error": "Conversation not found"}), 404
+
+    conn.execute("""
+        INSERT INTO duck_sessions(user_id, conversation_id, active, problem_statement)
+        VALUES (?,?,1,?)
+        ON CONFLICT(user_id, conversation_id) DO UPDATE SET
+            active=1, problem_statement=excluded.problem_statement,
+            turn_count=0, started_at=datetime('now')
+    """, (current_user.id, conversation_id, problem))
+    conn.commit()
+    conn.close()
+    return jsonify({
+        "status": "duck_mode_active",
+        "message": "🦆 Rubber Duck+ Mode ON — I will only ask questions. No answers from me!",
+        "problem": problem or "Tell me what you're stuck on."
+    })
+
+
+@app.route("/duck/stop", methods=["POST"])
+@login_required
+def duck_stop():
+    """Deactivate Rubber Duck+ Mode for a conversation."""
+    data = request.get_json(silent=True) or {}
+    conversation_id = data.get("conversation_id")
+    conn = sqlite3.connect("codebuddy.db")
+    conn.execute(
+        "UPDATE duck_sessions SET active=0 WHERE user_id=? AND conversation_id=?",
+        (current_user.id, conversation_id)
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "duck_mode_off", "message": "🦆 Duck Mode OFF — I can give answers again."})
+
+
+@app.route("/duck/status/<int:conversation_id>")
+@login_required
+def duck_status(conversation_id):
+    """Check if duck mode is active for a conversation."""
+    conn = sqlite3.connect("codebuddy.db")
+    conn.row_factory = sqlite3.Row
+    row = conn.execute(
+        "SELECT active, problem_statement, turn_count FROM duck_sessions WHERE user_id=? AND conversation_id=?",
+        (current_user.id, conversation_id)
+    ).fetchone()
+    conn.close()
+    if not row or not row["active"]:
+        return jsonify({"active": False})
+    return jsonify({
+        "active": True,
+        "problem": row["problem_statement"],
+        "turns": row["turn_count"],
+    })
+
+
+def _is_duck_active(user_id, conversation_id) -> tuple:
+    """Return (is_active, problem_statement) for a conversation."""
+    try:
+        conn = sqlite3.connect("codebuddy.db")
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT active, problem_statement, turn_count FROM duck_sessions WHERE user_id=? AND conversation_id=?",
+            (user_id, conversation_id)
+        ).fetchone()
+        if row and row["active"]:
+            # Increment turn count
+            conn.execute(
+                "UPDATE duck_sessions SET turn_count=turn_count+1 WHERE user_id=? AND conversation_id=?",
+                (user_id, conversation_id)
+            )
+            conn.commit()
+            conn.close()
+            return True, row["problem_statement"]
+        conn.close()
+    except Exception:
+        pass
+    return False, ""
+
+
+# ═══════════════════════════════════════════════════════════════
+# FEATURE 24 — PERSONAL CHANGELOG GENERATOR
+# World-first: Automatically writes a human-readable learning
+# diary from the day's conversation history — "what you learned,
+# what you built, what you struggled with, what to revisit."
+#
+# Turns every coding session into a permanent, searchable record
+# of your growth. Invaluable for portfolio building, job
+# interviews ("tell me about a hard bug you solved"), and
+# continuing education. No AI coding tool does this.
+# ═══════════════════════════════════════════════════════════════
+
+@app.route("/changelog/generate", methods=["POST"])
+@login_required
+@rate_limit(max_calls=10, window=60)
+def changelog_generate():
+    """Auto-generate today's personal learning changelog from conversation history.
+
+    Input JSON:
+      date : YYYY-MM-DD (defaults to today)
+
+    Returns JSON:
+      entry   : full markdown diary entry
+      topics  : list of topic tags
+      date    : date string
+    """
+    data = request.get_json(silent=True) or {}
+    target_date = (data.get("date") or datetime.now().strftime("%Y-%m-%d")).strip()[:10]
+
+    # Fetch today's conversations and messages
+    conn = sqlite3.connect("codebuddy.db")
+    conn.row_factory = sqlite3.Row
+    convos = conn.execute("""
+        SELECT c.id, c.title, c.mode
+        FROM conversations c
+        WHERE c.user_id=? AND DATE(c.updated_at)=?
+        ORDER BY c.id ASC
+    """, (current_user.id, target_date)).fetchall()
+
+    if not convos:
+        conn.close()
+        return jsonify({
+            "entry": None,
+            "topics": [],
+            "date": target_date,
+            "message": "No coding sessions found for this date."
+        })
+
+    # Gather key messages from those convos (user questions only)
+    all_qs = []
+    for c in convos:
+        msgs = conn.execute("""
+            SELECT content FROM messages
+            WHERE conversation_id=? AND role='user'
+            ORDER BY id ASC LIMIT 5
+        """, (c["id"],)).fetchall()
+        for m in msgs:
+            all_qs.append({"mode": c["mode"], "title": c["title"], "q": m["content"][:200]})
+    conn.close()
+
+    if not all_qs:
+        return jsonify({"entry": None, "topics": [], "date": target_date,
+                        "message": "No messages found for this date."})
+
+    session_summary = "\n".join(
+        f"[{q['mode'].upper()} — {q['title']}] {q['q']}" for q in all_qs[:20]
+    )
+
+    system_prompt = """You are a learning coach writing a developer's personal changelog.
+Given a list of their coding questions and sessions for today, write a warm, personal
+learning diary entry in Markdown. Structure it exactly as:
+
+## 📅 {date} — Daily Dev Log
+
+### 🧠 What I Learned Today
+[2-4 bullet points of key concepts or skills they touched]
+
+### 🔨 What I Built / Debugged
+[1-3 bullet points of concrete things they worked on]
+
+### 💡 Best Insight of the Day
+[One memorable insight or "aha moment" in 1-2 sentences]
+
+### 🔁 Worth Revisiting
+[1-2 topics they seemed to struggle with or revisited multiple times]
+
+### 🎯 Tomorrow's Focus
+[One actionable suggestion for their next session]
+
+---
+*Generated by CodeBuddy · Keep learning 🚀*
+
+Also return a JSON array of 3-5 short topic tags (e.g. ["Python", "recursion", "debugging"]).
+Format your response as:
+ENTRY:
+[the markdown entry]
+TOPICS:
+[json array]"""
+
+    headers = {"Authorization": f"Bearer {OPENROUTER_API_KEY}", "Content-Type": "application/json"}
+    payload = {
+        "model": MODELS["fast"],
+        "max_tokens": 800,
+        "temperature": 0.7,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"Date: {target_date}\n\nSessions:\n{session_summary}"}
+        ]
+    }
+
+    for model in [MODELS["fast"]] + FREE_FALLBACKS[:3]:
+        try:
+            payload["model"] = model
+            resp = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers, json=payload, timeout=30
+            )
+            if resp.status_code != 200:
+                continue
+            raw = resp.json()["choices"][0]["message"]["content"].strip()
+
+            # Parse ENTRY and TOPICS sections
+            entry, topics = raw, []
+            if "ENTRY:" in raw and "TOPICS:" in raw:
+                parts = raw.split("TOPICS:", 1)
+                entry = parts[0].replace("ENTRY:", "").strip()
+                try:
+                    topics = json.loads(re.sub(r"```json|```", "", parts[1]).strip())
+                except Exception:
+                    topics = []
+
+            # Persist to DB
+            conn2 = sqlite3.connect("codebuddy.db")
+            conn2.execute("""
+                INSERT INTO changelogs(user_id, date, entry, topics)
+                VALUES (?,?,?,?)
+                ON CONFLICT(user_id, date) DO UPDATE SET
+                    entry=excluded.entry, topics=excluded.topics,
+                    generated_at=datetime('now')
+            """, (current_user.id, target_date, entry, json.dumps(topics)))
+            conn2.commit()
+            conn2.close()
+
+            return jsonify({"entry": entry, "topics": topics, "date": target_date})
+
+        except (requests.RequestException, KeyError, ValueError) as exc:
+            app.logger.warning(f"changelog_generate model={model}: {exc}")
+            continue
+
+    return jsonify({"error": "Could not generate changelog — try again shortly."}), 503
+
+
+@app.route("/changelog/history")
+@login_required
+def changelog_history():
+    """Return the user's past changelog entries (most recent first)."""
+    conn = sqlite3.connect("codebuddy.db")
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute("""
+        SELECT date, entry, topics, generated_at
+        FROM changelogs WHERE user_id=?
+        ORDER BY date DESC LIMIT 30
+    """, (current_user.id,)).fetchall()
+    conn.close()
+    entries = []
+    for r in rows:
+        try:
+            topics = json.loads(r["topics"] or "[]")
+        except Exception:
+            topics = []
+        entries.append({"date": r["date"], "entry": r["entry"],
+                        "topics": topics, "generated_at": r["generated_at"]})
+    return jsonify({"entries": entries, "total": len(entries)})
+
+
+@app.route("/changelog/<date_str>")
+@login_required
+def changelog_get(date_str):
+    """Return a specific day's changelog entry."""
+    conn = sqlite3.connect("codebuddy.db")
+    conn.row_factory = sqlite3.Row
+    row = conn.execute(
+        "SELECT * FROM changelogs WHERE user_id=? AND date=?",
+        (current_user.id, date_str)
+    ).fetchone()
+    conn.close()
+    if not row:
+        return jsonify({"entry": None, "date": date_str})
+    try:
+        topics = json.loads(row["topics"] or "[]")
+    except Exception:
+        topics = []
+    return jsonify({"date": row["date"], "entry": row["entry"], "topics": topics})
+
+
+# ═══════════════════════════════════════════════════════════════
+# FEATURE 25 — CODE CONFIDENCE CALIBRATOR
+# World-first: Reveals the GAP between what you THINK you know
+# and what you can actually demonstrate. User claims "I know
+# Python decorators (7/10 confidence)." The AI fires 5 targeted
+# quiz questions. If they score 3/5, their calibrated score is
+# 60 — they were overconfident. The gap is recorded over time
+# to show improving calibration (a meta-skill for engineers).
+#
+# No learning platform has ever combined self-rating + live
+# quiz + gap tracking + calibration improvement over sessions.
+# ═══════════════════════════════════════════════════════════════
+
+@app.route("/calibrate/quiz", methods=["POST"])
+@login_required
+@rate_limit(max_calls=20, window=60)
+def calibrate_quiz():
+    """Generate a calibration quiz for a topic.
+
+    Input JSON:
+      topic       : what they claim to know (e.g. "Python decorators")
+      self_rating : their confidence 1-10
+      difficulty  : "beginner" | "intermediate" | "advanced" (optional)
+
+    Returns JSON:
+      quiz_id   : ID to submit answers against
+      questions : list of {id, question, options: [A,B,C,D]}
+    """
+    data = request.get_json(silent=True) or {}
+    topic = (data.get("topic") or "").strip()[:100]
+    self_rating = max(1, min(10, int(data.get("self_rating", 5))))
+    difficulty = data.get("difficulty", "intermediate")
+
+    if not topic:
+        return jsonify({"error": "topic required"}), 400
+
+    # Calibrate difficulty to self_rating
+    if self_rating <= 3:
+        difficulty = "beginner"
+    elif self_rating <= 6:
+        difficulty = "intermediate"
+    else:
+        difficulty = "advanced"
+
+    system_prompt = f"""You are a technical quiz generator for a coding confidence calibrator.
+
+Generate exactly 5 multiple-choice questions about: {topic}
+Difficulty level: {difficulty}
+
+Return ONLY a raw JSON array (no markdown, no preamble):
+[
+  {{
+    "id": 1,
+    "question": "Clear, specific question text",
+    "options": {{"A": "option", "B": "option", "C": "option", "D": "option"}},
+    "correct": "A",
+    "explanation": "Brief explanation of why this is correct (1 sentence)"
+  }},
+  ...
+]
+
+Rules:
+- Questions must test REAL understanding, not trivia or memorization
+- One clearly correct answer, three plausible distractors
+- Progressively harder: Q1 easy, Q5 hardest
+- Avoid obvious giveaways in wording
+- Test practical application, not just definitions"""
+
+    headers = {"Authorization": f"Bearer {OPENROUTER_API_KEY}", "Content-Type": "application/json"}
+    payload = {
+        "model": MODELS["fast"],
+        "max_tokens": 1200,
+        "temperature": 0.4,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"Generate 5 {difficulty} questions about: {topic}"}
+        ]
+    }
+
+    for model in [MODELS["fast"], MODELS["code"]] + FREE_FALLBACKS[:3]:
+        try:
+            payload["model"] = model
+            resp = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers, json=payload, timeout=25
+            )
+            if resp.status_code != 200:
+                continue
+            raw = resp.json()["choices"][0]["message"]["content"].strip()
+            raw = re.sub(r"```json|```", "", raw).strip()
+            questions = json.loads(raw)
+
+            if not isinstance(questions, list) or len(questions) < 3:
+                continue
+
+            # Store pending quiz in session
+            quiz_id = secrets.token_urlsafe(12)
+            session[f"quiz_{quiz_id}"] = {
+                "topic": topic,
+                "self_rating": self_rating,
+                "questions": questions,
+            }
+
+            # Strip correct answers before sending to client
+            client_qs = [
+                {"id": q["id"], "question": q["question"], "options": q["options"]}
+                for q in questions
+            ]
+            return jsonify({
+                "quiz_id": quiz_id,
+                "topic": topic,
+                "self_rating": self_rating,
+                "difficulty": difficulty,
+                "questions": client_qs,
+            })
+
+        except (requests.RequestException, json.JSONDecodeError, KeyError, ValueError) as exc:
+            app.logger.warning(f"calibrate_quiz model={model}: {exc}")
+            continue
+
+    return jsonify({"error": "Could not generate quiz — try again shortly."}), 503
+
+
+@app.route("/calibrate/submit", methods=["POST"])
+@login_required
+def calibrate_submit():
+    """Submit quiz answers and get calibration result.
+
+    Input JSON:
+      quiz_id : from /calibrate/quiz
+      answers : {"1": "A", "2": "C", ...}  question_id → chosen option
+
+    Returns JSON:
+      score         : 0-100
+      self_rating   : original claim
+      gap           : score - (self_rating * 10)
+      calibration   : "overconfident" | "underconfident" | "well-calibrated"
+      per_question  : [{id, correct, chosen, is_correct, explanation}]
+      verdict       : plain-English summary
+      badge         : emoji + label
+    """
+    data = request.get_json(silent=True) or {}
+    quiz_id = data.get("quiz_id", "")
+    answers = data.get("answers", {})
+
+    quiz_data = session.get(f"quiz_{quiz_id}")
+    if not quiz_data:
+        return jsonify({"error": "Quiz not found or expired — please start a new quiz."}), 404
+
+    topic = quiz_data["topic"]
+    self_rating = quiz_data["self_rating"]
+    questions = quiz_data["questions"]
+
+    # Score the quiz
+    correct_count = 0
+    per_question = []
+    for q in questions:
+        qid = str(q["id"])
+        chosen = answers.get(qid, "").upper()
+        correct = q.get("correct", "").upper()
+        is_correct = chosen == correct
+        if is_correct:
+            correct_count += 1
+        per_question.append({
+            "id": q["id"],
+            "question": q["question"],
+            "chosen": chosen,
+            "correct": correct,
+            "is_correct": is_correct,
+            "explanation": q.get("explanation", ""),
+        })
+
+    score = round((correct_count / len(questions)) * 100)
+    claimed = self_rating * 10
+    gap = score - claimed
+
+    if gap <= -25:
+        calibration = "overconfident"
+        badge = "⚠️ OVERCONFIDENT"
+        verdict = (f"You rated yourself {self_rating}/10 but scored {score}/100. "
+                   f"You're overestimating your knowledge of {topic} by about {abs(gap)} points. "
+                   f"That's valuable to know — focus on the questions you missed.")
+    elif gap >= 25:
+        calibration = "underconfident"
+        badge = "🌟 HIDDEN EXPERT"
+        verdict = (f"You only rated yourself {self_rating}/10 but scored {score}/100. "
+                   f"You know more about {topic} than you think! "
+                   f"Have more confidence in your skills — you're {abs(gap)} points ahead of your self-estimate.")
+    else:
+        calibration = "well-calibrated"
+        badge = "✅ WELL-CALIBRATED"
+        verdict = (f"Your self-rating of {self_rating}/10 closely matched your score of {score}/100. "
+                   f"You have accurate self-knowledge of your {topic} skills. "
+                   f"That's a rare and valuable meta-skill for engineers.")
+
+    # Persist record
+    try:
+        conn = sqlite3.connect("codebuddy.db")
+        conn.execute("""
+            INSERT INTO confidence_records
+                (user_id, topic, self_rating, actual_score, gap, questions, answers)
+            VALUES (?,?,?,?,?,?,?)
+        """, (
+            current_user.id, topic, self_rating, score, gap,
+            json.dumps([{"id": q["id"], "question": q["question"]} for q in questions]),
+            json.dumps(answers)
+        ))
+        conn.commit()
+        conn.close()
+    except Exception as exc:
+        app.logger.warning(f"calibrate_submit DB save: {exc}")
+
+    # Clean up session
+    session.pop(f"quiz_{quiz_id}", None)
+
+    return jsonify({
+        "score": score,
+        "self_rating": self_rating,
+        "claimed": claimed,
+        "gap": gap,
+        "calibration": calibration,
+        "badge": badge,
+        "verdict": verdict,
+        "per_question": per_question,
+        "correct_count": correct_count,
+        "total": len(questions),
+    })
+
+
+@app.route("/calibrate/history")
+@login_required
+def calibrate_history():
+    """Return the user's calibration history — shows improvement in self-awareness over time."""
+    conn = sqlite3.connect("codebuddy.db")
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute("""
+        SELECT topic, self_rating, actual_score, gap, created_at
+        FROM confidence_records
+        WHERE user_id=?
+        ORDER BY id DESC LIMIT 50
+    """, (current_user.id,)).fetchall()
+    conn.close()
+
+    records = [dict(r) for r in rows]
+
+    # Compute overall calibration trend
+    if records:
+        avg_gap = round(sum(abs(r["gap"]) for r in records) / len(records))
+        improving = len(records) >= 3 and abs(records[0]["gap"]) < abs(records[-1]["gap"])
+    else:
+        avg_gap = 0
+        improving = False
+
+    return jsonify({
+        "records": records,
+        "avg_absolute_gap": avg_gap,
+        "calibration_improving": improving,
+        "total": len(records),
+    })
+
+
+
+
+# ═══════════════════════════════════════════════════════════════
+# FEATURE 26 — ERROR AUTOPSY
+# World-first: When a user pastes an error, AI doesn't just fix
+# it. It first builds a DIAGNOSIS TREE — top 3 most likely root
+# causes ranked by probability for THIS specific code + language
+# + user history. The fix is shown AFTER the diagnosis, not
+# instead of it. Teaches root-cause thinking, not copy-paste.
+#
+# No coding AI presents probabilistic error diagnosis before fix.
+# They all jump straight to the solution.
+# ═══════════════════════════════════════════════════════════════
+
+import hashlib as _hashlib
+
+@app.route("/error_autopsy", methods=["POST"])
+@login_required
+@rate_limit(max_calls=20, window=60)
+def error_autopsy():
+    """Run a probabilistic root-cause autopsy on an error message.
+
+    Input JSON:
+      error    : the error message / traceback (required)
+      code     : the surrounding code context (optional)
+      language : programming language (optional, auto-detected)
+
+    Returns JSON:
+      causes  : [{rank, cause, probability, explanation}]
+      tree    : [{node, children}]  — diagnosis decision tree
+      verdict : most likely root cause in plain English
+      fix     : the actual fix code (shown AFTER diagnosis)
+      language: detected/confirmed language
+    """
+    data     = request.get_json(silent=True) or {}
+    error    = (data.get("error") or "").strip()[:3000]
+    code     = (data.get("code")  or "").strip()[:3000]
+    language = (data.get("language") or "").strip()[:30]
+
+    if not error:
+        return jsonify({"error": "No error message provided"}), 400
+
+    # Check cache — same error from same user within 24h
+    err_hash = _hashlib.md5(f"{current_user.id}:{error[:200]}".encode()).hexdigest()
+    conn = sqlite3.connect("codebuddy.db")
+    conn.row_factory = sqlite3.Row
+    cached = conn.execute(
+        "SELECT diagnosis FROM error_autopsies WHERE error_hash=? AND user_id=? "
+        "AND datetime(created_at) > datetime('now','-1 day')",
+        (err_hash, current_user.id)
+    ).fetchone()
+    conn.close()
+    if cached:
+        try:
+            return jsonify(json.loads(cached["diagnosis"]))
+        except Exception:
+            pass
+
+    system_prompt = """You are CodeBuddy's Error Autopsy engine — a senior debugging expert.
+
+Your job is NOT to fix the error immediately. First, diagnose it like a doctor.
+
+Return ONLY a raw JSON object (no markdown):
+{
+  "language": "<detected language>",
+  "error_type": "<error class name>",
+  "causes": [
+    {
+      "rank": 1,
+      "cause": "<short name of root cause>",
+      "probability": "<percentage like 65%>",
+      "explanation": "<1-2 sentences: why this is the most likely cause for THIS specific error + code>",
+      "clue": "<the exact part of the error or code that points to this cause>"
+    },
+    {"rank": 2, ...},
+    {"rank": 3, ...}
+  ],
+  "tree": [
+    {"question": "Is X null/undefined?", "yes": "NullPointerError path", "no": "Check Y next"},
+    {"question": "Is the loop index correct?", "yes": "Off-by-one", "no": "Check Z"}
+  ],
+  "verdict": "<plain English: most likely root cause in 1 sentence>",
+  "fix": "<the actual corrected code or command to fix the most likely cause>",
+  "prevention": "<one-line tip to avoid this class of error in the future>"
+}
+
+Rules:
+- Rank causes by actual probability for THIS specific error text + code
+- Be specific — name the exact line/variable/pattern causing the issue
+- The fix must target the #1 ranked cause
+- tree must have 2-4 decision nodes that a developer would actually step through"""
+
+    user_content = f"Error:\n```\n{error}\n```"
+    if code:
+        user_content += f"\n\nCode context:\n```{language}\n{code}\n```"
+    if language:
+        user_content += f"\n\nLanguage: {language}"
+
+    headers = {"Authorization": f"Bearer {OPENROUTER_API_KEY}", "Content-Type": "application/json"}
+    payload = {
+        "model": MODELS["fast"],
+        "max_tokens": 1200,
+        "temperature": 0.2,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user",   "content": user_content},
+        ]
+    }
+
+    for model in [MODELS["fast"], MODELS["code"]] + FREE_FALLBACKS[:3]:
+        try:
+            payload["model"] = model
+            resp = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers, json=payload, timeout=30
+            )
+            if resp.status_code != 200:
+                continue
+            raw = resp.json()["choices"][0]["message"]["content"].strip()
+            raw = re.sub(r"```json|```", "", raw).strip()
+            result = json.loads(raw)
+
+            # Cache result
+            try:
+                conn2 = sqlite3.connect("codebuddy.db")
+                conn2.execute(
+                    "INSERT INTO error_autopsies(user_id,error_hash,error_text,language,diagnosis) "
+                    "VALUES (?,?,?,?,?)",
+                    (current_user.id, err_hash, error[:500],
+                     result.get("language", language), json.dumps(result))
+                )
+                conn2.commit()
+                conn2.close()
+            except Exception:
+                pass
+
+            bump_stat(current_user.id, "debug_count")
+            return jsonify(result)
+
+        except (requests.RequestException, json.JSONDecodeError, KeyError, ValueError) as exc:
+            app.logger.warning(f"error_autopsy model={model}: {exc}")
+            continue
+
+    return jsonify({"error": "Autopsy failed — try again shortly."}), 503
+
+
+@app.route("/error_autopsy/history")
+@login_required
+def error_autopsy_history():
+    """Return the user's recent error autopsies."""
+    conn = sqlite3.connect("codebuddy.db")
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        "SELECT error_text, language, diagnosis, created_at "
+        "FROM error_autopsies WHERE user_id=? ORDER BY id DESC LIMIT 20",
+        (current_user.id,)
+    ).fetchall()
+    conn.close()
+    results = []
+    for r in rows:
+        try:
+            diag = json.loads(r["diagnosis"] or "{}")
+        except Exception:
+            diag = {}
+        results.append({
+            "error_text": r["error_text"],
+            "language":   r["language"],
+            "verdict":    diag.get("verdict", ""),
+            "error_type": diag.get("error_type", ""),
+            "created_at": r["created_at"],
+        })
+    return jsonify({"autopsies": results})
+
+
+# ═══════════════════════════════════════════════════════════════
+# FEATURE 27 — PAIR NAMING ASSISTANT
+# World-first: The hardest problem in CS is naming things.
+# This feature works in TWO directions:
+#
+# FORWARD: paste code body → get 5 ranked name options with
+#   scores for clarity, convention, searchability, intent.
+#
+# REVERSE: paste a name + body → AI tells you if the name is
+#   MISLEADING, ACCURATE, or UNDERSELLS what the code does.
+#   "Your function is called 'process' but it actually
+#   validates, transforms, AND persists — here are better names."
+#
+# No tool has ever done bidirectional naming analysis with
+# scoring and reasoning. Copilot suggests completions.
+# This judges and scores existing names and suggests better ones.
+# ═══════════════════════════════════════════════════════════════
+
+@app.route("/naming/suggest", methods=["POST"])
+@login_required
+@rate_limit(max_calls=30, window=60)
+def naming_suggest():
+    """Generate ranked name suggestions for a code block.
+
+    Input JSON:
+      code      : the function/class/variable body (required)
+      kind      : 'function' | 'class' | 'variable' | 'module' (default: function)
+      language  : programming language
+      current_name : existing name (optional — triggers reverse check if provided)
+
+    Returns JSON:
+      mode        : 'suggest' | 'reverse'
+      suggestions : [{name, score, clarity, convention, searchability, reasoning}]
+      reverse     : (only in reverse mode) {verdict, issues, better_names}
+      winner      : the top recommended name
+    """
+    data         = request.get_json(silent=True) or {}
+    code         = (data.get("code") or "").strip()[:3000]
+    kind         = (data.get("kind") or "function").strip()
+    language     = (data.get("language") or "python").strip()
+    current_name = (data.get("current_name") or "").strip()[:100]
+
+    if not code:
+        return jsonify({"error": "No code provided"}), 400
+
+    mode = "reverse" if current_name else "suggest"
+
+    if mode == "suggest":
+        system_prompt = f"""You are CodeBuddy's Pair Naming Assistant — a naming expert.
+
+Given a {kind} body in {language}, generate exactly 5 name candidates.
+
+Return ONLY raw JSON (no markdown):
+{{
+  "mode": "suggest",
+  "winner": "<best name>",
+  "suggestions": [
+    {{
+      "name": "<name>",
+      "score": <0-100>,
+      "clarity": <0-10>,
+      "convention": <0-10>,
+      "searchability": <0-10>,
+      "intent_match": <0-10>,
+      "reasoning": "<1 sentence: why this name works or doesn't>"
+    }}
+  ],
+  "naming_principle": "<one key naming insight for this specific code>"
+}}
+
+Rules:
+- Score honestly — a bad name should score < 40
+- Rank by overall score (highest first)
+- Vary naming styles: one verbose, one concise, one verb-first, etc.
+- Convention = follows {language} community standards (PEP8, camelCase etc.)
+- Searchability = how easy to grep/find in a large codebase"""
+        user_content = f"Language: {language}\nKind: {kind}\n\nCode:\n```{language}\n{code}\n```"
+
+    else:  # reverse mode
+        system_prompt = f"""You are CodeBuddy's Pair Naming Assistant in REVERSE MODE.
+
+The developer has a {kind} called `{current_name}`. Analyse if the name is accurate,
+misleading, or underselling what the code actually does.
+
+Return ONLY raw JSON (no markdown):
+{{
+  "mode": "reverse",
+  "current_name": "{current_name}",
+  "verdict": "accurate" | "misleading" | "undersells" | "oversells",
+  "score": <0-100 — how good the current name is>,
+  "issues": ["<issue 1>", "<issue 2>"],
+  "explanation": "<2-3 sentences: what the code actually does vs what the name implies>",
+  "better_names": [
+    {{"name": "<name>", "reasoning": "<why better>"}},
+    {{"name": "<name>", "reasoning": "<why better>"}},
+    {{"name": "<name>", "reasoning": "<why better>"}}
+  ],
+  "winner": "<the single best replacement name>"
+}}"""
+        user_content = (f"Language: {language}\nKind: {kind}\n"
+                        f"Current name: `{current_name}`\n\n"
+                        f"Code body:\n```{language}\n{code}\n```")
+
+    headers = {"Authorization": f"Bearer {OPENROUTER_API_KEY}", "Content-Type": "application/json"}
+    payload = {
+        "model": MODELS["fast"],
+        "max_tokens": 800,
+        "temperature": 0.4,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user",   "content": user_content},
+        ]
+    }
+
+    for model in [MODELS["fast"], MODELS["code"]] + FREE_FALLBACKS[:3]:
+        try:
+            payload["model"] = model
+            resp = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers, json=payload, timeout=25
+            )
+            if resp.status_code != 200:
+                continue
+            raw = resp.json()["choices"][0]["message"]["content"].strip()
+            raw = re.sub(r"```json|```", "", raw).strip()
+            result = json.loads(raw)
+
+            # Persist to history
+            try:
+                conn = sqlite3.connect("codebuddy.db")
+                conn.execute(
+                    "INSERT INTO naming_history(user_id,original_name,suggestions,code_snippet,mode) "
+                    "VALUES (?,?,?,?,?)",
+                    (current_user.id, current_name or "",
+                     json.dumps(result.get("suggestions") or result.get("better_names", [])),
+                     code[:300], mode)
+                )
+                conn.commit()
+                conn.close()
+            except Exception:
+                pass
+
+            return jsonify(result)
+
+        except (requests.RequestException, json.JSONDecodeError, KeyError, ValueError) as exc:
+            app.logger.warning(f"naming_suggest model={model}: {exc}")
+            continue
+
+    return jsonify({"error": "Naming assistant unavailable — try again shortly."}), 503
+
+
+@app.route("/naming/history")
+@login_required
+def naming_history():
+    """Return the user's recent naming analysis history."""
+    conn = sqlite3.connect("codebuddy.db")
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        "SELECT original_name, code_snippet, mode, created_at "
+        "FROM naming_history WHERE user_id=? ORDER BY id DESC LIMIT 30",
+        (current_user.id,)
+    ).fetchall()
+    conn.close()
+    return jsonify({"history": [dict(r) for r in rows]})
+
+
+# ═══════════════════════════════════════════════════════════════
+# FEATURE 28 — FOCUS ZONE DETECTOR
+# World-first: Analyses the TIMESTAMPS of every message the user
+# has ever sent to find when they code most productively —
+# by hour of day, day of week, and session length.
+#
+# "You send 3x more messages on Tuesday mornings 9-11am."
+# "Your bug-fix sessions average 23 mins on weekdays."
+# "You haven't coded after 9pm in 3 weeks."
+#
+# No coding tool has ever done temporal performance analytics.
+# Fitness apps do this for workouts. No one does it for coding.
+# ═══════════════════════════════════════════════════════════════
+
+def _record_focus_session(user_id, conversation_id):
+    """Called when a message is sent — records time-of-day analytics."""
+    try:
+        now = datetime.now()
+        hour  = now.hour
+        dow   = now.weekday()   # 0=Monday, 6=Sunday
+        today = now.strftime("%Y-%m-%d")
+        conn  = sqlite3.connect("codebuddy.db")
+        # Upsert: increment message_count for this user+date+hour
+        conn.execute("""
+            INSERT INTO focus_sessions(user_id, session_date, hour_of_day, day_of_week, message_count)
+            VALUES (?,?,?,?,1)
+            ON CONFLICT(user_id, session_date, hour_of_day) DO UPDATE SET
+                message_count = message_count + 1
+        """, (user_id, today, hour, dow))
+        conn.commit()
+        conn.close()
+    except Exception as exc:
+        app.logger.debug(f"_record_focus_session: {exc}")
+
+
+@app.route("/focus_zone")
+@login_required
+def focus_zone():
+    """Analyse the user's coding timestamps to find their peak performance windows.
+
+    Returns JSON:
+      peak_hour        : best single hour (0-23)
+      peak_day         : best day name (Monday etc.)
+      peak_window      : human label like "Tuesday 9-11am"
+      hourly_heatmap   : [{hour, count, label}] — 24 entries
+      daily_heatmap    : [{day, count, label}] — 7 entries
+      insights         : [str]  — 3-5 plain-English observations
+      total_sessions   : int
+      ai_recommendation: str   — one actionable scheduling tip
+    """
+    conn = sqlite3.connect("codebuddy.db")
+    conn.row_factory = sqlite3.Row
+
+    rows = conn.execute("""
+        SELECT hour_of_day, day_of_week, SUM(message_count) as total,
+               COUNT(*) as days_active
+        FROM focus_sessions
+        WHERE user_id=?
+        GROUP BY hour_of_day, day_of_week
+    """, (current_user.id,)).fetchall()
+
+    total_msgs = conn.execute(
+        "SELECT SUM(message_count) as t FROM focus_sessions WHERE user_id=?",
+        (current_user.id,)
+    ).fetchone()
+    conn.close()
+
+    if not rows:
+        return jsonify({
+            "peak_hour": None,
+            "peak_day": None,
+            "peak_window": None,
+            "hourly_heatmap": [],
+            "daily_heatmap":  [],
+            "insights": ["Not enough data yet — keep coding and check back after a few sessions!"],
+            "total_sessions": 0,
+            "ai_recommendation": "Start a few coding sessions to build your Focus Zone profile.",
+        })
+
+    # Build hourly and daily aggregates
+    hourly = {}   # hour → total messages
+    daily  = {}   # day  → total messages
+    for r in rows:
+        h = r["hour_of_day"]
+        d = r["day_of_week"]
+        hourly[h] = hourly.get(h, 0) + r["total"]
+        daily[d]  = daily.get(d, 0)  + r["total"]
+
+    peak_hour = max(hourly, key=hourly.get)
+    peak_day  = max(daily,  key=daily.get)
+
+    DAY_NAMES = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
+    peak_day_name = DAY_NAMES[peak_day]
+
+    def _hour_label(h):
+        period = "am" if h < 12 else "pm"
+        display = h if h <= 12 else h - 12
+        display = 12 if display == 0 else display
+        return f"{display}{period}"
+
+    peak_window = f"{peak_day_name} {_hour_label(peak_hour)}–{_hour_label((peak_hour+2)%24)}"
+
+    # Hourly heatmap (all 24 hours)
+    max_hourly = max(hourly.values()) if hourly else 1
+    hourly_heatmap = [
+        {
+            "hour":  h,
+            "label": _hour_label(h),
+            "count": hourly.get(h, 0),
+            "intensity": round(hourly.get(h, 0) / max_hourly, 2),
+        }
+        for h in range(24)
+    ]
+
+    # Daily heatmap (7 days)
+    max_daily = max(daily.values()) if daily else 1
+    daily_heatmap = [
+        {
+            "day":       i,
+            "label":     DAY_NAMES[i],
+            "short":     DAY_NAMES[i][:3],
+            "count":     daily.get(i, 0),
+            "intensity": round(daily.get(i, 0) / max_daily, 2),
+        }
+        for i in range(7)
+    ]
+
+    # Build natural-language insights
+    total = (total_msgs["t"] or 0) if total_msgs else 0
+    insights = []
+
+    # Peak hour insight
+    if peak_hour < 12:
+        insights.append(f"You're a morning coder — you're most active around {_hour_label(peak_hour)}.")
+    elif peak_hour < 17:
+        insights.append(f"Your peak coding window is the afternoon, around {_hour_label(peak_hour)}.")
+    else:
+        insights.append(f"You do your best work in the evening, around {_hour_label(peak_hour)}.")
+
+    # Peak day insight
+    if peak_day < 5:
+        insights.append(f"{peak_day_name} is your strongest coding day of the week.")
+    else:
+        insights.append(f"You code on weekends — {peak_day_name} is your most productive day.")
+
+    # Quiet period
+    quiet_hour = min(hourly, key=hourly.get) if hourly else None
+    if quiet_hour is not None:
+        insights.append(f"You rarely code around {_hour_label(quiet_hour)} — probably your natural rest window.")
+
+    # Consistency
+    active_days = len(set(r["day_of_week"] for r in rows))
+    if active_days >= 5:
+        insights.append("You code consistently across the whole week — great discipline.")
+    elif active_days <= 2:
+        insights.append("You tend to concentrate coding in 1-2 days. Spreading it out could improve retention.")
+
+    # Volume insight
+    if total > 500:
+        insights.append(f"You've sent {total:,} messages total — you're a power user!")
+    elif total > 100:
+        insights.append(f"{total} messages so far. Your focus pattern is becoming clear.")
+
+    ai_recommendation = (
+        f"Schedule your hardest problems for {peak_day_name} around {_hour_label(peak_hour)} — "
+        f"that's when your data says you're most focused. "
+        f"Save routine tasks (reading docs, reviewing) for your lower-energy windows."
+    )
+
+    return jsonify({
+        "peak_hour":         peak_hour,
+        "peak_hour_label":   _hour_label(peak_hour),
+        "peak_day":          peak_day,
+        "peak_day_name":     peak_day_name,
+        "peak_window":       peak_window,
+        "hourly_heatmap":    hourly_heatmap,
+        "daily_heatmap":     daily_heatmap,
+        "insights":          insights,
+        "total_messages":    total,
+        "ai_recommendation": ai_recommendation,
+    })
+
 
 if __name__ == "__main__":
     # CRITICAL: use_reloader=False stops Flask restarting with a new random

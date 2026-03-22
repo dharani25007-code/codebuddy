@@ -526,15 +526,25 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
         <div class="cbSymRow"><span class="cbSymPhrase">"Stop speaking"</span><span class="cbSymResult">Silence TTS</span></div>
       </div>
       <div class="cbPanelSection" id="cbTab-symbols">
+        <div id="cbSymCtxWarn" style="display:none;background:rgba(255,107,43,0.1);border:1px solid rgba(255,107,43,0.3);border-radius:4px;padding:7px 10px;margin-bottom:10px;font-family:IBM Plex Mono,monospace;font-size:9px;color:#ff6b2b;line-height:1.6">
+          ⚠ CODE CONTEXT is OFF — voice symbol substitution is disabled.<br>
+          Go to <strong>SETTINGS</strong> tab and turn CODE CONTEXT <strong>ON</strong> to use voice symbols.
+        </div>
         <div class="cbSymLabel">🎙 SAY THIS → GET CODE SYMBOL</div>
         <div style="font-family:IBM Plex Mono,monospace;font-size:9px;color:rgba(226,244,255,0.3);margin-bottom:10px;line-height:1.6">
-          Speak these phrases while coding by voice. They are replaced with the exact symbol in your code editor.
+          Speak these phrases while coding by voice — or <strong style="color:rgba(0,255,224,0.5)">tap any row</strong> to insert the symbol directly into your message.
         </div>
         ${Object.entries(CODE_SYMBOLS_WITH_DESC).map(([k, [sym, desc]]) => `
-          <div class="cbSymRow" style="flex-direction:column;align-items:flex-start;gap:2px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.04)">
+          <div class="cbSymRow" style="flex-direction:column;align-items:flex-start;gap:2px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.04);cursor:pointer;transition:background 0.15s;"
+               onclick="insertSymbolToInput(${JSON.stringify(sym)})"
+               onmouseenter="this.style.background='rgba(0,255,224,0.05)'"
+               onmouseleave="this.style.background='transparent'">
             <div style="display:flex;justify-content:space-between;width:100%;align-items:center">
               <span class="cbSymPhrase" style="font-size:10px">"${k}"</span>
-              <span class="cbSymResult" style="font-size:13px;min-width:36px;text-align:center">${sym.replace(/\n/g,'↵').replace(/\t/g,'→')}</span>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="font-family:IBM Plex Mono,monospace;font-size:8px;color:rgba(0,255,224,0.3);letter-spacing:1px">TAP</span>
+                <span class="cbSymResult" style="font-size:13px;min-width:36px;text-align:center">${sym.replace(/\n/g,'↵').replace(/\t/g,'→')}</span>
+              </div>
             </div>
             <span style="font-family:IBM Plex Mono,monospace;font-size:9px;color:rgba(0,255,224,0.4);margin-top:2px">${desc}</span>
           </div>
@@ -618,6 +628,35 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
     el.classList.add('active');
     const sec = document.getElementById('cbTab-' + name);
     if (sec) sec.classList.add('active');
+    // Show CODE CONTEXT warning when opening symbols tab and it is OFF
+    if (name === 'symbols') {
+      const warn = document.getElementById('cbSymCtxWarn');
+      if (warn) warn.style.display = STATE.codeContext ? 'none' : 'block';
+    }
+  }
+
+  function insertSymbolToInput(sym) {
+    // Insert symbol at cursor position in the chat message input
+    const el = document.getElementById('message');
+    if (!el) return;
+    const start = el.selectionStart ?? el.value.length;
+    const end   = el.selectionEnd   ?? el.value.length;
+    const before = el.value.slice(0, start);
+    const after  = el.value.slice(end);
+    el.value = before + sym + after;
+    // Restore cursor right after the inserted symbol
+    const newPos = start + sym.length;
+    el.setSelectionRange(newPos, newPos);
+    el.focus();
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    // Brief flash on the symbol result badge to confirm insertion
+    const rows = document.querySelectorAll('#cbTab-symbols .cbSymRow');
+    rows.forEach(row => {
+      if (row.getAttribute('data-sym') === sym) {
+        row.style.background = 'rgba(0,255,224,0.12)';
+        setTimeout(() => { row.style.background = 'transparent'; }, 300);
+      }
+    });
   }
 
   function initRecognition() {
@@ -1234,6 +1273,9 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
     STATE.codeContext = !STATE.codeContext;
     const el = document.getElementById('cbCodeCtxToggle');
     if (el) el.textContent = STATE.codeContext ? 'ON' : 'OFF';
+    // Update the symbols tab warning banner live
+    const warn = document.getElementById('cbSymCtxWarn');
+    if (warn) warn.style.display = STATE.codeContext ? 'none' : 'block';
     speak('Code context ' + (STATE.codeContext ? 'enabled' : 'disabled'));
   }
 
@@ -1580,6 +1622,7 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
   }
 
   window.switchPTab = switchPTab;
+  window.insertSymbolToInput = insertSymbolToInput;
   window.triggerRun = triggerRun;
   window.triggerDebug = triggerDebug;
   window.triggerExplain = triggerExplain;

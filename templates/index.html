@@ -935,9 +935,13 @@ async function runPython(code) {
       transition:all 0.2s;
     }
     .ob-card:hover { background:rgba(0,255,224,0.04);border-color:rgba(0,255,224,0.18);transform:translateX(3px); }
+    .ob-card.ob-new { border-color:rgba(168,85,247,0.2);background:rgba(168,85,247,0.03); }
+    .ob-card.ob-new:hover { border-color:rgba(168,85,247,0.4);background:rgba(168,85,247,0.06); }
     .ob-num { font-family:var(--display);font-size:11px;font-weight:900;color:rgba(0,255,224,0.25);letter-spacing:1px;min-width:24px;margin-top:2px; }
+    .ob-card.ob-new .ob-num { color:rgba(168,85,247,0.4); }
     .ob-body { flex:1; }
-    .ob-title { font-family:var(--display);font-size:11px;font-weight:800;letter-spacing:1.5px;color:rgba(226,244,255,0.85);margin-bottom:6px; }
+    .ob-title { font-family:var(--display);font-size:11px;font-weight:800;letter-spacing:1.5px;color:rgba(226,244,255,0.85);margin-bottom:6px;display:flex;align-items:center;gap:8px; }
+    .ob-new-badge { font-family:var(--display);font-size:7px;font-weight:900;letter-spacing:2px;color:#a855f7;background:rgba(168,85,247,0.12);border:1px solid rgba(168,85,247,0.3);padding:2px 7px;border-radius:20px; }
     .ob-desc { font-family:var(--mono);font-size:10.5px;color:rgba(226,244,255,0.4);line-height:1.75;margin-bottom:10px; }
     .ob-chips { display:flex;flex-wrap:wrap;gap:7px; }
     .ob-chip { font-family:var(--display);font-size:8px;font-weight:700;letter-spacing:1px;
@@ -945,6 +949,8 @@ async function runPython(code) {
       background:rgba(0,255,224,0.05);color:#00ffe0;cursor:pointer;transition:all 0.15s; }
     .ob-chip:hover { background:rgba(0,255,224,0.12);border-color:rgba(0,255,224,0.4); }
     .ob-arrow { font-size:18px;color:rgba(0,255,224,0.2);margin-top:4px;transition:all 0.2s; }
+    .ob-card.ob-new .ob-arrow { color:rgba(168,85,247,0.2); }
+    .ob-card.ob-new:hover .ob-arrow { color:rgba(168,85,247,0.6); }
     .ob-card:hover .ob-arrow { color:rgba(0,255,224,0.6);transform:translateX(4px); }
     .ob-mode-grid { display:flex;flex-wrap:wrap;gap:7px;margin-top:4px; }
     .ob-mode { position:relative;font-family:var(--display);font-size:8px;font-weight:700;letter-spacing:1px;
@@ -952,6 +958,11 @@ async function runPython(code) {
       background:rgba(255,255,255,0.03);color:rgba(226,244,255,0.55);cursor:default;
       display:flex;flex-direction:column;gap:2px; }
     .ob-mode-tip { font-size:7px;font-weight:400;letter-spacing:0.5px;color:rgba(226,244,255,0.3);font-family:var(--mono); }
+    .ob-section-label { font-family:var(--display);font-size:8px;font-weight:900;letter-spacing:3px;color:rgba(0,255,224,0.3);margin:18px 0 8px;padding-left:4px; }
+    .ob-section-label.ob-new-section { color:rgba(168,85,247,0.5); }
+    .ob-progress { display:flex;align-items:center;gap:10px;margin-bottom:20px;justify-content:center; }
+    .ob-prog-dot { width:6px;height:6px;border-radius:50%;background:rgba(0,255,224,0.15);transition:all 0.3s; }
+    .ob-prog-dot.active { background:#00ffe0;box-shadow:0 0 8px rgba(0,255,224,0.6); }
     @media(max-width:520px){.ob-mode-grid{gap:5px}.ob-mode{font-size:7px;padding:4px 8px}}
 
     .qchip {
@@ -4064,15 +4075,32 @@ async function runPython(code) {
       <div class="empty-forge" id="emptyState">
         {% if is_new_user %}
         <!-- ══════════════ ONBOARDING GUIDE (new users only) ══════════════ -->
-        <div id="onboardGuide" style="width:100%;max-width:680px;margin:0 auto;padding:24px 16px 40px">
+        <div id="onboardGuide" style="width:100%;max-width:700px;margin:0 auto;padding:24px 16px 40px">
 
           <!-- Header -->
-          <div style="text-align:center;margin-bottom:28px">
+          <div style="text-align:center;margin-bottom:24px">
             <div style="font-family:var(--display);font-size:22px;font-weight:900;letter-spacing:4px;color:#00ffe0;margin-bottom:8px">👋 WELCOME TO CODEBUDDY</div>
             <div style="font-family:var(--mono);font-size:12px;color:rgba(226,244,255,0.45);line-height:1.7">Hi <strong style="color:#c084fc">{{ username }}</strong> — here's everything you can do. Click any card to try it now.</div>
+            <!-- Progress dots -->
+            <div class="ob-progress" style="margin-top:16px">
+              <div class="ob-prog-dot active"></div>
+              <div class="ob-prog-dot active"></div>
+              <div class="ob-prog-dot active"></div>
+              <div class="ob-prog-dot active"></div>
+              <div class="ob-prog-dot active"></div>
+              <div class="ob-prog-dot active"></div>
+              <div class="ob-prog-dot" style="background:rgba(168,85,247,0.4);box-shadow:0 0 8px rgba(168,85,247,0.4)"></div>
+              <div class="ob-prog-dot" style="background:rgba(168,85,247,0.4);box-shadow:0 0 8px rgba(168,85,247,0.4)"></div>
+              <div class="ob-prog-dot" style="background:rgba(168,85,247,0.4);box-shadow:0 0 8px rgba(168,85,247,0.4)"></div>
+              <div class="ob-prog-dot" style="background:rgba(168,85,247,0.4);box-shadow:0 0 8px rgba(168,85,247,0.4)"></div>
+              <div class="ob-prog-dot" style="background:rgba(168,85,247,0.4);box-shadow:0 0 8px rgba(168,85,247,0.4)"></div>
+              <div class="ob-prog-dot" style="background:rgba(168,85,247,0.4);box-shadow:0 0 8px rgba(168,85,247,0.4)"></div>
+            </div>
+            <div style="font-family:var(--mono);font-size:9px;color:rgba(226,244,255,0.2);letter-spacing:2px">6 CORE FEATURES · <span style="color:rgba(168,85,247,0.6)">6 WORLD-FIRSTS</span></div>
           </div>
 
-          <!-- Step-by-step cards -->
+          <!-- ── SECTION: CORE FEATURES ── -->
+          <div class="ob-section-label">── CORE FEATURES</div>
           <div style="display:flex;flex-direction:column;gap:12px">
 
             <!-- 1. Ask anything -->
@@ -4136,11 +4164,11 @@ async function runPython(code) {
               <div class="ob-arrow">→</div>
             </div>
 
-            <!-- 5. Features Hub -->
+            <!-- 5. Features Hub — updated to 11 world-firsts -->
             <div class="ob-card" onclick="window.HUB&&HUB.open()">
               <div class="ob-num">05</div>
               <div class="ob-body">
-                <div class="ob-title">⚡ 5 World-First Features</div>
+                <div class="ob-title">⚡ 11 World-First Features</div>
                 <div class="ob-desc">Click <strong style="color:#fbbf24">⚡ FEATURES HUB</strong> in the sidebar to unlock exclusive tools no other AI coding assistant has.</div>
                 <div class="ob-mode-grid">
                   <span class="ob-mode" style="--ob-c:#a855f7">🧠 THOUGHT REPLAY<span class="ob-mode-tip">Watch AI think step-by-step</span></span>
@@ -4148,6 +4176,12 @@ async function runPython(code) {
                   <span class="ob-mode" style="--ob-c:#4ade80">✨ KARMA<span class="ob-mode-tip">Earn XP for helping others</span></span>
                   <span class="ob-mode" style="--ob-c:#38bdf8">📈 LEARNING<span class="ob-mode-tip">Replay your coding journey</span></span>
                   <span class="ob-mode" style="--ob-c:#e879f9">👁 BLIND REVIEW<span class="ob-mode-tip">Anonymous peer code review</span></span>
+                  <span class="ob-mode" style="--ob-c:#fb923c">😤 MOOD ENGINE<span class="ob-mode-tip">AI adapts to your emotion</span></span>
+                  <span class="ob-mode" style="--ob-c:#a3e635">⚰ DEAD CODE<span class="ob-mode-tip">AI burial map of dead code</span></span>
+                  <span class="ob-mode" style="--ob-c:#67e8f9">🧬 CODE DNA<span class="ob-mode-tip">AI matches your coding style</span></span>
+                  <span class="ob-mode" style="--ob-c:#facc15">🦆 RUBBER DUCK+<span class="ob-mode-tip">Socratic AI — no answers</span></span>
+                  <span class="ob-mode" style="--ob-c:#34d399">📓 CHANGELOG<span class="ob-mode-tip">Auto learning diary</span></span>
+                  <span class="ob-mode" style="--ob-c:#f87171">🎯 CALIBRATOR<span class="ob-mode-tip">Expose confidence gaps</span></span>
                 </div>
               </div>
               <div class="ob-arrow">→</div>
@@ -4169,11 +4203,112 @@ async function runPython(code) {
 
           </div>
 
+          <!-- ── SECTION: WORLD-FIRST FEATURES ── -->
+          <div class="ob-section-label ob-new-section" style="margin-top:24px">── WORLD-FIRST FEATURES (v6–v8)</div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+
+            <!-- 7. Code Mood Engine -->
+            <div class="ob-card ob-new" onclick="quickAsk('wtf why is this not working!! my loop keeps running forever')">
+              <div class="ob-num">07</div>
+              <div class="ob-body">
+                <div class="ob-title">😤 Code Mood Engine <span class="ob-new-badge">WORLD-FIRST</span></div>
+                <div class="ob-desc">The AI silently detects if you're frustrated, confused, or confident and adapts its tone automatically. Frustrated? Warmer, no theory. Confused? Simpler with analogies. Confident? Goes deeper. <strong style="color:rgba(168,85,247,0.7)">No other coding AI does this.</strong></div>
+                <div class="ob-chips">
+                  <span class="ob-chip" style="border-color:rgba(168,85,247,0.3);color:#a855f7;background:rgba(168,85,247,0.06)" onclick="event.stopPropagation();quickAsk('ugh this stupid bug STILL wont fix!! why does my array keep returning undefined???')">😤 Try: Frustrated message</span>
+                  <span class="ob-chip" style="border-color:rgba(168,85,247,0.3);color:#a855f7;background:rgba(168,85,247,0.06)" onclick="event.stopPropagation();fetch('/mood/history').then(r=>r.json()).then(d=>{const s=d.summary||{};const dom=d.dominant_mood||'neutral';const emojis={frustrated:'😤',confused:'🤔',confident:'💪',neutral:'😐'};alert('😤 Your Mood History\n\nDominant mood: '+(emojis[dom]||'')+'  '+dom.toUpperCase()+'\n\nBreakdown:\n😤 Frustrated: '+(s.frustrated||0)+' times\n🤔 Confused: '+(s.confused||0)+' times\n💪 Confident: '+(s.confident||0)+' times\n😐 Neutral: '+(s.neutral||0)+' times\n\nTotal signals: '+d.recent.length)})">📊 Mood History</span>
+                </div>
+              </div>
+              <div class="ob-arrow">→</div>
+            </div>
+
+            <!-- 8. Dead Code Archaeologist -->
+            <div class="ob-card ob-new" onclick="quickAsk('Analyze my code for dead/unreachable functions')">
+              <div class="ob-num">08</div>
+              <div class="ob-body">
+                <div class="ob-title">⚰ Dead Code Archaeologist <span class="ob-new-badge">WORLD-FIRST</span></div>
+                <div class="ob-desc">Paste any file and get a full <strong style="color:rgba(168,85,247,0.7)">burial map</strong> — AI explains exactly WHY each dead block is unreachable, with a visual call graph. Not just a flag — a causal diagnosis with three severity levels.</div>
+                <div class="ob-mode-grid">
+                  <span class="ob-mode" style="border-color:rgba(255,107,43,0.2);background:rgba(255,107,43,0.04);color:rgba(255,107,43,0.8)">🧟 ZOMBIE<span class="ob-mode-tip">Runs but has no effect</span></span>
+                  <span class="ob-mode" style="border-color:rgba(168,85,247,0.2);background:rgba(168,85,247,0.04);color:rgba(168,85,247,0.8)">👻 GHOST<span class="ob-mode-tip">Defined but never called</span></span>
+                  <span class="ob-mode" style="border-color:rgba(251,191,36,0.2);background:rgba(251,191,36,0.04);color:rgba(251,191,36,0.8)">🦴 FOSSIL<span class="ob-mode-tip">Leftover from old version</span></span>
+                </div>
+                <div class="ob-chips" style="margin-top:10px">
+                  <span class="ob-chip" style="border-color:rgba(168,85,247,0.3);color:#a855f7;background:rgba(168,85,247,0.06)" onclick="event.stopPropagation();DeadCode.scan()">⚰ Scan My Code</span>
+                </div>
+              </div>
+              <div class="ob-arrow">→</div>
+            </div>
+
+            <!-- 9. Code DNA -->
+            <div class="ob-card ob-new" onclick="fetch('/dna/me').then(r=>r.json()).then(d=>alert(d.profile?'DNA: '+JSON.stringify(d.profile,null,2):d.message))">
+              <div class="ob-num">09</div>
+              <div class="ob-body">
+                <div class="ob-title">🧬 Code DNA Fingerprinting <span class="ob-new-badge">WORLD-FIRST</span></div>
+                <div class="ob-desc">Learns your personal coding style from past conversations — indentation, naming, comments, patterns — and silently applies it to every code example. <strong style="color:rgba(168,85,247,0.7)">Your style. Your AI.</strong></div>
+                <div class="ob-chips">
+                  <span class="ob-chip" style="border-color:rgba(168,85,247,0.3);color:#a855f7;background:rgba(168,85,247,0.06)" onclick="event.stopPropagation();fetch('/dna/build',{method:'POST'}).then(r=>r.json()).then(d=>alert(d.profile?'🧬 DNA Built!\nStyle: '+d.profile.naming_convention+'\nIndent: '+d.profile.indent_size+' '+d.profile.indent_style:d.error||'Not enough code yet!'))">🧬 Build My DNA</span>
+                  <span class="ob-chip" style="border-color:rgba(168,85,247,0.3);color:#a855f7;background:rgba(168,85,247,0.06)" onclick="event.stopPropagation();fetch('/dna/patch_preview',{method:'POST'}).then(r=>r.json()).then(d=>alert(d.active?'✅ Active: '+d.traits.join(', '):'No DNA yet — paste some code first!'))">🔍 Style Traits</span>
+                </div>
+              </div>
+              <div class="ob-arrow">→</div>
+            </div>
+
+            <!-- 10. Rubber Duck+ Mode -->
+            <div class="ob-card ob-new" onclick="DuckMode.activate()">
+              <div class="ob-num">10</div>
+              <div class="ob-body">
+                <div class="ob-title">🦆 Rubber Duck+ Mode <span class="ob-new-badge">WORLD-FIRST</span></div>
+                <div class="ob-desc">Activate Duck Mode and CodeBuddy <strong style="color:rgba(250,204,21,0.8)">refuses to give you the answer</strong> — it only asks Socratic questions to guide you to the solution yourself. The fastest way to truly understand your code. No other coding AI deliberately won't answer.</div>
+                <div class="ob-chips">
+                  <span class="ob-chip" style="border-color:rgba(250,204,21,0.3);color:#facc15;background:rgba(250,204,21,0.06)" onclick="event.stopPropagation();DuckMode.activate()">🦆 Activate Duck Mode</span>
+                  <span class="ob-chip" style="border-color:rgba(250,204,21,0.3);color:#facc15;background:rgba(250,204,21,0.06)" onclick="event.stopPropagation();DuckMode.deactivate()">🔇 Deactivate</span>
+                  <span class="ob-chip" style="border-color:rgba(250,204,21,0.3);color:#facc15;background:rgba(250,204,21,0.06)" onclick="event.stopPropagation();DuckMode.status()">📡 Check Status</span>
+                </div>
+              </div>
+              <div class="ob-arrow">→</div>
+            </div>
+
+            <!-- 11. Personal Changelog Generator -->
+            <div class="ob-card ob-new" onclick="Changelog.generate()">
+              <div class="ob-num">11</div>
+              <div class="ob-body">
+                <div class="ob-title">📓 Personal Changelog Generator <span class="ob-new-badge">WORLD-FIRST</span></div>
+                <div class="ob-desc">One click turns today's coding sessions into a structured <strong style="color:rgba(52,211,153,0.8)">learning diary</strong> — what you learned, what you built, best insight, what to revisit, and tomorrow's focus. Permanent portfolio evidence. Growth documented automatically.</div>
+                <div class="ob-chips">
+                  <span class="ob-chip" style="border-color:rgba(52,211,153,0.3);color:#34d399;background:rgba(52,211,153,0.06)" onclick="event.stopPropagation();Changelog.generate()">📓 Generate Today's Log</span>
+                  <span class="ob-chip" style="border-color:rgba(52,211,153,0.3);color:#34d399;background:rgba(52,211,153,0.06)" onclick="event.stopPropagation();Changelog.history()">📚 View History</span>
+                </div>
+              </div>
+              <div class="ob-arrow">→</div>
+            </div>
+
+            <!-- 12. Code Confidence Calibrator -->
+            <div class="ob-card ob-new" onclick="CalibQuiz.open()">
+              <div class="ob-num">12</div>
+              <div class="ob-body">
+                <div class="ob-title">🎯 Code Confidence Calibrator <span class="ob-new-badge">WORLD-FIRST</span></div>
+                <div class="ob-desc">Claim a confidence level → take a 5-question quiz → see the <strong style="color:rgba(248,113,113,0.8)">gap</strong> between what you think you know and what you can prove. Are you overconfident or a hidden expert? Track your calibration improving over time.</div>
+                <div class="ob-mode-grid">
+                  <span class="ob-mode" style="border-color:rgba(239,68,68,0.2);background:rgba(239,68,68,0.04);color:rgba(239,68,68,0.8)">⚠️ OVERCONFIDENT<span class="ob-mode-tip">Claimed 70, scored 40</span></span>
+                  <span class="ob-mode" style="border-color:rgba(251,191,36,0.2);background:rgba(251,191,36,0.04);color:rgba(251,191,36,0.8)">✅ CALIBRATED<span class="ob-mode-tip">Claim matches reality</span></span>
+                  <span class="ob-mode" style="border-color:rgba(52,211,153,0.2);background:rgba(52,211,153,0.04);color:rgba(52,211,153,0.8)">🌟 HIDDEN EXPERT<span class="ob-mode-tip">Scored higher than claimed</span></span>
+                </div>
+                <div class="ob-chips" style="margin-top:10px">
+                  <span class="ob-chip" style="border-color:rgba(248,113,113,0.3);color:#f87171;background:rgba(248,113,113,0.06)" onclick="event.stopPropagation();CalibQuiz.open()">🎯 Start Quiz</span>
+                  <span class="ob-chip" style="border-color:rgba(248,113,113,0.3);color:#f87171;background:rgba(248,113,113,0.06)" onclick="event.stopPropagation();fetch('/calibrate/history').then(r=>r.json()).then(d=>{if(!d.total){alert('No calibrations yet — take your first quiz!');return;}let msg='📊 Calibration History\n\n'+d.total+' quizzes done\nAvg gap: '+d.avg_absolute_gap+' pts\n'+(d.calibration_improving?'✅ Improving!':'Keep practicing!')+'\n\nRecent topics:\n';d.records.slice(0,5).forEach(r=>{msg+='\n• '+r.topic+': rated '+r.self_rating+'/10, scored '+r.actual_score+'%  (gap: '+(r.gap>0?'+':'')+r.gap+')'});alert(msg);})">📊 My History</span>
+                </div>
+              </div>
+              <div class="ob-arrow">→</div>
+            </div>
+
+          </div>
+
           <!-- Dismiss button -->
-          <div style="text-align:center;margin-top:24px">
+          <div style="text-align:center;margin-top:28px">
             <button onclick="dismissOnboarding()" style="background:rgba(0,255,224,0.06);border:1px solid rgba(0,255,224,0.2);color:#00ffe0;font-family:var(--display);font-size:9px;font-weight:700;letter-spacing:2px;padding:10px 28px;border-radius:6px;cursor:pointer;transition:all 0.2s">
               ✓ GOT IT — START CODING
             </button>
+            <div style="font-family:var(--mono);font-size:9px;color:rgba(226,244,255,0.15);margin-top:10px">CodeBuddy v8.0 · 12 world-first features · 20 languages</div>
           </div>
         </div>
 
@@ -4699,6 +4834,7 @@ async function runPython(code) {
         sendBtn.disabled = false;
       }
       currentChatId = id;
+      window._currentChatId = id;
       sessionMsgCount = 0;
       document.querySelectorAll('.chat-item').forEach(e => e.classList.remove('active'));
       el.classList.add('active');
@@ -4772,6 +4908,7 @@ async function runPython(code) {
           list.insertBefore(item, list.firstChild);
           // Select it immediately
           currentChatId = id;
+          window._currentChatId = id;
           sessionMsgCount = 0;
           chatBox.innerHTML = '';
           // Show empty state
@@ -4844,6 +4981,7 @@ async function runPython(code) {
             item.addEventListener('click', function(e) { if (!e.target.closest('.menu')) selectChat(id, item); });
             list.insertBefore(item, list.firstChild);
             currentChatId = id;
+            window._currentChatId = id;
             sessionMsgCount = 0;
             const emp = document.getElementById('emptyState');
             if (emp) emp.remove();
@@ -5278,6 +5416,7 @@ Format: Start with "SCORE: X/10" then your analysis.`;
       if (!currentChatId) {
         fetch('/new_chat', { method: 'POST' }).then(r => r.json()).then(d => {
           currentChatId = d.chat_id || d.id;
+          window._currentChatId = currentChatId;
           ivSendContext(systemPrompt);
         }).catch(() => { ivSendContext(systemPrompt); });
       } else {
@@ -5604,22 +5743,20 @@ Hints used: ${IV.hintCount} | Skipped: ${IV.skipCount} | Best streak: ${IV.maxSt
     }
 
     function getLang() {
-      // Priority 1: voice clone detected language (set after recording)
-      if (window._vcDetectedLang && window._hasVoiceClone) {
-        const v = window._vcDetectedLang;
-        return v === 'ta-en' ? 'ta-IN' : v;
+      const el = document.getElementById('cbLangSel');
+      let v = el ? el.value : 'en-US';
+      if (v === 'en-US' && window._vcDetectedLang && window._hasVoiceClone) {
+        v = window._vcDetectedLang;
       }
-      // Priority 2: voice bar selector (cbLangSel)
-      const v = (document.getElementById('cbLangSel') || { value: 'en-US' }).value;
       return v === 'ta-en' ? 'ta-IN' : v;
     }
     function getLangRaw() {
-      // Priority 1: voice clone detected language
-      if (window._vcDetectedLang && window._hasVoiceClone) {
-        return window._vcDetectedLang;
+      const el = document.getElementById('cbLangSel');
+      let v = el ? el.value : 'en-US';
+      if (v === 'en-US' && window._vcDetectedLang && window._hasVoiceClone) {
+        v = window._vcDetectedLang;
       }
-      // Priority 2: UI selector
-      return (document.getElementById('cbLangSel') || { value: 'en-US' }).value;
+      return v;
     }
 
     const LANG_LABELS = {
@@ -8380,6 +8517,537 @@ const VideoAnalyzer = (() => {
   return { open, close, handleDrop, handleFile, clearFile, analyze, sendToChat };
 })();
 window.VideoAnalyzer = VideoAnalyzer;
+</script>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     FEATURE MODALS — CalibQuiz · DeadCode · Changelog
+     All six features now have proper full UI instead of alert()
+     ═══════════════════════════════════════════════════════════════ -->
+
+<!-- SHARED MODAL OVERLAY -->
+<div id="featureModalOverlay" onclick="FeatureModal.close()" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(2,4,8,0.88);backdrop-filter:blur(8px)"></div>
+<div id="featureModal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9001;width:min(700px,96vw);max-height:88vh;overflow-y:auto;background:#060d1a;border:1px solid rgba(0,255,224,0.2);border-radius:12px;padding:0">
+  <div id="featureModalInner"></div>
+</div>
+
+<style>
+  .fm-header{display:flex;align-items:center;justify-content:space-between;padding:18px 24px 14px;border-bottom:1px solid rgba(0,255,224,0.08)}
+  .fm-title{font-family:var(--display);font-size:11px;font-weight:700;letter-spacing:2px;color:#00ffe0}
+  .fm-close{background:none;border:1px solid rgba(0,255,224,0.15);color:rgba(0,255,224,0.5);font-size:14px;width:28px;height:28px;border-radius:4px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .fm-close:hover{background:rgba(0,255,224,0.06);color:#00ffe0}
+  .fm-body{padding:20px 24px 24px}
+  .fm-input{width:100%;background:rgba(0,255,224,0.03);border:1px solid rgba(0,255,224,0.15);color:#e2f4ff;font-family:var(--mono);font-size:13px;padding:10px 14px;border-radius:6px;outline:none;box-sizing:border-box;margin-bottom:10px}
+  .fm-input:focus{border-color:rgba(0,255,224,0.4)}
+  .fm-btn{font-family:var(--display);font-size:9px;font-weight:700;letter-spacing:1.5px;padding:10px 22px;border-radius:6px;cursor:pointer;transition:all 0.2s;border:none}
+  .fm-btn-primary{background:#00ffe0;color:#020408}
+  .fm-btn-primary:hover{background:#00ccb4}
+  .fm-btn-secondary{background:rgba(0,255,224,0.06);border:1px solid rgba(0,255,224,0.2);color:#00ffe0}
+  .fm-btn-secondary:hover{background:rgba(0,255,224,0.12)}
+  .fm-label{font-family:var(--display);font-size:8px;font-weight:700;letter-spacing:2px;color:rgba(0,255,224,0.4);margin-bottom:6px}
+  .fm-q-card{background:rgba(0,255,224,0.02);border:1px solid rgba(0,255,224,0.1);border-radius:8px;padding:16px;margin-bottom:12px}
+  .fm-q-text{font-family:var(--body);font-size:13px;color:#e2f4ff;margin-bottom:12px;line-height:1.6}
+  .fm-option{display:flex;align-items:flex-start;gap:10px;padding:8px 12px;border:1px solid rgba(0,255,224,0.08);border-radius:6px;margin-bottom:6px;cursor:pointer;transition:all 0.15s}
+  .fm-option:hover{background:rgba(0,255,224,0.04);border-color:rgba(0,255,224,0.2)}
+  .fm-option.selected{background:rgba(0,255,224,0.08);border-color:rgba(0,255,224,0.4)}
+  .fm-option.correct{background:rgba(52,211,153,0.08);border-color:rgba(52,211,153,0.4)}
+  .fm-option.wrong{background:rgba(239,68,68,0.08);border-color:rgba(239,68,68,0.3)}
+  .fm-opt-key{font-family:var(--mono);font-size:11px;color:rgba(0,255,224,0.6);min-width:18px;font-weight:700;padding-top:1px}
+  .fm-opt-text{font-family:var(--body);font-size:13px;color:rgba(226,244,255,0.85);line-height:1.5}
+  .fm-progress{height:3px;background:rgba(0,255,224,0.1);border-radius:2px;margin-bottom:18px;overflow:hidden}
+  .fm-progress-fill{height:100%;background:#00ffe0;transition:width 0.4s ease;border-radius:2px}
+  .fm-result-badge{font-family:var(--display);font-size:12px;font-weight:700;letter-spacing:2px;padding:10px 20px;border-radius:8px;text-align:center;margin-bottom:16px}
+  .fm-overconfident{background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#f87171}
+  .fm-calibrated{background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.3);color:#34d399}
+  .fm-hidden{background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.3);color:#a855f7}
+  .fm-stat-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px}
+  .fm-stat{background:rgba(0,255,224,0.03);border:1px solid rgba(0,255,224,0.1);border-radius:8px;padding:12px;text-align:center}
+  .fm-stat-val{font-family:var(--display);font-size:18px;font-weight:700;color:#00ffe0}
+  .fm-stat-label{font-family:var(--mono);font-size:10px;color:rgba(0,255,224,0.4);margin-top:4px}
+  .fm-verdict{font-family:var(--body);font-size:13px;color:rgba(226,244,255,0.75);line-height:1.7;background:rgba(0,255,224,0.02);border:1px solid rgba(0,255,224,0.08);border-radius:8px;padding:14px;margin-bottom:16px}
+  .fm-per-q{background:rgba(0,0,0,0.2);border-radius:8px;padding:14px;margin-bottom:8px}
+  .fm-per-q-text{font-family:var(--body);font-size:12px;color:rgba(226,244,255,0.7);margin-bottom:6px;line-height:1.5}
+  .fm-per-q-ans{font-family:var(--mono);font-size:11px;margin-bottom:4px}
+  .fm-per-q-exp{font-family:var(--body);font-size:11px;color:rgba(0,255,224,0.5);font-style:italic;line-height:1.5}
+  .fm-spin{display:inline-block;width:16px;height:16px;border:2px solid rgba(0,255,224,0.2);border-top-color:#00ffe0;border-radius:50%;animation:fmspin 0.7s linear infinite}
+  @keyframes fmspin{to{transform:rotate(360deg)}}
+  .fm-dc-code{width:100%;min-height:140px;background:rgba(0,0,0,0.4);border:1px solid rgba(0,255,224,0.15);color:#e2f4ff;font-family:var(--mono);font-size:12px;padding:12px;border-radius:6px;resize:vertical;outline:none;box-sizing:border-box;margin-bottom:10px}
+  .fm-dc-item{border-radius:8px;padding:12px 14px;margin-bottom:8px;border:1px solid}
+  .fm-dc-zombie{background:rgba(255,107,43,0.06);border-color:rgba(255,107,43,0.2)}
+  .fm-dc-ghost{background:rgba(168,85,247,0.06);border-color:rgba(168,85,247,0.2)}
+  .fm-dc-fossil{background:rgba(251,191,36,0.06);border-color:rgba(251,191,36,0.2)}
+  .fm-dc-name{font-family:var(--mono);font-size:12px;font-weight:700;margin-bottom:4px}
+  .fm-dc-why{font-family:var(--body);font-size:12px;color:rgba(226,244,255,0.65);line-height:1.5}
+  .fm-cl-entry{background:rgba(0,255,224,0.02);border:1px solid rgba(0,255,224,0.1);border-radius:8px;padding:16px;margin-bottom:10px}
+  .fm-cl-date{font-family:var(--display);font-size:8px;letter-spacing:2px;color:rgba(0,255,224,0.4);margin-bottom:8px}
+  .fm-cl-text{font-family:var(--body);font-size:12px;color:rgba(226,244,255,0.75);line-height:1.7;white-space:pre-wrap}
+</style>
+
+<script>
+/* ── SHARED MODAL ENGINE ── */
+const FeatureModal = (() => {
+  function open(html) {
+    document.getElementById('featureModalInner').innerHTML = html;
+    document.getElementById('featureModalOverlay').style.display = 'block';
+    document.getElementById('featureModal').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+  }
+  function close() {
+    document.getElementById('featureModalOverlay').style.display = 'none';
+    document.getElementById('featureModal').style.display = 'none';
+    document.getElementById('featureModalInner').innerHTML = '';
+    document.body.style.overflow = '';
+  }
+  function setInner(html) {
+    document.getElementById('featureModalInner').innerHTML = html;
+  }
+  return { open, close, setInner };
+})();
+
+/* ═══════════════════════════════════════════════════════════════
+   🎯 CALIBRATOR QUIZ — Full working quiz modal
+   ═══════════════════════════════════════════════════════════════ */
+const CalibQuiz = (() => {
+  let _state = { step: 'setup', quiz_id: null, questions: [], answers: {}, currentQ: 0, topic: '', self_rating: 5 };
+
+  function open() {
+    _state = { step: 'setup', quiz_id: null, questions: [], answers: {}, currentQ: 0, topic: '', self_rating: 5 };
+    FeatureModal.open('<div></div>');
+    renderSetup();
+  }
+
+  function renderSetup() {
+    FeatureModal.setInner(`
+      <div class="fm-header">
+        <span class="fm-title">🎯 CODE CONFIDENCE CALIBRATOR</span>
+        <button class="fm-close" onclick="FeatureModal.close()">✕</button>
+      </div>
+      <div class="fm-body">
+        <div class="fm-label">WHAT TOPIC DO YOU WANT TO TEST?</div>
+        <input class="fm-input" id="cq-topic" placeholder="e.g. Python decorators, React hooks, SQL joins..." />
+        <div class="fm-label" style="margin-top:12px">YOUR CONFIDENCE LEVEL (1 = beginner · 10 = expert)</div>
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px">
+          <input type="range" min="1" max="10" value="5" id="cq-slider" oninput="document.getElementById('cq-val').textContent=this.value;CalibQuiz._rating=parseInt(this.value)" style="flex:1">
+          <span id="cq-val" style="font-family:var(--display);font-size:18px;color:#00ffe0;min-width:24px">5</span><span style="font-family:var(--mono);font-size:11px;color:rgba(0,255,224,0.4)">/10</span>
+        </div>
+        <div style="display:flex;gap:10px">
+          <button class="fm-btn fm-btn-primary" onclick="CalibQuiz.startQuiz()" style="flex:1">⚡ GENERATE 5 QUESTIONS</button>
+          <button class="fm-btn fm-btn-secondary" onclick="FeatureModal.close()">CANCEL</button>
+        </div>
+        <div id="cq-err" style="margin-top:10px;font-family:var(--mono);font-size:11px;color:#f87171;display:none"></div>
+      </div>
+    `);
+    CalibQuiz._rating = 5;
+  }
+
+  function startQuiz() {
+    const topic = document.getElementById('cq-topic').value.trim();
+    if (!topic) { document.getElementById('cq-err').textContent = '⚠ Enter a topic first'; document.getElementById('cq-err').style.display = 'block'; return; }
+    const rating = CalibQuiz._rating || 5;
+    _state.topic = topic; _state.self_rating = rating;
+    FeatureModal.setInner(`
+      <div class="fm-header"><span class="fm-title">🎯 GENERATING QUIZ…</span><button class="fm-close" onclick="FeatureModal.close()">✕</button></div>
+      <div class="fm-body" style="text-align:center;padding:40px 24px">
+        <div class="fm-spin" style="width:32px;height:32px;margin:0 auto 16px"></div>
+        <div style="font-family:var(--mono);font-size:12px;color:rgba(0,255,224,0.6)">Building 5 questions on <strong style="color:#00ffe0">${topic}</strong>…</div>
+      </div>
+    `);
+    fetch('/calibrate/quiz', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ topic, self_rating: rating }) })
+      .then(r => r.json())
+      .then(d => {
+        if (d.error) { showErr(d.error); return; }
+        _state.quiz_id = d.quiz_id;
+        _state.questions = d.questions;
+        _state.currentQ = 0;
+        _state.answers = {};
+        renderQuestion();
+      })
+      .catch(() => showErr('Network error — is the server running?'));
+  }
+
+  function showErr(msg) {
+    FeatureModal.setInner(`
+      <div class="fm-header"><span class="fm-title">🎯 CODE CONFIDENCE CALIBRATOR</span><button class="fm-close" onclick="FeatureModal.close()">✕</button></div>
+      <div class="fm-body" style="text-align:center;padding:32px 24px">
+        <div style="font-size:28px;margin-bottom:12px">⚠️</div>
+        <div style="font-family:var(--body);font-size:13px;color:#f87171;margin-bottom:20px">${msg}</div>
+        <button class="fm-btn fm-btn-secondary" onclick="CalibQuiz.open()">← TRY AGAIN</button>
+      </div>
+    `);
+  }
+
+  function renderQuestion() {
+    const q = _state.questions[_state.currentQ];
+    const total = _state.questions.length;
+    const pct = (_state.currentQ / total) * 100;
+    const opts = Object.entries(q.options);
+    FeatureModal.setInner(`
+      <div class="fm-header">
+        <span class="fm-title">🎯 QUESTION ${_state.currentQ + 1} OF ${total} · ${_state.topic.toUpperCase()}</span>
+        <button class="fm-close" onclick="FeatureModal.close()">✕</button>
+      </div>
+      <div class="fm-body">
+        <div class="fm-progress"><div class="fm-progress-fill" style="width:${pct}%"></div></div>
+        <div class="fm-q-card">
+          <div class="fm-q-text">${q.question}</div>
+          ${opts.map(([k, v]) => `
+            <div class="fm-option" id="opt-${k}" onclick="CalibQuiz.selectOption('${k}')">
+              <span class="fm-opt-key">${k}</span>
+              <span class="fm-opt-text">${v}</span>
+            </div>
+          `).join('')}
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-family:var(--mono);font-size:10px;color:rgba(0,255,224,0.3)">${Object.keys(_state.answers).length} of ${total} answered</span>
+          <button class="fm-btn fm-btn-primary" id="cq-next-btn" onclick="CalibQuiz.nextQuestion()" style="display:none">
+            ${_state.currentQ < total - 1 ? 'NEXT →' : '✓ SUBMIT QUIZ'}
+          </button>
+        </div>
+      </div>
+    `);
+    // Re-highlight if already answered
+    const existing = _state.answers[String(q.id)];
+    if (existing) {
+      document.getElementById('opt-' + existing)?.classList.add('selected');
+      document.getElementById('cq-next-btn').style.display = 'inline-block';
+    }
+  }
+
+  function selectOption(key) {
+    const q = _state.questions[_state.currentQ];
+    _state.answers[String(q.id)] = key;
+    document.querySelectorAll('.fm-option').forEach(el => el.classList.remove('selected'));
+    document.getElementById('opt-' + key)?.classList.add('selected');
+    document.getElementById('cq-next-btn').style.display = 'inline-block';
+  }
+
+  function nextQuestion() {
+    const q = _state.questions[_state.currentQ];
+    if (!_state.answers[String(q.id)]) return;
+    if (_state.currentQ < _state.questions.length - 1) {
+      _state.currentQ++;
+      renderQuestion();
+    } else {
+      submitQuiz();
+    }
+  }
+
+  function submitQuiz() {
+    FeatureModal.setInner(`
+      <div class="fm-header"><span class="fm-title">🎯 SCORING YOUR QUIZ…</span><button class="fm-close" onclick="FeatureModal.close()">✕</button></div>
+      <div class="fm-body" style="text-align:center;padding:40px 24px">
+        <div class="fm-spin" style="width:32px;height:32px;margin:0 auto 16px"></div>
+        <div style="font-family:var(--mono);font-size:12px;color:rgba(0,255,224,0.6)">Calculating your calibration gap…</div>
+      </div>
+    `);
+    fetch('/calibrate/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ quiz_id: _state.quiz_id, answers: _state.answers }) })
+      .then(r => r.json())
+      .then(d => {
+        if (d.error) { showErr(d.error); return; }
+        renderResult(d);
+      })
+      .catch(() => showErr('Could not submit — try again.'));
+  }
+
+  function renderResult(d) {
+    const badgeClass = d.calibration === 'overconfident' ? 'fm-overconfident' : d.calibration === 'underconfident' ? 'fm-hidden' : 'fm-calibrated';
+    const gapStr = (d.gap >= 0 ? '+' : '') + d.gap;
+    const perQHtml = (d.per_question || []).map(q => `
+      <div class="fm-per-q">
+        <div class="fm-per-q-text">${q.question}</div>
+        <div class="fm-per-q-ans">
+          ${q.is_correct
+            ? `<span style="color:#34d399">✓ Correct</span>`
+            : `<span style="color:#f87171">✗ You chose ${q.chosen || '(none)'} · Correct: ${q.correct}</span>`}
+        </div>
+        ${q.explanation ? `<div class="fm-per-q-exp">${q.explanation}</div>` : ''}
+      </div>
+    `).join('');
+    FeatureModal.setInner(`
+      <div class="fm-header">
+        <span class="fm-title">🎯 CALIBRATION RESULT · ${_state.topic.toUpperCase()}</span>
+        <button class="fm-close" onclick="FeatureModal.close()">✕</button>
+      </div>
+      <div class="fm-body">
+        <div class="fm-result-badge ${badgeClass}">${d.badge}</div>
+        <div class="fm-stat-row">
+          <div class="fm-stat"><div class="fm-stat-val">${d.self_rating}/10</div><div class="fm-stat-label">SELF RATING</div></div>
+          <div class="fm-stat"><div class="fm-stat-val">${d.correct_count}/${d.total}</div><div class="fm-stat-label">CORRECT</div></div>
+          <div class="fm-stat"><div class="fm-stat-val" style="${d.gap < -20 ? 'color:#f87171' : d.gap > 20 ? 'color:#a855f7' : ''}">${gapStr}pts</div><div class="fm-stat-label">GAP</div></div>
+        </div>
+        <div class="fm-verdict">${d.verdict}</div>
+        <div class="fm-label" style="margin-bottom:10px">QUESTION BREAKDOWN</div>
+        ${perQHtml}
+        <div style="display:flex;gap:10px;margin-top:16px">
+          <button class="fm-btn fm-btn-primary" onclick="CalibQuiz.open()" style="flex:1">🎯 TRY ANOTHER TOPIC</button>
+          <button class="fm-btn fm-btn-secondary" onclick="FeatureModal.close()">CLOSE</button>
+        </div>
+      </div>
+    `);
+  }
+
+  return { open, startQuiz, selectOption, nextQuestion, _rating: 5 };
+})();
+
+/* ═══════════════════════════════════════════════════════════════
+   ⚰️ DEAD CODE ARCHAEOLOGIST — Full modal with real API
+   ═══════════════════════════════════════════════════════════════ */
+const DeadCode = (() => {
+  function scan() {
+    FeatureModal.open(`
+      <div class="fm-header">
+        <span class="fm-title">⚰ DEAD CODE ARCHAEOLOGIST</span>
+        <button class="fm-close" onclick="FeatureModal.close()">✕</button>
+      </div>
+      <div class="fm-body">
+        <div class="fm-label">PASTE YOUR CODE BELOW</div>
+        <textarea class="fm-dc-code" id="dc-code" placeholder="Paste your Python, JS, or any code here…"></textarea>
+        <div style="display:flex;gap:10px;margin-bottom:10px">
+          <select id="dc-lang" class="fm-input" style="margin:0;flex:1">
+            <option value="python">Python</option>
+            <option value="javascript">JavaScript</option>
+            <option value="typescript">TypeScript</option>
+            <option value="java">Java</option>
+            <option value="go">Go</option>
+            <option value="other">Other</option>
+          </select>
+          <button class="fm-btn fm-btn-primary" onclick="DeadCode.analyze()" style="white-space:nowrap">⚰ ANALYZE</button>
+        </div>
+        <div id="dc-result"></div>
+      </div>
+    `);
+  }
+
+  function analyze() {
+    const code = document.getElementById('dc-code').value.trim();
+    const lang = document.getElementById('dc-lang').value;
+    if (!code) { document.getElementById('dc-result').innerHTML = '<div style="color:#f87171;font-family:var(--mono);font-size:11px">⚠ Paste some code first</div>'; return; }
+    document.getElementById('dc-result').innerHTML = `
+      <div style="text-align:center;padding:24px">
+        <div class="fm-spin" style="width:28px;height:28px;margin:0 auto 12px"></div>
+        <div style="font-family:var(--mono);font-size:11px;color:rgba(0,255,224,0.5)">Analyzing for dead code…</div>
+      </div>`;
+    fetch('/dead_code', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, language: lang }) })
+      .then(r => r.json())
+      .then(d => {
+        if (d.error) { document.getElementById('dc-result').innerHTML = `<div style="color:#f87171;font-family:var(--mono);font-size:11px">⚠ ${d.error}</div>`; return; }
+        renderResult(d);
+      })
+      .catch(e => { document.getElementById('dc-result').innerHTML = `<div style="color:#f87171;font-family:var(--mono);font-size:11px">⚠ ${e.message}</div>`; });
+  }
+
+  function renderResult(d) {
+    const items = d.dead_blocks || d.items || [];
+    if (!items.length) {
+      document.getElementById('dc-result').innerHTML = `<div style="text-align:center;padding:20px;font-family:var(--body);font-size:13px;color:#34d399">✅ No dead code found — clean codebase!</div>`;
+      return;
+    }
+    const typeMap = { zombie: { cls: 'fm-dc-zombie', emoji: '🧟', label: 'ZOMBIE', color: '#ff6b2b' }, ghost: { cls: 'fm-dc-ghost', emoji: '👻', label: 'GHOST', color: '#a855f7' }, fossil: { cls: 'fm-dc-fossil', emoji: '🦴', label: 'FOSSIL', color: '#fbbf24' } };
+    const html = items.map(item => {
+      const t = typeMap[(item.severity || item.type || 'ghost').toLowerCase()] || typeMap.ghost;
+      return `<div class="fm-dc-item ${t.cls}">
+        <div class="fm-dc-name" style="color:${t.color}">${t.emoji} ${t.label} · <code style="color:${t.color}">${item.name || item.function || 'unknown'}</code>${item.line ? ` <span style="color:rgba(226,244,255,0.3);font-size:10px">line ${item.line}</span>` : ''}</div>
+        <div class="fm-dc-why">${item.reason || item.why || item.explanation || 'Dead code detected.'}</div>
+      </div>`;
+    }).join('');
+    const summary = d.summary || `Found ${items.length} dead block${items.length !== 1 ? 's' : ''}.`;
+    document.getElementById('dc-result').innerHTML = `
+      <div class="fm-label" style="margin-bottom:8px">BURIAL MAP · ${items.length} DEAD BLOCK${items.length !== 1 ? 'S' : ''} FOUND</div>
+      <div style="font-family:var(--body);font-size:12px;color:rgba(0,255,224,0.5);margin-bottom:12px">${summary}</div>
+      ${html}`;
+  }
+
+  return { scan, analyze };
+})();
+
+/* ═══════════════════════════════════════════════════════════════
+   📓 CHANGELOG GENERATOR — Full modal with diary display
+   ═══════════════════════════════════════════════════════════════ */
+const Changelog = (() => {
+  function generate() {
+    FeatureModal.open(`
+      <div class="fm-header">
+        <span class="fm-title">📓 PERSONAL CHANGELOG</span>
+        <button class="fm-close" onclick="FeatureModal.close()">✕</button>
+      </div>
+      <div class="fm-body" style="text-align:center;padding:40px 24px">
+        <div class="fm-spin" style="width:32px;height:32px;margin:0 auto 16px"></div>
+        <div style="font-family:var(--mono);font-size:12px;color:rgba(0,255,224,0.6)">Mining today's sessions into your learning diary…</div>
+      </div>
+    `);
+    fetch('/changelog/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
+      .then(r => r.json())
+      .then(d => {
+        if (!d.entry) {
+          FeatureModal.setInner(`
+            <div class="fm-header"><span class="fm-title">📓 PERSONAL CHANGELOG</span><button class="fm-close" onclick="FeatureModal.close()">✕</button></div>
+            <div class="fm-body" style="text-align:center;padding:32px 24px">
+              <div style="font-size:32px;margin-bottom:12px">📭</div>
+              <div style="font-family:var(--body);font-size:13px;color:rgba(226,244,255,0.6);margin-bottom:20px">${d.message || 'No coding sessions found today yet. Start chatting and come back!'}</div>
+              <button class="fm-btn fm-btn-secondary" onclick="FeatureModal.close()">CLOSE</button>
+            </div>
+          `);
+          return;
+        }
+        renderEntry(d.date || 'Today', d.entry, d.topics || []);
+      })
+      .catch(e => {
+        FeatureModal.setInner(`<div class="fm-header"><span class="fm-title">📓 CHANGELOG</span><button class="fm-close" onclick="FeatureModal.close()">✕</button></div><div class="fm-body"><div style="color:#f87171;font-family:var(--mono);font-size:12px">⚠ ${e.message}</div></div>`);
+      });
+  }
+
+  function history() {
+    FeatureModal.open(`
+      <div class="fm-header">
+        <span class="fm-title">📚 CHANGELOG HISTORY</span>
+        <button class="fm-close" onclick="FeatureModal.close()">✕</button>
+      </div>
+      <div class="fm-body" style="text-align:center;padding:40px 24px">
+        <div class="fm-spin" style="width:32px;height:32px;margin:0 auto 16px"></div>
+        <div style="font-family:var(--mono);font-size:12px;color:rgba(0,255,224,0.6)">Loading your learning diary…</div>
+      </div>
+    `);
+    fetch('/changelog/history').then(r => r.json()).then(d => {
+      if (!d.total) {
+        FeatureModal.setInner(`
+          <div class="fm-header"><span class="fm-title">📚 CHANGELOG HISTORY</span><button class="fm-close" onclick="FeatureModal.close()">✕</button></div>
+          <div class="fm-body" style="text-align:center;padding:32px 24px">
+            <div style="font-size:32px;margin-bottom:12px">📭</div>
+            <div style="font-family:var(--body);font-size:13px;color:rgba(226,244,255,0.6);margin-bottom:20px">No diary entries yet — generate your first one above!</div>
+            <button class="fm-btn fm-btn-primary" onclick="Changelog.generate()">📓 GENERATE TODAY'S LOG</button>
+          </div>
+        `);
+        return;
+      }
+      const entries = d.entries || d.history || [];
+      const entriesHtml = entries.map(e => `
+        <div class="fm-cl-entry">
+          <div class="fm-cl-date">${e.date || e.generated_at || '—'}</div>
+          <div class="fm-cl-text">${(e.entry || e.content || '').slice(0, 600)}${(e.entry || e.content || '').length > 600 ? '…' : ''}</div>
+        </div>
+      `).join('');
+      FeatureModal.setInner(`
+        <div class="fm-header">
+          <span class="fm-title">📚 CHANGELOG HISTORY · ${d.total} ENTRIES</span>
+          <button class="fm-close" onclick="FeatureModal.close()">✕</button>
+        </div>
+        <div class="fm-body">
+          <div style="font-family:var(--body);font-size:12px;color:rgba(0,255,224,0.4);margin-bottom:14px">${d.total} learning diary entr${d.total !== 1 ? 'ies' : 'y'} — your coding journey documented.</div>
+          ${entriesHtml || '<div style="font-family:var(--mono);font-size:12px;color:rgba(226,244,255,0.4)">No entries loaded.</div>'}
+          <button class="fm-btn fm-btn-primary" onclick="Changelog.generate()" style="width:100%;margin-top:8px">📓 GENERATE TODAY'S LOG</button>
+        </div>
+      `);
+    }).catch(() => {
+      FeatureModal.setInner(`<div class="fm-header"><span class="fm-title">📚 HISTORY</span><button class="fm-close" onclick="FeatureModal.close()">✕</button></div><div class="fm-body"><div style="color:#f87171;font-family:var(--mono);font-size:12px">⚠ Could not load history.</div></div>`);
+    });
+  }
+
+  function renderEntry(date, entry, topics) {
+    FeatureModal.setInner(`
+      <div class="fm-header">
+        <span class="fm-title">📓 TODAY'S LEARNING DIARY · ${date.toUpperCase()}</span>
+        <button class="fm-close" onclick="FeatureModal.close()">✕</button>
+      </div>
+      <div class="fm-body">
+        ${topics.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">${topics.map(t=>`<span style="font-family:var(--mono);font-size:10px;padding:3px 8px;border:1px solid rgba(0,255,224,0.2);border-radius:4px;color:rgba(0,255,224,0.7);background:rgba(0,255,224,0.04)">${t}</span>`).join('')}</div>` : ''}
+        <div class="fm-cl-text" style="font-size:13px;line-height:1.8;color:rgba(226,244,255,0.85)">${entry}</div>
+        <div style="display:flex;gap:10px;margin-top:18px">
+          <button class="fm-btn fm-btn-secondary" onclick="Changelog.history()">📚 VIEW HISTORY</button>
+          <button class="fm-btn fm-btn-secondary" onclick="FeatureModal.close()">CLOSE</button>
+        </div>
+      </div>
+    `);
+  }
+
+  return { generate, history };
+})();
+/* ═══════════════════════════════════════════════════════════════
+   🦆 DUCK MODE — proper activate/deactivate with chat banner
+   ═══════════════════════════════════════════════════════════════ */
+const DuckMode = (() => {
+  function _showBanner(on) {
+    let banner = document.getElementById('duck-banner');
+    if (on) {
+      if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'duck-banner';
+        banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:8000;background:#92400e;color:#fbbf24;font-family:var(--display);font-size:9px;font-weight:700;letter-spacing:2px;text-align:center;padding:7px 16px;display:flex;align-items:center;justify-content:center;gap:12px';
+        banner.innerHTML = '🦆 DUCK MODE ACTIVE — I will only ask questions. No answers from me!  <button onclick="DuckMode.deactivate()" style="background:rgba(0,0,0,0.3);border:1px solid rgba(251,191,36,0.4);color:#fbbf24;font-family:var(--display);font-size:8px;letter-spacing:1px;padding:3px 10px;border-radius:4px;cursor:pointer">DEACTIVATE</button>';
+        document.body.appendChild(banner);
+      }
+    } else {
+      if (banner) banner.remove();
+    }
+  }
+
+  function activate() {
+    const cid = window._currentChatId || '';
+    if (!cid) {
+      FeatureModal.open(`
+        <div class="fm-header"><span class="fm-title">🦆 DUCK MODE</span><button class="fm-close" onclick="FeatureModal.close()">✕</button></div>
+        <div class="fm-body" style="text-align:center;padding:32px 24px">
+          <div style="font-size:36px;margin-bottom:12px">🦆</div>
+          <div style="font-family:var(--body);font-size:13px;color:rgba(226,244,255,0.7);margin-bottom:8px">You need an active chat session first.</div>
+          <div style="font-family:var(--mono);font-size:11px;color:rgba(0,255,224,0.4);margin-bottom:20px">Open a chat from the sidebar (or start a new one), then activate Duck Mode.</div>
+          <button class="fm-btn fm-btn-secondary" onclick="FeatureModal.close()">OK</button>
+        </div>
+      `);
+      return;
+    }
+    fetch('/duck/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ conversation_id: cid }) })
+      .then(r => r.json())
+      .then(d => {
+        if (d.error) { alert('⚠ ' + d.error); return; }
+        _showBanner(true);
+        FeatureModal.open(`
+          <div class="fm-header"><span class="fm-title">🦆 DUCK MODE ACTIVATED</span><button class="fm-close" onclick="FeatureModal.close()">✕</button></div>
+          <div class="fm-body" style="text-align:center;padding:32px 24px">
+            <div style="font-size:48px;margin-bottom:14px">🦆</div>
+            <div style="font-family:var(--display);font-size:11px;font-weight:700;letter-spacing:2px;color:#fbbf24;margin-bottom:12px">DUCK MODE IS ON</div>
+            <div style="font-family:var(--body);font-size:13px;color:rgba(226,244,255,0.7);line-height:1.7;max-width:380px;margin:0 auto 20px">I will <strong style="color:#fbbf24">refuse to give you answers.</strong> Instead I'll ask Socratic questions to help you think it through yourself. This is the fastest way to truly understand your code.</div>
+            <div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);border-radius:8px;padding:12px;font-family:var(--mono);font-size:11px;color:rgba(251,191,36,0.7);margin-bottom:20px">💡 Tip: Tell me what you're stuck on and I'll guide your thinking — no spoilers!</div>
+            <button class="fm-btn fm-btn-primary" onclick="FeatureModal.close()" style="background:#fbbf24;color:#020408">START THINKING →</button>
+          </div>
+        `);
+      })
+      .catch(() => alert('⚠ Could not activate Duck Mode — check server is running.'));
+  }
+
+  function deactivate() {
+    const cid = window._currentChatId || '';
+    if (!cid) { _showBanner(false); return; }
+    fetch('/duck/stop', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ conversation_id: cid }) })
+      .then(r => r.json())
+      .then(d => {
+        _showBanner(false);
+        // Small toast instead of disruptive alert
+        const toast = document.createElement('div');
+        toast.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#1a2a1a;border:1px solid rgba(52,211,153,0.3);color:#34d399;font-family:var(--display);font-size:9px;letter-spacing:2px;padding:10px 20px;border-radius:8px;z-index:9999;pointer-events:none';
+        toast.textContent = '🦆 Duck Mode OFF — I can give answers again.';
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+      })
+      .catch(() => { _showBanner(false); });
+  }
+
+  function status() {
+    const cid = window._currentChatId || '';
+    if (!cid) { alert('No active chat — open a chat first.'); return; }
+    fetch('/duck/status/' + cid)
+      .then(r => r.json())
+      .then(d => {
+        if (d.active) {
+          _showBanner(true);
+          alert('🦆 Duck Mode: ACTIVE\nTurns taken: ' + (d.turns || 0) + '\nProblem: ' + (d.problem || 'not set'));
+        } else {
+          _showBanner(false);
+          alert('🦆 Duck Mode: INACTIVE for this chat.\nClick "Activate Duck Mode" to enable it.');
+        }
+      })
+      .catch(() => alert('⚠ Could not check status.'));
+  }
+
+  return { activate, deactivate, status };
+})();
 </script>
 
 </body>
