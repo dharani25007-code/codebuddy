@@ -81,7 +81,7 @@ async function runPython(code) {
       --nova-dim: rgba(168, 85, 247, 0.1);
       --gold: #fbbf24;
       --ice: #38bdf8;
-      --text: #e2f4ff;
+      --text: #ffffff;
       --text-2: rgba(226, 244, 255, 0.45);
       --text-3: rgba(226, 244, 255, 0.18);
       --border: rgba(0, 255, 224, 0.08);
@@ -96,9 +96,9 @@ async function runPython(code) {
     }
 
     body.light {
-      --void: #e8f4f8;
-      --deep: #d4ecf5;
-      --abyss: #eaf6fb;
+      --void: #a4d6e7;
+      --deep: #abd2e0;
+      --abyss: #a7d1e2;
       --plasma: #0891b2;
       --plasma-dim: rgba(8, 145, 178, 0.1);
       --plasma-glow: rgba(8, 145, 178, 0.2);
@@ -4179,7 +4179,6 @@ async function runPython(code) {
                   <span class="ob-mode" style="--ob-c:#fb923c">😤 MOOD ENGINE<span class="ob-mode-tip">AI adapts to your emotion</span></span>
                   <span class="ob-mode" style="--ob-c:#a3e635">⚰ DEAD CODE<span class="ob-mode-tip">AI burial map of dead code</span></span>
                   <span class="ob-mode" style="--ob-c:#67e8f9">🧬 CODE DNA<span class="ob-mode-tip">AI matches your coding style</span></span>
-                  <span class="ob-mode" style="--ob-c:#facc15">🦆 RUBBER DUCK+<span class="ob-mode-tip">Socratic AI — no answers</span></span>
                   <span class="ob-mode" style="--ob-c:#34d399">📓 CHANGELOG<span class="ob-mode-tip">Auto learning diary</span></span>
                   <span class="ob-mode" style="--ob-c:#f87171">🎯 CALIBRATOR<span class="ob-mode-tip">Expose confidence gaps</span></span>
                 </div>
@@ -4248,21 +4247,6 @@ async function runPython(code) {
                 <div class="ob-chips">
                   <span class="ob-chip" style="border-color:rgba(168,85,247,0.3);color:#a855f7;background:rgba(168,85,247,0.06)" onclick="event.stopPropagation();fetch('/dna/build',{method:'POST'}).then(r=>r.json()).then(d=>alert(d.profile?'🧬 DNA Built!\nStyle: '+d.profile.naming_convention+'\nIndent: '+d.profile.indent_size+' '+d.profile.indent_style:d.error||'Not enough code yet!'))">🧬 Build My DNA</span>
                   <span class="ob-chip" style="border-color:rgba(168,85,247,0.3);color:#a855f7;background:rgba(168,85,247,0.06)" onclick="event.stopPropagation();fetch('/dna/patch_preview',{method:'POST'}).then(r=>r.json()).then(d=>alert(d.active?'✅ Active: '+d.traits.join(', '):'No DNA yet — paste some code first!'))">🔍 Style Traits</span>
-                </div>
-              </div>
-              <div class="ob-arrow">→</div>
-            </div>
-
-            <!-- 10. Rubber Duck+ Mode -->
-            <div class="ob-card ob-new" onclick="DuckMode.activate()">
-              <div class="ob-num">10</div>
-              <div class="ob-body">
-                <div class="ob-title">🦆 Rubber Duck+ Mode <span class="ob-new-badge">WORLD-FIRST</span></div>
-                <div class="ob-desc">Activate Duck Mode and CodeBuddy <strong style="color:rgba(250,204,21,0.8)">refuses to give you the answer</strong> — it only asks Socratic questions to guide you to the solution yourself. The fastest way to truly understand your code. No other coding AI deliberately won't answer.</div>
-                <div class="ob-chips">
-                  <span class="ob-chip" style="border-color:rgba(250,204,21,0.3);color:#facc15;background:rgba(250,204,21,0.06)" onclick="event.stopPropagation();DuckMode.activate()">🦆 Activate Duck Mode</span>
-                  <span class="ob-chip" style="border-color:rgba(250,204,21,0.3);color:#facc15;background:rgba(250,204,21,0.06)" onclick="event.stopPropagation();DuckMode.deactivate()">🔇 Deactivate</span>
-                  <span class="ob-chip" style="border-color:rgba(250,204,21,0.3);color:#facc15;background:rgba(250,204,21,0.06)" onclick="event.stopPropagation();DuckMode.status()">📡 Check Status</span>
                 </div>
               </div>
               <div class="ob-arrow">→</div>
@@ -6648,11 +6632,19 @@ Hints used: ${IV.hintCount} | Skipped: ${IV.skipCount} | Best streak: ${IV.maxSt
     /* header */
     .hub-hdr {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 16px 22px 14px;
+      padding: 14px 22px 12px;
       border-bottom: 1px solid rgba(0,255,224,0.08);
       flex-shrink: 0;
-      background: rgba(0,255,224,0.02);
+      background: rgba(4,8,20,0.97);
+      position: relative; overflow: hidden;
     }
+    .hub-hdr::before {
+      content:''; position: absolute; top:0; left:0; right:0; height:2px;
+      background: linear-gradient(90deg, transparent, var(--plasma), var(--nova), var(--fire), transparent);
+      background-size: 200% 100%;
+      animation: hubScan 3s linear infinite;
+    }
+    @keyframes hubScan { 0%{background-position:0%} 100%{background-position:200%} }
     .hub-hdr-title {
       font-family: var(--display); font-size: 11px; font-weight: 800;
       letter-spacing: 4px; color: var(--plasma);
@@ -6672,18 +6664,38 @@ Hints used: ${IV.hintCount} | Skipped: ${IV.skipCount} | Best streak: ${IV.maxSt
 
     /* tab bar */
     .hub-tabs {
-      display: flex; gap: 2px; padding: 10px 22px 0;
+      display: flex; gap: 0; padding: 0 0 0 16px;
       border-bottom: 1px solid rgba(0,255,224,0.07);
       flex-shrink: 0; overflow-x: auto;
+      scrollbar-width: none; -ms-overflow-style: none;
+      position: relative;
     }
+    .hub-tabs::-webkit-scrollbar { display: none; }
+    .hub-tabs-wrap {
+      position: relative; flex-shrink: 0;
+    }
+    .hub-tab-arrow {
+      position: absolute; top: 0; bottom: 0; width: 28px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; cursor: pointer; z-index: 5;
+      background: linear-gradient(90deg, rgba(4,8,20,0.95), transparent);
+      color: rgba(0,255,224,0.5); transition: color 0.2s; user-select: none;
+    }
+    .hub-tab-arrow.right { right: 0; background: linear-gradient(270deg, rgba(4,8,20,0.95), transparent); }
+    .hub-tab-arrow:hover { color: var(--plasma); }
     .hub-tab {
-      padding: 7px 14px; font-family: var(--display); font-size: 8px;
-      font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+      padding: 11px 16px; font-family: var(--display); font-size: 7.5px;
+      font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
       color: var(--text-3); cursor: pointer; border-bottom: 2px solid transparent;
-      transition: all 0.15s; white-space: nowrap; border-radius: 3px 3px 0 0;
+      transition: all 0.18s; white-space: nowrap; flex-shrink: 0;
+      display: flex; align-items: center; gap: 5px;
     }
-    .hub-tab:hover { color: var(--text-2); }
+    .hub-tab:hover { color: var(--text); background: rgba(0,255,224,0.02); }
     .hub-tab.active { color: var(--plasma); border-color: var(--plasma); background: rgba(0,255,224,0.04); }
+    .hub-tab.active::after {
+      content:''; position: absolute; bottom: -1px; height: 1px;
+      background: var(--plasma); box-shadow: 0 0 8px var(--plasma);
+    }
 
     /* body */
     .hub-body { flex: 1; overflow-y: auto; padding: 20px 22px; }
@@ -6694,33 +6706,36 @@ Hints used: ${IV.hintCount} | Skipped: ${IV.skipCount} | Best streak: ${IV.maxSt
 
     /* Feature header block — matches screenshot design */
     .hub-feature-header {
-      display: flex; gap: 16px; align-items: flex-start;
-      padding: 16px 18px; border-radius: 8px; margin-bottom: 20px;
-      background: rgba(0,255,224,0.03); border: 1px solid rgba(0,255,224,0.1);
+      display: flex; gap: 18px; align-items: flex-start;
+      padding: 18px 20px; border-radius: 8px; margin-bottom: 22px;
+      background: rgba(0,255,224,0.02); border: 1px solid rgba(0,255,224,0.12);
       position: relative; overflow: hidden;
     }
     .hub-feature-header::before {
       content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
-      background: linear-gradient(180deg, var(--plasma), var(--nova));
-      border-radius: 3px 0 0 3px;
+      background: linear-gradient(180deg, var(--plasma), var(--nova), var(--fire));
     }
     .hub-feature-icon {
-      font-size: 32px; flex-shrink: 0; width: 54px; height: 54px;
+      font-size: 30px; flex-shrink: 0; width: 58px; height: 58px;
       display: flex; align-items: center; justify-content: center;
-      background: rgba(0,255,224,0.06); border: 1px solid rgba(0,255,224,0.15);
-      border-radius: 8px;
+      background: rgba(0,255,224,0.05); border: 1px solid rgba(0,255,224,0.12);
+      border-radius: 8px; position: relative; overflow: hidden;
+    }
+    .hub-feature-icon::after {
+      content:''; position: absolute; inset:0;
+      background: linear-gradient(135deg, rgba(0,255,224,0.08), transparent);
     }
     .hub-feature-meta { flex: 1; min-width: 0; }
     .hub-feature-label {
       font-family: var(--display); font-size: 8px; font-weight: 700;
-      letter-spacing: 3px; color: var(--nova); margin-bottom: 5px; text-transform: uppercase;
+      letter-spacing: 3px; color: var(--nova); margin-bottom: 4px; text-transform: uppercase;
     }
     .hub-feature-title {
-      font-family: var(--display); font-size: 17px; font-weight: 900;
-      letter-spacing: 1.5px; color: var(--text); margin-bottom: 7px; text-transform: uppercase;
+      font-family: var(--display); font-size: 18px; font-weight: 900;
+      letter-spacing: 1px; color: var(--text); margin-bottom: 8px; text-transform: uppercase;
     }
     .hub-feature-desc {
-      font-family: var(--mono); font-size: 11.5px; color: var(--text-3); line-height: 1.75;
+      font-family: var(--mono); font-size: 11.5px; color: rgba(226,244,255,0.5); line-height: 1.8;
     }
 
     /* shared components */
@@ -6893,12 +6908,21 @@ Hints used: ${IV.hintCount} | Skipped: ${IV.skipCount} | Best streak: ${IV.maxSt
       </div>
       <button class="hub-close" onclick="HUB.close()">✕</button>
     </div>
-    <div class="hub-tabs">
-      <div class="hub-tab active" onclick="HUB.tab('replay',this)">🧠 THOUGHT REPLAY</div>
-      <div class="hub-tab" onclick="HUB.tab('battle',this)">⚔ BATTLE</div>
-      <div class="hub-tab" onclick="HUB.tab('karma',this)">✨ KARMA</div>
-      <div class="hub-tab" onclick="HUB.tab('learning',this)">📈 LEARNING</div>
-      <div class="hub-tab" onclick="HUB.tab('blind',this)">👁 BLIND REVIEW</div>
+    <div class="hub-tabs-wrap" style="position:relative;flex-shrink:0">
+      <button class="hub-tab-arrow left" id="hubTabLeft" onclick="HUB.scrollTabs(-1)">◀</button>
+      <div class="hub-tabs" id="hubTabBar">
+        <div class="hub-tab active" onclick="HUB.tab('replay',this)">🧠 THOUGHT REPLAY</div>
+        <div class="hub-tab" onclick="HUB.tab('battle',this)">⚔ BATTLE</div>
+        <div class="hub-tab" onclick="HUB.tab('karma',this)">✨ KARMA</div>
+        <div class="hub-tab" onclick="HUB.tab('learning',this)">📈 LEARNING</div>
+        <div class="hub-tab" onclick="HUB.tab('blind',this)">👁 BLIND REVIEW</div>
+        <div class="hub-tab" onclick="HUB.tab('calibrator',this)">🎯 CALIBRATOR</div>
+        <div class="hub-tab" onclick="HUB.tab('changelog',this)">📓 CHANGELOG</div>
+        <div class="hub-tab" onclick="HUB.tab('deadcode',this)">⚰ DEAD CODE</div>
+        <div class="hub-tab" onclick="HUB.tab('mood',this)">😤 MOOD ENGINE</div>
+        <div class="hub-tab" onclick="HUB.tab('dna',this)">🧬 CODE DNA</div>
+      </div>
+      <button class="hub-tab-arrow right" id="hubTabRight" onclick="HUB.scrollTabs(1)">▶</button>
     </div>
     <div class="hub-body">
 
@@ -7105,6 +7129,113 @@ def find_max(arr):
         </div>
       </div>
 
+
+      <!-- CALIBRATOR -->
+      <div class="hub-panel" id="hub-calibrator">
+        <div class="hub-feature-header">
+          <div class="hub-feature-icon">🎯</div>
+          <div class="hub-feature-meta">
+            <div class="hub-feature-label">WORLD-FIRST</div>
+            <div class="hub-feature-title">CONFIDENCE CALIBRATOR</div>
+            <div class="hub-feature-desc">Discover the gap between what you THINK you know and what you can actually prove. Self-rate a topic, take a quiz, see your real score.</div>
+          </div>
+        </div>
+        <div class="hub-row" style="gap:12px;margin-bottom:14px">
+          <div class="hub-col" style="flex:2">
+            <label class="hub-label">Topic to test</label>
+            <input class="hub-input" id="cal-topic" placeholder="e.g. Python decorators, React hooks, SQL joins…">
+          </div>
+          <div class="hub-col" style="flex:1">
+            <label class="hub-label">Your confidence (1–10)</label>
+            <input class="hub-input" id="cal-rating" type="number" min="1" max="10" value="6">
+          </div>
+        </div>
+        <button class="hub-btn" id="cal-btn" onclick="HUB.calStartQuiz()" style="margin-bottom:14px">🎯 START CALIBRATION QUIZ</button>
+        <div id="cal-quiz-area"></div>
+        <div id="cal-result-area"></div>
+      </div>
+
+      <!-- CHANGELOG -->
+      <div class="hub-panel" id="hub-changelog">
+        <div class="hub-feature-header">
+          <div class="hub-feature-icon">📓</div>
+          <div class="hub-feature-meta">
+            <div class="hub-feature-label">WORLD-FIRST</div>
+            <div class="hub-feature-title">PERSONAL CHANGELOG</div>
+            <div class="hub-feature-desc">Auto-generate your daily learning diary — what you learned, built, and struggled with. Your coding journey, documented forever.</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:14px;align-items:center;flex-wrap:wrap">
+          <button class="hub-btn" id="cl-gen-btn" onclick="HUB.clGenerate()">✨ GENERATE TODAY'S LOG</button>
+          <button class="hub-btn purple" onclick="HUB.clLoadHistory()">📚 LOAD HISTORY</button>
+          <input class="hub-input" id="cl-date" type="date" style="width:160px" title="Generate for a specific date">
+        </div>
+        <div id="cl-output" style="display:none;padding:14px;border:1px solid rgba(0,255,224,0.1);border-radius:6px;background:rgba(0,255,224,0.02);margin-bottom:12px">
+          <div id="cl-entry-text" style="font-family:var(--mono);font-size:11.5px;color:var(--text-2);line-height:1.8;white-space:pre-wrap"></div>
+        </div>
+        <div id="cl-history-list" style="margin-top:4px"></div>
+      </div>
+
+      <!-- DEAD CODE -->
+      <div class="hub-panel" id="hub-deadcode">
+        <div class="hub-feature-header">
+          <div class="hub-feature-icon">⚰</div>
+          <div class="hub-feature-meta">
+            <div class="hub-feature-label">WORLD-FIRST</div>
+            <div class="hub-feature-title">DEAD CODE ARCHAEOLOGIST</div>
+            <div class="hub-feature-desc">AI finds unreachable code and explains exactly WHY each piece is dead — zombie, ghost, or fossil — with a visual burial map and call graph.</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
+          <select class="hub-select" id="dc-lang" style="width:150px">
+            <option value="python">Python</option><option value="javascript">JavaScript</option>
+            <option value="typescript">TypeScript</option><option value="java">Java</option>
+            <option value="cpp">C++</option><option value="go">Go</option>
+            <option value="rust">Rust</option><option value="php">PHP</option>
+            <option value="ruby">Ruby</option><option value="csharp">C#</option>
+          </select>
+          <button class="hub-btn fire" id="dc-btn" onclick="HUB.dcScan()">⚰ SCAN FOR DEAD CODE</button>
+          <span id="dc-loading" style="display:none;font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--text-3)">🔍 ANALYSING…</span>
+        </div>
+        <textarea class="hub-textarea" id="dc-code" rows="9" placeholder="// Paste your code to scan for dead / unreachable sections…"></textarea>
+        <div id="dc-results" style="margin-top:12px"></div>
+      </div>
+
+      <!-- MOOD ENGINE -->
+      <div class="hub-panel" id="hub-mood">
+        <div class="hub-feature-header">
+          <div class="hub-feature-icon">😤</div>
+          <div class="hub-feature-meta">
+            <div class="hub-feature-label">WORLD-FIRST</div>
+            <div class="hub-feature-title">CODE MOOD ENGINE</div>
+            <div class="hub-feature-desc">CodeBuddy silently detects your emotional state from your messages — frustrated, confused, confident — and automatically adapts tone and depth. See your mood history below.</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:16px">
+          <button class="hub-btn" onclick="HUB.loadMoodHistory()">😤 LOAD MOOD HISTORY</button>
+        </div>
+        <div id="mood-overview" style="display:none;margin-bottom:16px"></div>
+        <div id="mood-history-list"></div>
+      </div>
+
+      <!-- CODE DNA -->
+      <div class="hub-panel" id="hub-dna">
+        <div class="hub-feature-header">
+          <div class="hub-feature-icon">🧬</div>
+          <div class="hub-feature-meta">
+            <div class="hub-feature-label">WORLD-FIRST</div>
+            <div class="hub-feature-title">CODE DNA FINGERPRINTING</div>
+            <div class="hub-feature-desc">Builds a personal coding style profile from ALL your past code. AI responses are style-matched to your OWN DNA — indentation, naming, patterns, recurring mistakes.</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+          <button class="hub-btn" id="dna-build-btn" onclick="HUB.dnaBuild()">🧬 BUILD MY DNA</button>
+          <button class="hub-btn purple" onclick="HUB.dnaView()">🔍 VIEW MY PROFILE</button>
+        </div>
+        <div id="dna-status" style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-bottom:12px">Click BUILD to analyse your coding style from chat history.</div>
+        <div id="dna-profile-display"></div>
+      </div>
+
     </div><!-- /hub-body -->
   </div><!-- /featuresHub -->
 
@@ -7136,10 +7267,19 @@ def find_max(arr):
       el.classList.add('active');
       const panel = document.getElementById('hub-' + name);
       if (panel) panel.classList.add('active');
+      // scroll active tab into view
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
       // auto-load on tab open
-      if (name === 'karma') loadKarma();
-      if (name === 'learning') loadLearning();
-      if (name === 'blind') loadBlindQueue();
+      if (name === 'karma')      loadKarma();
+      if (name === 'learning')   loadLearning();
+      if (name === 'blind')      loadBlindQueue();
+      if (name === 'changelog')  clLoadHistory();
+      if (name === 'mood')       loadMoodHistory();
+      if (name === 'dna')        dnaView();
+    }
+    function scrollTabs(dir) {
+      const bar = document.getElementById('hubTabBar');
+      if (bar) bar.scrollBy({ left: dir * 160, behavior: 'smooth' });
     }
     function _setBtn(id, loading, label) {
       const b = document.getElementById(id);
@@ -7647,16 +7787,363 @@ def find_max(arr):
       clearTimeout(t._t); t._t = setTimeout(() => t.style.opacity='0', 3200);
     }
 
+    /* ══════════════════════════════════════════════════════
+       CALIBRATOR — Confidence quiz (fully working)
+    ══════════════════════════════════════════════════════ */
+    let _calQuizId = null, _calQuestions = [];
+    async function calStartQuiz() {
+      const topic = (document.getElementById('cal-topic').value || '').trim();
+      const rating = Math.max(1, Math.min(10, parseInt(document.getElementById('cal-rating').value) || 6));
+      if (!topic) { hubToast('Enter a topic first', 'warn'); return; }
+      _setBtn('cal-btn', true, 'GENERATING QUIZ…');
+      document.getElementById('cal-quiz-area').innerHTML = '';
+      document.getElementById('cal-result-area').innerHTML = '';
+      try {
+        const r = await fetch('/calibrate/quiz', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ topic, self_rating: rating })
+        });
+        if (!r.ok) throw new Error('Server error ' + r.status);
+        const d = await r.json();
+        if (d.error) { hubToast(d.error, 'err'); return; }
+        _calQuizId = d.quiz_id;
+        _calQuestions = d.questions || [];
+        _renderCalQuiz(_calQuestions, d.topic, d.self_rating, d.difficulty);
+      } catch(e) { hubToast('Quiz failed: ' + e.message + ' — try again in a moment', 'err'); }
+      _setBtn('cal-btn', false, '🎯 START CALIBRATION QUIZ');
+    }
+    function _renderCalQuiz(qs, topic, rating, diff) {
+      const area = document.getElementById('cal-quiz-area');
+      let html = `<div style="padding:12px 14px;border:1px solid rgba(0,255,224,0.12);border-radius:6px;background:rgba(0,255,224,0.02);margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;flex-wrap:wrap;gap:6px">
+          <span style="font-family:var(--display);font-size:9px;font-weight:700;letter-spacing:2px;color:var(--plasma)">${(topic||'').toUpperCase()}</span>
+          <div style="display:flex;gap:6px">
+            <span class="hub-badge cyan">${(diff||'').toUpperCase()}</span>
+            <span class="hub-badge purple">SELF-RATED ${rating}/10</span>
+          </div>
+        </div>
+        <div style="font-family:var(--mono);font-size:10.5px;color:var(--text-3)">Answer all ${qs.length} questions then submit.</div>
+      </div>`;
+      qs.forEach((q, i) => {
+        html += `<div style="padding:12px 14px;border:1px solid rgba(0,255,224,0.07);border-radius:6px;background:rgba(0,0,0,0.3);margin-bottom:10px">
+          <div style="font-family:var(--mono);font-size:12px;color:var(--text);margin-bottom:10px;line-height:1.6">
+            <span style="color:var(--plasma);font-weight:700;margin-right:6px">Q${i+1}.</span>${(q.question||'').replace(/</g,'&lt;')}
+          </div><div style="display:flex;flex-direction:column;gap:5px">`;
+        Object.entries(q.options || {}).forEach(([k, v]) => {
+          html += `<label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;padding:7px 10px;border-radius:4px;border:1px solid rgba(0,255,224,0.06);transition:background 0.15s" onmouseover="this.style.background='rgba(0,255,224,0.05)'" onmouseout="this.style.background='transparent'">
+            <input type="radio" name="calq${q.id}" value="${k}" style="margin-top:2px;accent-color:var(--plasma)">
+            <span style="font-family:var(--mono);font-size:11.5px;color:var(--text-2);line-height:1.5"><strong style="color:var(--plasma);margin-right:6px">${k}.</strong>${String(v||'').replace(/</g,'&lt;')}</span>
+          </label>`;
+        });
+        html += `</div></div>`;
+      });
+      html += `<button class="hub-btn" onclick="HUB.calSubmit()" style="margin-top:4px;width:100%;padding:13px">✅ SUBMIT ANSWERS & SEE MY CALIBRATION</button>`;
+      area.innerHTML = html;
+    }
+    async function calSubmit() {
+      if (!_calQuizId || !_calQuestions.length) { hubToast('No active quiz', 'warn'); return; }
+      const answers = {};
+      let missing = 0;
+      _calQuestions.forEach(q => {
+        const sel = document.querySelector(`input[name="calq${q.id}"]:checked`);
+        if (sel) answers[String(q.id)] = sel.value;
+        else missing++;
+      });
+      if (missing > 0) { hubToast(`Answer all ${_calQuestions.length} questions first (${missing} remaining)`, 'warn'); return; }
+      try {
+        const r = await fetch('/calibrate/submit', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ quiz_id: _calQuizId, answers })
+        });
+        if (!r.ok) throw new Error('Server error ' + r.status);
+        const d = await r.json();
+        if (d.error) { hubToast(d.error, 'err'); return; }
+        document.getElementById('cal-quiz-area').innerHTML = '';
+        _renderCalResult(d);
+      } catch(e) { hubToast('Submit failed: ' + e.message, 'err'); }
+    }
+    function _renderCalResult(d) {
+      const gc = d.calibration === 'overconfident' ? '#ff6b2b' : d.calibration === 'underconfident' ? '#4ade80' : '#00ffe0';
+      document.getElementById('cal-result-area').innerHTML = `
+        <div style="padding:18px 20px;border:1px solid ${gc}30;border-radius:8px;background:rgba(2,4,8,0.85);margin-bottom:14px;position:relative;overflow:hidden">
+          <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,${gc},transparent)"></div>
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:14px;margin-bottom:14px">
+            <div><div style="font-family:var(--display);font-size:9px;letter-spacing:2px;color:var(--text-3);margin-bottom:4px">YOUR SCORE</div>
+              <div style="font-family:var(--display);font-size:52px;font-weight:900;color:${gc};text-shadow:0 0 30px ${gc}40;line-height:1">${d.score}<span style="font-size:20px;opacity:0.5">/100</span></div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-family:var(--display);font-size:13px;font-weight:800;color:${gc};letter-spacing:2px;margin-bottom:6px">${d.badge||''}</div>
+              <div style="font-family:var(--mono);font-size:10px;color:var(--text-3)">Self-rated: ${d.self_rating}/10 → Claimed ${d.claimed}/100</div>
+              <div style="font-family:var(--mono);font-size:10px;color:${gc};margin-top:2px">Gap: ${d.gap > 0 ? '+' : ''}${d.gap} pts</div>
+            </div>
+          </div>
+          <div style="font-family:var(--mono);font-size:11.5px;color:var(--text-2);line-height:1.7;margin-bottom:12px">${(d.verdict||'').replace(/</g,'&lt;')}</div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <span class="hub-badge green">${d.correct_count} correct</span>
+            <span class="hub-badge cyan">${d.total} total</span>
+            <span class="hub-badge ${d.calibration==='overconfident'?'fire':d.calibration==='underconfident'?'green':'cyan'}">${d.calibration}</span>
+          </div>
+        </div>
+        ${(d.per_question||[]).map(q => `
+          <div style="padding:9px 12px;border-radius:5px;background:${q.is_correct?'rgba(74,222,128,0.04)':'rgba(255,107,43,0.04)'};border:1px solid ${q.is_correct?'rgba(74,222,128,0.15)':'rgba(255,107,43,0.15)'};margin-bottom:7px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;flex-wrap:wrap;gap:4px">
+              <span style="font-family:var(--display);font-size:8px;font-weight:700;letter-spacing:1.5px;color:${q.is_correct?'#4ade80':'#ff6b2b'}">${q.is_correct?'✅ CORRECT':'❌ WRONG'}</span>
+              <span style="font-family:var(--mono);font-size:10px;color:var(--text-3)">Your: <strong style="color:${q.is_correct?'#4ade80':'#ff6b2b'}">${q.chosen||'—'}</strong> · Correct: <strong style="color:#4ade80">${q.correct}</strong></span>
+            </div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--text-2);line-height:1.5;margin-bottom:4px">${(q.question||'').replace(/</g,'&lt;')}</div>
+            ${q.explanation ? `<div style="font-family:var(--mono);font-size:10.5px;color:var(--text-3);font-style:italic">${q.explanation.replace(/</g,'&lt;')}</div>` : ''}
+          </div>`).join('')}
+        <button class="hub-btn" onclick="document.getElementById('cal-result-area').innerHTML=''" style="margin-top:8px">🔄 TRY ANOTHER TOPIC</button>`;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       CHANGELOG — Daily learning diary
+    ══════════════════════════════════════════════════════ */
+    async function clGenerate() {
+      const dateEl = document.getElementById('cl-date');
+      const date = dateEl.value || new Date().toISOString().slice(0, 10);
+      _setBtn('cl-gen-btn', true, 'GENERATING…');
+      const out = document.getElementById('cl-output');
+      document.getElementById('cl-entry-text').textContent = '';
+      out.style.display = 'none';
+      try {
+        const r = await fetch('/changelog/generate', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date })
+        });
+        if (!r.ok) throw new Error('Server error ' + r.status);
+        const d = await r.json();
+        if (d.error) { hubToast(d.error, 'err'); return; }
+        if (!d.entry) { hubToast(d.message || 'No sessions found for this date', 'warn'); return; }
+        out.style.display = 'block';
+        document.getElementById('cl-entry-text').innerHTML = _renderMarkdown(d.entry)
+          + (d.topics && d.topics.length ? `<div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap">${d.topics.map(t=>`<span class="hub-badge cyan">${t}</span>`).join('')}</div>` : '');
+      } catch(e) { hubToast('Failed: ' + e.message, 'err'); }
+      _setBtn('cl-gen-btn', false, "✨ GENERATE TODAY'S LOG");
+    }
+    async function clLoadHistory() {
+      const list = document.getElementById('cl-history-list');
+      if (!list) return;
+      list.innerHTML = '<span style="font-family:var(--mono);font-size:10px;color:var(--text-3)">Loading…</span>';
+      try {
+        const r = await fetch('/changelog/history');
+        const d = await r.json();
+        const entries = d.entries || [];
+        if (!entries.length) { list.innerHTML = '<div style="font-family:var(--mono);font-size:11px;color:var(--text-3);padding:10px 0">No entries yet. Generate your first one above!</div>'; return; }
+        list.innerHTML = entries.map(e =>
+          `<div style="padding:10px 14px;border:1px solid rgba(0,255,224,0.07);border-radius:6px;margin-bottom:8px;cursor:pointer;transition:border-color 0.2s" onmouseover="this.style.borderColor='rgba(0,255,224,0.25)'" onmouseout="this.style.borderColor='rgba(0,255,224,0.07)'" onclick="HUB.clShowEntry(${JSON.stringify(e.entry||'')},${JSON.stringify(e.topics||[])})">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;flex-wrap:wrap;gap:5px">
+              <span style="font-family:var(--display);font-size:9px;font-weight:700;letter-spacing:2px;color:var(--plasma)">${e.date||''}</span>
+              <div style="display:flex;gap:5px;flex-wrap:wrap">${(e.topics||[]).map(t=>`<span class="hub-badge cyan">${t}</span>`).join('')}</div>
+            </div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(e.entry||'').split('\n').find(l=>l.trim()&&!l.startsWith('#'))||'Click to read'}</div>
+          </div>`
+        ).join('');
+      } catch { list.innerHTML = '<span style="color:var(--fire);font-family:var(--mono);font-size:10px">Failed to load history.</span>'; }
+    }
+    function clShowEntry(entry, topics) {
+      const out = document.getElementById('cl-output');
+      out.style.display = 'block';
+      document.getElementById('cl-entry-text').innerHTML = _renderMarkdown(entry)
+        + (topics && topics.length ? `<div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap">${topics.map(t=>`<span class="hub-badge cyan">${t}</span>`).join('')}</div>` : '');
+      out.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+    function _renderMarkdown(text) {
+      if (!text) return '';
+      return text
+        .replace(/^### (.+)$/gm, '<div style="font-family:var(--display);font-size:9px;font-weight:800;letter-spacing:2px;color:var(--plasma);margin:14px 0 6px;text-transform:uppercase">$1</div>')
+        .replace(/^## (.+)$/gm, '<div style="font-family:var(--display);font-size:11px;font-weight:800;letter-spacing:1.5px;color:var(--text);margin:16px 0 8px;text-transform:uppercase">$1</div>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong style="color:var(--plasma)">$1</strong>')
+        .replace(/^- (.+)$/gm, '<div style="display:flex;gap:8px;margin:3px 0"><span style="color:var(--plasma);flex-shrink:0">&#9658;</span><span>$1</span></div>')
+        .replace(/\n\n/g, '<br>')
+        .replace(/---/g, '<hr style="border:none;border-top:1px solid rgba(0,255,224,0.08);margin:12px 0">');
+    }
+
+    /* ══════════════════════════════════════════════════════
+       DEAD CODE ARCHAEOLOGIST
+    ══════════════════════════════════════════════════════ */
+    async function dcScan() {
+      const code = (document.getElementById('dc-code').value || '').trim();
+      const lang = document.getElementById('dc-lang').value || 'python';
+      if (!code) { hubToast('Paste some code first', 'warn'); return; }
+      _setBtn('dc-btn', true, 'SCANNING…');
+      document.getElementById('dc-loading').style.display = 'inline';
+      document.getElementById('dc-results').innerHTML = '';
+      try {
+        const r = await fetch('/dead_code', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code, language: lang })
+        });
+        if (!r.ok) throw new Error('Analysis failed: HTTP ' + r.status);
+        const d = await r.json();
+        if (d.error) throw new Error(d.error);
+        _renderDcResults(d);
+      } catch(e) { hubToast('Scan error: ' + e.message, 'err'); }
+      _setBtn('dc-btn', false, '⚰ SCAN FOR DEAD CODE');
+      document.getElementById('dc-loading').style.display = 'none';
+    }
+    function _renderDcResults(d) {
+      const blocks = d.dead_blocks || [];
+      const sevCol = { zombie: '#fbbf24', ghost: '#ff6b2b', fossil: '#94a3b8' };
+      const sevLabel = { zombie: '⚡ ZOMBIE', ghost: '👻 GHOST', fossil: '🪨 FOSSIL' };
+      let html = `<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px;padding:12px 16px;border:1px solid rgba(0,255,224,0.1);border-radius:6px;background:rgba(0,255,224,0.02)">
+        <div style="font-family:var(--display);font-size:32px;font-weight:900;color:${blocks.length?'#ff6b2b':'#4ade80'}">${d.total_dead_lines||0}</div>
+        <div><div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--text-3)">DEAD LINES</div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--text-3);margin-top:2px">${blocks.length} block${blocks.length!==1?'s':''} detected</div></div>
+      </div>`;
+      if (d.summary) html += `<div style="font-family:var(--mono);font-size:11.5px;color:var(--text-2);line-height:1.7;padding:10px 14px;border-left:3px solid var(--plasma);background:rgba(0,255,224,0.02);border-radius:0 4px 4px 0;margin-bottom:14px">${(d.summary).replace(/</g,'&lt;')}</div>`;
+      if (!blocks.length) {
+        html += `<div style="font-family:var(--mono);font-size:12px;color:#4ade80;padding:16px;text-align:center">✅ No dead code found — this file looks clean!</div>`;
+      } else {
+        blocks.forEach(b => {
+          const col = sevCol[b.severity] || '#94a3b8';
+          html += `<details style="border:1px solid ${col}28;border-radius:6px;margin-bottom:8px;background:rgba(0,0,0,0.2);overflow:hidden">
+            <summary style="padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;list-style:none;user-select:none">
+              <span style="font-family:var(--display);font-size:8px;font-weight:700;letter-spacing:2px;color:${col};flex-shrink:0">${sevLabel[b.severity]||'DEAD'}</span>
+              <span style="font-family:var(--mono);font-size:11px;color:var(--text);flex:1">${(b.label||'Unknown').replace(/</g,'&lt;')}</span>
+              <span style="font-family:var(--mono);font-size:9.5px;color:var(--text-3)">L${b.start_line||'?'}–${b.end_line||'?'}</span>
+            </summary>
+            <div style="padding:10px 14px;border-top:1px solid ${col}18">
+              <div style="font-family:var(--mono);font-size:11px;color:var(--text-2);line-height:1.6;margin-bottom:6px">${(b.reason||'').replace(/</g,'&lt;')}</div>
+              ${b.fix?`<div style="font-family:var(--mono);font-size:11px;color:#4ade80">💡 ${(b.fix).replace(/</g,'&lt;')}</div>`:''}
+            </div>
+          </details>`;
+        });
+      }
+      if (d.call_graph && d.call_graph.length) {
+        html += `<div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--text-3);margin:14px 0 8px">CALL GRAPH</div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px">
+            ${d.call_graph.slice(0,24).map(e=>`<span style="font-family:var(--mono);font-size:10px;padding:3px 8px;background:rgba(0,255,224,0.04);border:1px solid rgba(0,255,224,0.08);border-radius:3px;color:var(--text-2)">${(e.caller||'?').replace(/</g,'&lt;')} <span style="color:var(--plasma)">→</span> ${(e.callee||'?').replace(/</g,'&lt;')}</span>`).join('')}
+          </div>`;
+      }
+      document.getElementById('dc-results').innerHTML = html;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       MOOD ENGINE — History viewer
+    ══════════════════════════════════════════════════════ */
+    async function loadMoodHistory() {
+      const ov = document.getElementById('mood-overview');
+      const list = document.getElementById('mood-history-list');
+      list.innerHTML = '<span style="font-family:var(--mono);font-size:10px;color:var(--text-3)">Loading mood history…</span>';
+      try {
+        const r = await fetch('/mood/history');
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const d = await r.json();
+        const s = d.summary || {};
+        const dom = d.dominant_mood || 'neutral';
+        const emojis = { frustrated: '😤', confused: '🤔', confident: '💪', neutral: '😐' };
+        const moodCol = { frustrated: '#ff6b2b', confused: '#fbbf24', confident: '#4ade80', neutral: '#94a3b8' };
+        const col = moodCol[dom] || '#94a3b8';
+        ov.style.display = 'block';
+        ov.innerHTML = `
+          <div style="padding:14px 16px;border:1px solid ${col}30;border-radius:8px;background:rgba(0,0,0,0.3);margin-bottom:14px">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px">
+              <div>
+                <div style="font-family:var(--display);font-size:9px;letter-spacing:2px;color:var(--text-3);margin-bottom:4px">DOMINANT MOOD</div>
+                <div style="font-family:var(--display);font-size:24px;font-weight:900;color:${col}">${emojis[dom]||'😐'} ${dom.toUpperCase()}</div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+                ${Object.entries(s).map(([m,c])=>`<div style="padding:6px 10px;border-radius:4px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.05)">
+                  <div style="font-family:var(--display);font-size:7px;letter-spacing:1px;color:var(--text-3)">${emojis[m]||''} ${m.toUpperCase()}</div>
+                  <div style="font-family:var(--display);font-size:18px;font-weight:800;color:${moodCol[m]||'#94a3b8'}">${c}</div>
+                </div>`).join('')}
+              </div>
+            </div>
+            <div style="font-family:var(--mono);font-size:10.5px;color:var(--text-3)">
+              💡 CodeBuddy auto-detects your mood and adapts tone — warm when frustrated, simplified when confused, deeper when confident.
+            </div>
+          </div>`;
+        const recent = (d.recent || []).slice(0, 20);
+        if (!recent.length) { list.innerHTML = '<div style="font-family:var(--mono);font-size:11px;color:var(--text-3)">No mood signals yet. Start chatting to build your history.</div>'; return; }
+        list.innerHTML = `<div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--text-3);margin-bottom:8px">RECENT SIGNALS</div>` +
+          recent.map(m => `<div style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:4px;border:1px solid rgba(255,255,255,0.05);background:rgba(0,0,0,0.15);margin-bottom:5px">
+            <span style="font-size:16px">${emojis[m.mood]||'😐'}</span>
+            <span style="font-family:var(--display);font-size:8px;font-weight:700;letter-spacing:1.5px;color:${moodCol[m.mood]||'#94a3b8'};flex:1">${(m.mood||'').toUpperCase()}</span>
+            <span style="font-family:var(--mono);font-size:9px;color:var(--text-3)">${(m.detected_at||'').slice(0,16)}</span>
+            <div style="width:40px;height:4px;border-radius:2px;background:rgba(255,255,255,0.05);overflow:hidden"><div style="height:100%;width:${Math.round((m.score||0)*100)}%;background:${moodCol[m.mood]||'#94a3b8'};border-radius:2px"></div></div>
+          </div>`).join('');
+      } catch(e) { list.innerHTML = `<span style="color:var(--fire);font-family:var(--mono);font-size:10px">Failed: ${e.message}</span>`; }
+    }
+
+    /* ══════════════════════════════════════════════════════
+       CODE DNA — Build & View profile
+    ══════════════════════════════════════════════════════ */
+    async function dnaBuild() {
+      _setBtn('dna-build-btn', true, 'ANALYSING…');
+      document.getElementById('dna-status').textContent = 'Scanning your code history…';
+      try {
+        const r = await fetch('/dna/build', { method: 'POST' });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const d = await r.json();
+        if (d.error) { document.getElementById('dna-status').textContent = d.error; return; }
+        document.getElementById('dna-status').textContent = '✅ DNA built! Showing your profile…';
+        _renderDnaProfile(d.profile);
+      } catch(e) { document.getElementById('dna-status').textContent = 'Failed: ' + e.message; }
+      _setBtn('dna-build-btn', false, '🧬 BUILD MY DNA');
+    }
+    async function dnaView() {
+      try {
+        const r = await fetch('/dna/me');
+        if (!r.ok) return;
+        const d = await r.json();
+        if (d.profile) {
+          document.getElementById('dna-status').textContent = `Profile from ${d.profile._sample_count||'?'} samples · Updated ${(d.profile._updated_at||'').slice(0,10)}`;
+          _renderDnaProfile(d.profile);
+        } else {
+          document.getElementById('dna-status').textContent = d.message || 'No DNA yet — paste code in chat then click BUILD.';
+        }
+      } catch {}
+    }
+    function _renderDnaProfile(p) {
+      if (!p) return;
+      const traitMap = [
+        ['naming_convention',  '📛 Naming',      v => v],
+        ['indent_style',       '⬛ Indent',       v => `${p.indent_size||4} ${v}`],
+        ['comment_style',      '💬 Comments',     v => v],
+        ['error_handling',     '🛡 Error handling', v => v],
+        ['prefers_verbose',    '📝 Style',         v => v ? 'Verbose / explicit' : 'Concise'],
+      ];
+      const traits = traitMap.filter(([k]) => p[k] !== undefined && p[k] !== null);
+      let html = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+        ${traits.map(([k, label, fmt]) => `<div style="padding:10px 12px;border:1px solid rgba(0,255,224,0.08);border-radius:6px;background:rgba(0,255,224,0.02)">
+          <div style="font-family:var(--display);font-size:7.5px;letter-spacing:1.5px;color:var(--text-3);margin-bottom:4px">${label}</div>
+          <div style="font-family:var(--mono);font-size:12px;color:var(--plasma);font-weight:700">${fmt(p[k])}</div>
+        </div>`).join('')}
+      </div>`;
+      if (p.common_patterns && p.common_patterns.length) {
+        html += `<div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--text-3);margin-bottom:8px">FAVOURITE PATTERNS</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">
+            ${p.common_patterns.map(pat => `<span class="hub-badge cyan">${pat}</span>`).join('')}
+          </div>`;
+      }
+      if (p.common_mistakes && p.common_mistakes.length) {
+        html += `<div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--text-3);margin-bottom:8px">WATCH OUT FOR</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">
+            ${p.common_mistakes.map(m => `<span class="hub-badge fire">${m}</span>`).join('')}
+          </div>`;
+      }
+      if (p.style_summary) {
+        html += `<div style="font-family:var(--mono);font-size:11.5px;color:var(--text-2);line-height:1.7;padding:12px 14px;border-left:3px solid var(--nova);background:rgba(168,85,247,0.03);border-radius:0 4px 4px 0">${p.style_summary}</div>`;
+      }
+      document.getElementById('dna-profile-display').innerHTML = html;
+    }
+
     /* ── keyboard close ── */
     document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
 
     return {
-      open, close, tab,
+      open, close, tab, scrollTabs,
       thoughtReplay, thoughtReplayReset,
       battleCreate, battleJoin, battleUpdate, battleJudge, battleReset, copyBattleId,
       loadKarma, earnKarma,
       loadLearning,
       blindTab, blindSubmit, loadBlindQueue, openBlindReview, submitBlindReview, loadMySubmissions,
+      calStartQuiz, calSubmit,
+      clGenerate, clLoadHistory, clShowEntry,
+      dcScan,
+      loadMoodHistory,
+      dnaBuild, dnaView,
       searchChats, openSearchResult,
       _battleId: () => _battleId,
     };
@@ -8959,94 +9446,6 @@ const Changelog = (() => {
   }
 
   return { generate, history };
-})();
-/* ═══════════════════════════════════════════════════════════════
-   🦆 DUCK MODE — proper activate/deactivate with chat banner
-   ═══════════════════════════════════════════════════════════════ */
-const DuckMode = (() => {
-  function _showBanner(on) {
-    let banner = document.getElementById('duck-banner');
-    if (on) {
-      if (!banner) {
-        banner = document.createElement('div');
-        banner.id = 'duck-banner';
-        banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:8000;background:#92400e;color:#fbbf24;font-family:var(--display);font-size:9px;font-weight:700;letter-spacing:2px;text-align:center;padding:7px 16px;display:flex;align-items:center;justify-content:center;gap:12px';
-        banner.innerHTML = '🦆 DUCK MODE ACTIVE — I will only ask questions. No answers from me!  <button onclick="DuckMode.deactivate()" style="background:rgba(0,0,0,0.3);border:1px solid rgba(251,191,36,0.4);color:#fbbf24;font-family:var(--display);font-size:8px;letter-spacing:1px;padding:3px 10px;border-radius:4px;cursor:pointer">DEACTIVATE</button>';
-        document.body.appendChild(banner);
-      }
-    } else {
-      if (banner) banner.remove();
-    }
-  }
-
-  function activate() {
-    const cid = window._currentChatId || '';
-    if (!cid) {
-      FeatureModal.open(`
-        <div class="fm-header"><span class="fm-title">🦆 DUCK MODE</span><button class="fm-close" onclick="FeatureModal.close()">✕</button></div>
-        <div class="fm-body" style="text-align:center;padding:32px 24px">
-          <div style="font-size:36px;margin-bottom:12px">🦆</div>
-          <div style="font-family:var(--body);font-size:13px;color:rgba(226,244,255,0.7);margin-bottom:8px">You need an active chat session first.</div>
-          <div style="font-family:var(--mono);font-size:11px;color:rgba(0,255,224,0.4);margin-bottom:20px">Open a chat from the sidebar (or start a new one), then activate Duck Mode.</div>
-          <button class="fm-btn fm-btn-secondary" onclick="FeatureModal.close()">OK</button>
-        </div>
-      `);
-      return;
-    }
-    fetch('/duck/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ conversation_id: cid }) })
-      .then(r => r.json())
-      .then(d => {
-        if (d.error) { alert('⚠ ' + d.error); return; }
-        _showBanner(true);
-        FeatureModal.open(`
-          <div class="fm-header"><span class="fm-title">🦆 DUCK MODE ACTIVATED</span><button class="fm-close" onclick="FeatureModal.close()">✕</button></div>
-          <div class="fm-body" style="text-align:center;padding:32px 24px">
-            <div style="font-size:48px;margin-bottom:14px">🦆</div>
-            <div style="font-family:var(--display);font-size:11px;font-weight:700;letter-spacing:2px;color:#fbbf24;margin-bottom:12px">DUCK MODE IS ON</div>
-            <div style="font-family:var(--body);font-size:13px;color:rgba(226,244,255,0.7);line-height:1.7;max-width:380px;margin:0 auto 20px">I will <strong style="color:#fbbf24">refuse to give you answers.</strong> Instead I'll ask Socratic questions to help you think it through yourself. This is the fastest way to truly understand your code.</div>
-            <div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);border-radius:8px;padding:12px;font-family:var(--mono);font-size:11px;color:rgba(251,191,36,0.7);margin-bottom:20px">💡 Tip: Tell me what you're stuck on and I'll guide your thinking — no spoilers!</div>
-            <button class="fm-btn fm-btn-primary" onclick="FeatureModal.close()" style="background:#fbbf24;color:#020408">START THINKING →</button>
-          </div>
-        `);
-      })
-      .catch(() => alert('⚠ Could not activate Duck Mode — check server is running.'));
-  }
-
-  function deactivate() {
-    const cid = window._currentChatId || '';
-    if (!cid) { _showBanner(false); return; }
-    fetch('/duck/stop', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ conversation_id: cid }) })
-      .then(r => r.json())
-      .then(d => {
-        _showBanner(false);
-        // Small toast instead of disruptive alert
-        const toast = document.createElement('div');
-        toast.style.cssText = 'position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:#1a2a1a;border:1px solid rgba(52,211,153,0.3);color:#34d399;font-family:var(--display);font-size:9px;letter-spacing:2px;padding:10px 20px;border-radius:8px;z-index:9999;pointer-events:none';
-        toast.textContent = '🦆 Duck Mode OFF — I can give answers again.';
-        document.body.appendChild(toast);
-        setTimeout(() => toast.remove(), 3000);
-      })
-      .catch(() => { _showBanner(false); });
-  }
-
-  function status() {
-    const cid = window._currentChatId || '';
-    if (!cid) { alert('No active chat — open a chat first.'); return; }
-    fetch('/duck/status/' + cid)
-      .then(r => r.json())
-      .then(d => {
-        if (d.active) {
-          _showBanner(true);
-          alert('🦆 Duck Mode: ACTIVE\nTurns taken: ' + (d.turns || 0) + '\nProblem: ' + (d.problem || 'not set'));
-        } else {
-          _showBanner(false);
-          alert('🦆 Duck Mode: INACTIVE for this chat.\nClick "Activate Duck Mode" to enable it.');
-        }
-      })
-      .catch(() => alert('⚠ Could not check status.'));
-  }
-
-  return { activate, deactivate, status };
 })();
 </script>
 

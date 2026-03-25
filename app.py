@@ -678,28 +678,79 @@ def generate_chat_title(user_message):
 # Free models on OpenRouter, ranked by coding quality
 MODELS = {
     # ── PRIMARY MODELS (all :free — zero cost on OpenRouter) ─────────────────
-    # Best coding model as of March 2026 — 480B MoE, 262K context, tools
-    "code":       "qwen/qwen3-coder:free",
-    # Best multilingual / fast — Llama 3.3 70B, 128K context, confirmed free
-    "fast":       "meta-llama/llama-3.3-70b-instruct:free",
-    # Lightweight classifier — small & fast, free
-    "classifier": "meta-llama/llama-3.2-3b-instruct:free",
+    # Best coding model — DeepSeek V3 free, very reliable
+    "code":       "deepseek/deepseek-chat-v3-0324:free",
+    # Best fast/multilingual — Llama 4 Scout, confirmed free March 2026
+    "fast":       "meta-llama/llama-4-scout:free",
+    # Lightweight classifier — Gemma 3 4B, fast and free
+    "classifier": "google/gemma-3-4b-it:free",
     # Title generation — tiny, near-instant, free
-    "title":      "meta-llama/llama-3.2-3b-instruct:free",
+    "title":      "google/gemma-3-4b-it:free",
 }
 
 # ── ORDERED FALLBACK CHAIN (all :free, different providers) ─────────────────
 # When ANY model returns 429/404/503, these are tried in order.
-# Multiple providers = if one is rate-limited, another will work.
+# Expanded and reordered for maximum reliability in March 2026.
 FREE_FALLBACKS = [
-    "meta-llama/llama-3.3-70b-instruct:free",
-    "qwen/qwen3-coder:free",
-    "mistralai/mistral-small-3.1-24b-instruct:free",
+    "deepseek/deepseek-chat-v3-0324:free",      # DeepSeek V3 — very stable
+    "meta-llama/llama-4-scout:free",             # Llama 4 Scout — fast
+    "meta-llama/llama-4-maverick:free",          # Llama 4 Maverick — capable
+    "meta-llama/llama-3.3-70b-instruct:free",    # Llama 3.3 70B — reliable
+    "deepseek/deepseek-r1:free",                 # DeepSeek R1 — reasoning
+    "deepseek/deepseek-r1-distill-llama-70b:free",
+    "deepseek/deepseek-r1-distill-qwen-32b:free",
     "google/gemma-3-27b-it:free",
-    # NOTE: "openai/gpt-oss-20b:free" removed — unverified model ID on OpenRouter free tier
-    "deepseek/deepseek-r1:free",          # Strong reasoning model, confirmed free
-    "openrouter/auto",                     # Last resort: OpenRouter picks any working free model
+    "google/gemma-3-12b-it:free",
+    "mistralai/mistral-small-3.1-24b-instruct:free",
+    "qwen/qwen3-coder:free",
+    "nvidia/llama-3.1-nemotron-70b-instruct:free",
+    "microsoft/phi-4:free",
+    "openrouter/auto",
 ]
+
+import time as _time
+
+def _ai_call(messages, model=None, max_tokens=1000, temperature=0.3, timeout=30):
+    """Central AI helper: tries model then FREE_FALLBACKS with 0.8s delay between attempts."""
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://codebuddy.ai",
+        "X-Title": "CodeBuddy AI",
+    }
+    chain = []
+    if model and model not in chain:
+        chain.append(model)
+    for m in FREE_FALLBACKS:
+        if m not in chain:
+            chain.append(m)
+
+    last_err = "All models unavailable"
+    for i, m in enumerate(chain):
+        if i > 0:
+            _time.sleep(1.5)  # increased from 0.8s — gives rate-limited models time to recover
+        try:
+            resp = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers,
+                json={"model": m, "max_tokens": max_tokens,
+                      "temperature": temperature, "messages": messages},
+                timeout=timeout,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                if "choices" in data and data["choices"]:
+                    return data["choices"][0]["message"]["content"].strip()
+            last_err = f"HTTP {resp.status_code} from {m}"
+            app.logger.warning(f"_ai_call: {last_err}")
+            if resp.status_code not in (429, 503, 502, 500, 404):
+                break
+        except requests.RequestException as exc:
+            last_err = str(exc)
+            app.logger.warning(f"_ai_call: {m} exception: {exc}")
+            continue
+
+    raise RuntimeError(f"AI unavailable — {last_err}. Please try again in a moment.")
 
 def get_model_for_mode(mode, lang_code="en-US"):
     """Pick the best free model based on task type and language.
@@ -2671,60 +2722,28 @@ Rules:
 - No markdown, no prose outside the JSON array
 - Output ONLY the raw JSON array, nothing else"""
 
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "model": MODELS["fast"],
-        "max_tokens": 1200,
-        "temperature": 0.3,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Debug this code:\n\n```\n{code[:2000]}\n```"},
-        ],
-    }
-
-    # Try primary model then fallbacks — free models often return 429 instead of choices
-    models_to_try = [MODELS["fast"]] + [m for m in FREE_FALLBACKS if m != MODELS["fast"]]
-    last_error = "Unknown error"
-
-    for model in models_to_try:
-        try:
-            payload["model"] = model
-            resp = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers=headers, json=payload, timeout=30
-            )
-            resp_json = resp.json()
-
-            if "choices" not in resp_json:
-                api_err = resp_json.get("error", {})
-                last_error = api_err.get("message", str(resp_json)) if isinstance(api_err, dict) else str(api_err)
-                app.logger.warning("thought_replay: model %s returned no choices: %s", model, last_error)
-                if resp.status_code not in (429, 503, 502, 500):
-                    break
-                continue
-
-            raw = resp_json["choices"][0]["message"]["content"].strip()
-            raw = re.sub(r"```json|```", "", raw).strip()
-            steps = json.loads(raw)
-            if not isinstance(steps, list):
-                steps = [steps]
-
-            for i, step in enumerate(steps):
-                step["step"] = i + 1
-
-            bump_stat(current_user.id, "debug_count")
-            return jsonify(steps)
-
-        except (requests.RequestException, json.JSONDecodeError, ValueError) as exc:
-            last_error = str(exc)
-            app.logger.warning("thought_replay: model %s exception: %s", model, exc)
-            continue
-
-    bump_stat(current_user.id, "debug_count")
-    return jsonify({"error": f"AI unavailable ({last_error}). All models rate-limited — try again in a moment."}), 503
+    try:
+        raw = _ai_call(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Debug this code:\n\n```\n{code[:2000]}\n```"},
+            ],
+            model=MODELS["fast"], max_tokens=1200, temperature=0.3, timeout=35,
+        )
+        raw = re.sub(r"```json|```", "", raw).strip()
+        steps = json.loads(raw)
+        if not isinstance(steps, list):
+            steps = [steps]
+        for i, step in enumerate(steps):
+            step["step"] = i + 1
+        bump_stat(current_user.id, "debug_count")
+        return jsonify(steps)
+    except (json.JSONDecodeError, ValueError) as exc:
+        bump_stat(current_user.id, "debug_count")
+        return jsonify({"error": f"Could not parse AI response: {exc}"}), 503
+    except RuntimeError as exc:
+        bump_stat(current_user.id, "debug_count")
+        return jsonify({"error": str(exc)}), 503
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -3340,13 +3359,23 @@ def learning_insight():
     }
 
     try:
-        resp = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers=headers, json=payload, timeout=20
+        insight = _ai_call(
+            messages=[
+                {"role": "system", "content": (
+                    "You are a coding coach reviewing a student's learning journey. "
+                    "Given a list of questions they asked during a learning period, "
+                    "write ONE short paragraph (3-4 sentences) that: "
+                    "1) identifies the main skill theme they were learning, "
+                    "2) highlights the most impressive question, "
+                    "3) ends with one motivating observation about their growth. "
+                    "Be specific and warm. No bullet points."
+                )},
+                {"role": "user", "content": f"Milestone: {milestone}\n\nQuestions:\n{joined}"},
+            ],
+            model=MODELS["fast"], max_tokens=200, temperature=0.7, timeout=25,
         )
-        insight = resp.json()["choices"][0]["message"]["content"].strip()
         return jsonify({"insight": insight})
-    except (requests.RequestException, KeyError, ValueError):
+    except RuntimeError:
         return jsonify({"insight": f"During '{milestone}', you asked great questions that show real depth of curiosity."})
 
 
@@ -3810,9 +3839,17 @@ def autocomplete():
 # Extracts frames from uploaded video, sends to vision-capable AI model,
 # streams back a detailed analysis of the programming content shown.
 
-# Vision-capable free model on OpenRouter
-_VIDEO_MODEL = "google/gemini-flash-1.5"          # Vision + fast + free tier
-_VIDEO_MODEL_FALLBACK = "anthropic/claude-3-haiku" # fallback if Gemini quota hit
+# Vision-capable free models on OpenRouter (updated March 2026)
+_VIDEO_MODEL = "google/gemini-2.0-flash-exp:free"          # Best free vision model
+_VIDEO_MODEL_FALLBACK = "google/gemini-flash-1.5-8b"        # Lighter Gemini vision
+_VIDEO_VISION_CHAIN = [
+    "google/gemini-2.0-flash-exp:free",
+    "google/gemini-flash-1.5-8b",
+    "google/gemini-2.5-pro-exp-03-25:free",
+    "meta-llama/llama-3.2-11b-vision-instruct:free",
+    "qwen/qwen2-vl-7b-instruct:free",
+    "openrouter/auto",
+]
 
 def _extract_video_frames(video_path, max_frames=6):
     """Extract up to max_frames evenly-spaced frames from a video file.
@@ -3955,7 +3992,7 @@ def analyze_video():
                 },
                 {"role": "user", "content": content_parts}
             ]
-            model_to_use = _VIDEO_MODEL
+            model_to_use = _VIDEO_VISION_CHAIN[0]
         else:
             # No OpenCV — text-only analysis based on filename + question
             app.logger.info("analyze_video: OpenCV not available — text-only mode")
@@ -4000,9 +4037,10 @@ def analyze_video():
                     headers=headers, json=payload, stream=True, timeout=(15, 120)
                 )
 
-                # Fallback chain for vision models
-                if resp.status_code in (404, 429, 503) and has_frames:
-                    for fb in [_VIDEO_MODEL_FALLBACK, MODELS["fast"]]:
+                # Fallback chain for vision models — try all known working vision models
+                if resp.status_code in (404, 429, 503, 400):
+                    fallback_chain = _VIDEO_VISION_CHAIN if has_frames else FREE_FALLBACKS
+                    for fb in fallback_chain:
                         if fb in tried_models:
                             continue
                         tried_models.append(fb)
@@ -4018,7 +4056,16 @@ def analyze_video():
                     yield "⚠ API key invalid. Check your OPENROUTER_API_KEY in .env"
                     return
                 if resp.status_code != 200:
-                    yield f"⚠ API Error {resp.status_code}. Try again in a moment."
+                    err_detail = ""
+                    try:
+                        err_json = resp.json()
+                        err_detail = err_json.get("error", {}).get("message", "") if isinstance(err_json.get("error"), dict) else str(err_json.get("error", ""))
+                    except Exception:
+                        pass
+                    if resp.status_code == 404:
+                        yield "⚠ **Vision model unavailable** — the video analysis model is currently offline on OpenRouter. Please try again in a few minutes, or contact support."
+                    else:
+                        yield f"⚠ API Error {resp.status_code}. {err_detail or 'Try again in a moment.'}"
                     return
 
                 for line in resp.iter_lines():
@@ -4965,55 +5012,28 @@ Severity levels:
 call_graph must include ALL function calls you can detect — both live and dead nodes.
 If no dead code found, return empty dead_blocks array with a positive summary."""
 
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "model": MODELS["code"],
-        "max_tokens": 2000,
-        "temperature": 0.1,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user",   "content": f"Language: {language}\n\nCode:\n```{language}\n{code}\n```"},
-        ],
-    }
-
-    models_to_try = [MODELS["code"], MODELS["fast"]] + FREE_FALLBACKS[:3]
-    last_err = "Unknown"
-
-    for model in models_to_try:
-        try:
-            payload["model"] = model
-            resp = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers=headers, json=payload, timeout=35
-            )
-            if resp.status_code not in (200, 201):
-                last_err = f"HTTP {resp.status_code}"
-                continue
-            raw = resp.json()["choices"][0]["message"]["content"].strip()
-            raw = re.sub(r"```json|```", "", raw).strip()
-            result = json.loads(raw)
-
-            # Guarantee required keys exist
-            result.setdefault("dead_blocks", [])
-            result.setdefault("call_graph", [])
-            result.setdefault("summary", "Analysis complete.")
-            result.setdefault("total_dead_lines", sum(
-                max(0, b.get("end_line", 0) - b.get("start_line", 0) + 1)
-                for b in result["dead_blocks"]
-            ))
-            return jsonify(result)
-
-        except (requests.RequestException, json.JSONDecodeError, KeyError, ValueError) as exc:
-            last_err = str(exc)
-            continue
-
-    return jsonify({
-        "error": f"Analysis failed: {last_err}",
-        "dead_blocks": [], "call_graph": [], "summary": "", "total_dead_lines": 0
-    }), 503
+    try:
+        raw = _ai_call(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": f"Language: {language}\n\nCode:\n```{language}\n{code}\n```"},
+            ],
+            model=MODELS["code"], max_tokens=2000, temperature=0.1, timeout=40,
+        )
+        raw = re.sub(r"```json|```", "", raw).strip()
+        result = json.loads(raw)
+        result.setdefault("dead_blocks", [])
+        result.setdefault("call_graph", [])
+        result.setdefault("summary", "Analysis complete.")
+        result.setdefault("total_dead_lines", sum(
+            max(0, b.get("end_line", 0) - b.get("start_line", 0) + 1)
+            for b in result["dead_blocks"]
+        ))
+        return jsonify(result)
+    except (json.JSONDecodeError, KeyError, ValueError) as exc:
+        return jsonify({"error": f"Could not parse response: {exc}", "dead_blocks": [], "call_graph": [], "summary": "", "total_dead_lines": 0}), 503
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc), "dead_blocks": [], "call_graph": [], "summary": "", "total_dead_lines": 0}), 503
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -5996,46 +6016,36 @@ TOPICS:
         ]
     }
 
-    for model in [MODELS["fast"]] + FREE_FALLBACKS[:3]:
-        try:
-            payload["model"] = model
-            resp = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers=headers, json=payload, timeout=30
-            )
-            if resp.status_code != 200:
-                continue
-            raw = resp.json()["choices"][0]["message"]["content"].strip()
+    try:
+        raw = _ai_call(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Date: {target_date}\n\nSessions:\n{session_summary}"}
+            ],
+            model=MODELS["fast"], max_tokens=800, temperature=0.7, timeout=35,
+        )
+        entry, topics = raw, []
+        if "ENTRY:" in raw and "TOPICS:" in raw:
+            parts = raw.split("TOPICS:", 1)
+            entry = parts[0].replace("ENTRY:", "").strip()
+            try:
+                topics = json.loads(re.sub(r"```json|```", "", parts[1]).strip())
+            except Exception:
+                topics = []
 
-            # Parse ENTRY and TOPICS sections
-            entry, topics = raw, []
-            if "ENTRY:" in raw and "TOPICS:" in raw:
-                parts = raw.split("TOPICS:", 1)
-                entry = parts[0].replace("ENTRY:", "").strip()
-                try:
-                    topics = json.loads(re.sub(r"```json|```", "", parts[1]).strip())
-                except Exception:
-                    topics = []
-
-            # Persist to DB
-            conn2 = sqlite3.connect("codebuddy.db")
-            conn2.execute("""
-                INSERT INTO changelogs(user_id, date, entry, topics)
-                VALUES (?,?,?,?)
-                ON CONFLICT(user_id, date) DO UPDATE SET
-                    entry=excluded.entry, topics=excluded.topics,
-                    generated_at=datetime('now')
-            """, (current_user.id, target_date, entry, json.dumps(topics)))
-            conn2.commit()
-            conn2.close()
-
-            return jsonify({"entry": entry, "topics": topics, "date": target_date})
-
-        except (requests.RequestException, KeyError, ValueError) as exc:
-            app.logger.warning(f"changelog_generate model={model}: {exc}")
-            continue
-
-    return jsonify({"error": "Could not generate changelog — try again shortly."}), 503
+        conn2 = sqlite3.connect("codebuddy.db")
+        conn2.execute("""
+            INSERT INTO changelogs(user_id, date, entry, topics)
+            VALUES (?,?,?,?)
+            ON CONFLICT(user_id, date) DO UPDATE SET
+                entry=excluded.entry, topics=excluded.topics,
+                generated_at=datetime('now')
+        """, (current_user.id, target_date, entry, json.dumps(topics)))
+        conn2.commit()
+        conn2.close()
+        return jsonify({"entry": entry, "topics": topics, "date": target_date})
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 503
 
 
 @app.route("/changelog/history")
@@ -6160,48 +6170,51 @@ Rules:
         ]
     }
 
-    for model in [MODELS["fast"], MODELS["code"]] + FREE_FALLBACKS[:3]:
-        try:
-            payload["model"] = model
-            resp = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers=headers, json=payload, timeout=25
-            )
-            if resp.status_code != 200:
-                continue
-            raw = resp.json()["choices"][0]["message"]["content"].strip()
-            raw = re.sub(r"```json|```", "", raw).strip()
-            questions = json.loads(raw)
+    try:
+        raw = _ai_call(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Generate 5 {difficulty} questions about: {topic}"}
+            ],
+            model=MODELS["fast"], max_tokens=1200, temperature=0.4, timeout=40,
+        )
+        raw = re.sub(r"```json|```", "", raw).strip()
+        questions = json.loads(raw)
 
-            if not isinstance(questions, list) or len(questions) < 3:
-                continue
+        if not isinstance(questions, list) or len(questions) < 3:
+            return jsonify({"error": "AI returned too few questions — try again."}), 503
 
-            # Store pending quiz in session
-            quiz_id = secrets.token_urlsafe(12)
-            session[f"quiz_{quiz_id}"] = {
-                "topic": topic,
-                "self_rating": self_rating,
-                "questions": questions,
-            }
-
-            # Strip correct answers before sending to client
-            client_qs = [
-                {"id": q["id"], "question": q["question"], "options": q["options"]}
-                for q in questions
-            ]
-            return jsonify({
-                "quiz_id": quiz_id,
-                "topic": topic,
-                "self_rating": self_rating,
-                "difficulty": difficulty,
-                "questions": client_qs,
+        normalised = []
+        for i, q in enumerate(questions):
+            opts = q.get("options", {})
+            if isinstance(opts, list):
+                opts = {chr(65+j): v for j, v in enumerate(opts[:4])}
+            normalised.append({
+                "id":          q.get("id", i+1),
+                "question":    q.get("question", ""),
+                "options":     opts,
+                "correct":     q.get("correct", q.get("answer", "A")).upper()[:1],
+                "explanation": q.get("explanation", q.get("reason", "")),
             })
 
-        except (requests.RequestException, json.JSONDecodeError, KeyError, ValueError) as exc:
-            app.logger.warning(f"calibrate_quiz model={model}: {exc}")
-            continue
+        quiz_id = secrets.token_urlsafe(12)
+        session[f"quiz_{quiz_id}"] = {
+            "topic": topic, "self_rating": self_rating, "questions": normalised,
+        }
+        session.modified = True
 
-    return jsonify({"error": "Could not generate quiz — try again shortly."}), 503
+        client_qs = [
+            {"id": q["id"], "question": q["question"], "options": q["options"]}
+            for q in normalised
+        ]
+        return jsonify({
+            "quiz_id": quiz_id, "topic": topic, "self_rating": self_rating,
+            "difficulty": difficulty, "questions": client_qs,
+        })
+    except (json.JSONDecodeError, KeyError, ValueError) as exc:
+        return jsonify({"error": f"Could not parse quiz: {exc}"}), 503
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 503
 
 
 @app.route("/calibrate/submit", methods=["POST"])
@@ -6295,6 +6308,7 @@ def calibrate_submit():
 
     # Clean up session
     session.pop(f"quiz_{quiz_id}", None)
+    session.modified = True
 
     return jsonify({
         "score": score,
@@ -6451,41 +6465,36 @@ Rules:
         ]
     }
 
-    for model in [MODELS["fast"], MODELS["code"]] + FREE_FALLBACKS[:3]:
+    try:
+        raw = _ai_call(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": user_content},
+            ],
+            model=MODELS["fast"], max_tokens=1200, temperature=0.2, timeout=30,
+        )
+        raw = re.sub(r"```json|```", "", raw).strip()
+        result = json.loads(raw)
+
         try:
-            payload["model"] = model
-            resp = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers=headers, json=payload, timeout=30
+            conn2 = sqlite3.connect("codebuddy.db")
+            conn2.execute(
+                "INSERT INTO error_autopsies(user_id,error_hash,error_text,language,diagnosis) "
+                "VALUES (?,?,?,?,?)",
+                (current_user.id, err_hash, error[:500],
+                 result.get("language", language), json.dumps(result))
             )
-            if resp.status_code != 200:
-                continue
-            raw = resp.json()["choices"][0]["message"]["content"].strip()
-            raw = re.sub(r"```json|```", "", raw).strip()
-            result = json.loads(raw)
+            conn2.commit()
+            conn2.close()
+        except Exception:
+            pass
 
-            # Cache result
-            try:
-                conn2 = sqlite3.connect("codebuddy.db")
-                conn2.execute(
-                    "INSERT INTO error_autopsies(user_id,error_hash,error_text,language,diagnosis) "
-                    "VALUES (?,?,?,?,?)",
-                    (current_user.id, err_hash, error[:500],
-                     result.get("language", language), json.dumps(result))
-                )
-                conn2.commit()
-                conn2.close()
-            except Exception:
-                pass
-
-            bump_stat(current_user.id, "debug_count")
-            return jsonify(result)
-
-        except (requests.RequestException, json.JSONDecodeError, KeyError, ValueError) as exc:
-            app.logger.warning(f"error_autopsy model={model}: {exc}")
-            continue
-
-    return jsonify({"error": "Autopsy failed — try again shortly."}), 503
+        bump_stat(current_user.id, "debug_count")
+        return jsonify(result)
+    except (json.JSONDecodeError, KeyError, ValueError) as exc:
+        return jsonify({"error": f"Could not parse autopsy: {exc}"}), 503
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 503
 
 
 @app.route("/error_autopsy/history")
@@ -6630,41 +6639,36 @@ Return ONLY raw JSON (no markdown):
         ]
     }
 
-    for model in [MODELS["fast"], MODELS["code"]] + FREE_FALLBACKS[:3]:
+    try:
+        raw = _ai_call(
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": user_content},
+            ],
+            model=MODELS["fast"], max_tokens=800, temperature=0.4, timeout=25,
+        )
+        raw = re.sub(r"```json|```", "", raw).strip()
+        result = json.loads(raw)
+
         try:
-            payload["model"] = model
-            resp = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers=headers, json=payload, timeout=25
+            conn = sqlite3.connect("codebuddy.db")
+            conn.execute(
+                "INSERT INTO naming_history(user_id,original_name,suggestions,code_snippet,mode) "
+                "VALUES (?,?,?,?,?)",
+                (current_user.id, current_name or "",
+                 json.dumps(result.get("suggestions") or result.get("better_names", [])),
+                 code[:300], mode)
             )
-            if resp.status_code != 200:
-                continue
-            raw = resp.json()["choices"][0]["message"]["content"].strip()
-            raw = re.sub(r"```json|```", "", raw).strip()
-            result = json.loads(raw)
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
 
-            # Persist to history
-            try:
-                conn = sqlite3.connect("codebuddy.db")
-                conn.execute(
-                    "INSERT INTO naming_history(user_id,original_name,suggestions,code_snippet,mode) "
-                    "VALUES (?,?,?,?,?)",
-                    (current_user.id, current_name or "",
-                     json.dumps(result.get("suggestions") or result.get("better_names", [])),
-                     code[:300], mode)
-                )
-                conn.commit()
-                conn.close()
-            except Exception:
-                pass
-
-            return jsonify(result)
-
-        except (requests.RequestException, json.JSONDecodeError, KeyError, ValueError) as exc:
-            app.logger.warning(f"naming_suggest model={model}: {exc}")
-            continue
-
-    return jsonify({"error": "Naming assistant unavailable — try again shortly."}), 503
+        return jsonify(result)
+    except (json.JSONDecodeError, KeyError, ValueError) as exc:
+        return jsonify({"error": f"Could not parse response: {exc}"}), 503
+    except RuntimeError as exc:
+        return jsonify({"error": str(exc)}), 503
 
 
 @app.route("/naming/history")

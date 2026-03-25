@@ -351,8 +351,6 @@ body::after {
 .vl-lang{font-family:var(--display);font-size:7px;letter-spacing:1px;padding:4px 10px;border:1px solid var(--border);border-radius:2px;cursor:pointer;color:var(--text-3);transition:all 0.2s;}
 .vl-lang:hover,.vl-lang.active{border-color:var(--border-hi);color:var(--plasma);background:var(--plasma-dim);}
 
-/* battle JS placeholder */
-let baInterval=null;
 
 /* ══════════════════════════════════
    FEATURE 4 — CODE KARMA
@@ -531,6 +529,15 @@ let baInterval=null;
       </div>
       <div class="tab" data-tab="blind" onclick="switchTab(this,'blind')">
         <span class="tab-icon">👁</span><span class="tab-label">BLIND REVIEW</span>
+      </div>
+      <div class="tab" data-tab="calibrator" onclick="switchTab(this,'calibrator')">
+        <span class="tab-icon">🎯</span><span class="tab-label">CALIBRATOR</span>
+      </div>
+      <div class="tab" data-tab="changelog" onclick="switchTab(this,'changelog')">
+        <span class="tab-icon">📓</span><span class="tab-label">CHANGELOG</span>
+      </div>
+      <div class="tab" data-tab="deadcode" onclick="switchTab(this,'deadcode')">
+        <span class="tab-icon">⚰</span><span class="tab-label">DEAD CODE</span>
       </div>
 </div>
     <button class="tab-scroll-btn right visible" id="tabScrollRight" onclick="scrollTabs(1)">▶</button>
@@ -802,6 +809,155 @@ def calculate_average(numbers):
       </div>
     </div>
 
+
+    <!-- TAB: CALIBRATOR -->
+    <div class="tab-pane" id="pane-calibrator">
+      <div class="pane-head">
+        <div class="pane-icon-wrap">🎯</div>
+        <div class="pane-title-block">
+          <div class="pane-num">FEATURE 25 - WORLD-FIRST</div>
+          <div class="pane-title">CODE CONFIDENCE CALIBRATOR</div>
+          <div class="pane-desc">Rate your confidence, take a 5-question AI quiz, see the exact gap between what you think you know and what you can prove. Track calibration improving over time.</div>
+        </div>
+        <div class="pane-badge" style="border-color:rgba(248,113,113,0.5);color:#f87171;background:rgba(248,113,113,0.08)">WORLD-FIRST</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+        <div style="padding:16px;border:1px solid rgba(248,113,113,0.2);border-radius:4px;background:rgba(248,113,113,0.04);text-align:center;">
+          <div style="font-family:var(--display);font-size:28px;font-weight:800;color:#f87171;" id="calSelfRating">-</div>
+          <div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--text-3);">SELF RATING /10</div>
+        </div>
+        <div style="padding:16px;border:1px solid rgba(52,211,153,0.2);border-radius:4px;background:rgba(52,211,153,0.04);text-align:center;">
+          <div style="font-family:var(--display);font-size:28px;font-weight:800;color:#34d399;" id="calScore">-</div>
+          <div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--text-3);">ACTUAL SCORE</div>
+        </div>
+      </div>
+      <div id="calSetup">
+        <div class="section-title">TOPIC TO TEST</div>
+        <input class="input-field" id="calTopic" placeholder="e.g. Python decorators, React hooks, SQL joins..." style="margin-bottom:10px;">
+        <div class="section-title">YOUR CONFIDENCE (1=beginner, 10=expert)</div>
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
+          <input type="range" min="1" max="10" value="5" id="calSlider" oninput="document.getElementById('calSliderVal').textContent=this.value" style="flex:1;height:4px;border-radius:2px;outline:none;cursor:pointer;">
+          <span id="calSliderVal" style="font-family:var(--display);font-size:22px;font-weight:800;color:#f87171;min-width:24px;">5</span>
+          <span style="font-family:var(--mono);font-size:11px;color:var(--text-3);">/10</span>
+        </div>
+        <div class="btn-row">
+          <button class="btn fire" id="calStartBtn" onclick="calStartQuiz()">GENERATE 5 QUESTIONS</button>
+          <button class="btn" onclick="calLoadHistory()">MY HISTORY</button>
+        </div>
+        <div id="calErr" style="display:none;margin-top:8px;padding:8px 12px;background:rgba(255,107,43,0.1);border:1px solid rgba(255,107,43,0.3);border-radius:3px;font-family:var(--mono);font-size:11px;color:#ff6b2b;"></div>
+      </div>
+      <div id="calQuiz" style="display:none;">
+        <div style="height:3px;background:rgba(248,113,113,0.15);border-radius:2px;margin-bottom:18px;overflow:hidden;">
+          <div id="calProgress" style="height:100%;background:#f87171;transition:width 0.4s;border-radius:2px;width:0%"></div>
+        </div>
+        <div id="calQHead" style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--text-3);margin-bottom:10px;"></div>
+        <div id="calQuestion" style="font-family:var(--mono);font-size:13px;color:var(--text);line-height:1.7;margin-bottom:16px;padding:14px;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:4px;"></div>
+        <div id="calOptions" style="display:flex;flex-direction:column;gap:7px;margin-bottom:16px;"></div>
+        <button class="btn fire" id="calNextBtn" onclick="calNextQ()" style="display:none;">NEXT</button>
+        <button class="btn fire" id="calSubmitBtn" onclick="calSubmit()" style="display:none;">SUBMIT QUIZ</button>
+      </div>
+      <div id="calResult" style="display:none;">
+        <div id="calBadge" style="font-family:var(--display);font-size:12px;font-weight:700;letter-spacing:2px;padding:12px 20px;border-radius:4px;text-align:center;margin-bottom:16px;border:1px solid var(--border);"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;">
+          <div style="padding:14px;border:1px solid var(--border);border-radius:4px;text-align:center;background:rgba(0,0,0,0.3);">
+            <div style="font-family:var(--display);font-size:20px;font-weight:800;color:var(--plasma);" id="calRSelf"></div>
+            <div style="font-family:var(--display);font-size:7px;letter-spacing:2px;color:var(--text-3);margin-top:4px;">SELF RATING</div>
+          </div>
+          <div style="padding:14px;border:1px solid var(--border);border-radius:4px;text-align:center;background:rgba(0,0,0,0.3);">
+            <div style="font-family:var(--display);font-size:20px;font-weight:800;color:var(--plasma);" id="calRCorrect"></div>
+            <div style="font-family:var(--display);font-size:7px;letter-spacing:2px;color:var(--text-3);margin-top:4px;">CORRECT</div>
+          </div>
+          <div style="padding:14px;border:1px solid var(--border);border-radius:4px;text-align:center;background:rgba(0,0,0,0.3);">
+            <div style="font-family:var(--display);font-size:20px;font-weight:800;" id="calRGap"></div>
+            <div style="font-family:var(--display);font-size:7px;letter-spacing:2px;color:var(--text-3);margin-top:4px;">GAP (PTS)</div>
+          </div>
+        </div>
+        <div id="calVerdict" style="font-family:var(--mono);font-size:12px;color:var(--text-2);line-height:1.7;padding:14px;border:1px solid var(--border);border-radius:4px;background:rgba(0,0,0,0.3);margin-bottom:14px;"></div>
+        <div id="calBreakdown" style="margin-bottom:14px;"></div>
+        <button class="btn fire" onclick="calReset()">TRY ANOTHER TOPIC</button>
+      </div>
+      <div id="calHistory" style="display:none;margin-top:10px;">
+        <div class="section-title">CALIBRATION HISTORY</div>
+        <div id="calHistList"></div>
+        <button class="btn" onclick="document.getElementById('calHistory').style.display='none';document.getElementById('calSetup').style.display='block';" style="margin-top:10px;">BACK</button>
+      </div>
+    </div>
+
+    <!-- TAB: CHANGELOG -->
+    <div class="tab-pane" id="pane-changelog">
+      <div class="pane-head">
+        <div class="pane-icon-wrap">📓</div>
+        <div class="pane-title-block">
+          <div class="pane-num">FEATURE 24 - WORLD-FIRST</div>
+          <div class="pane-title">PERSONAL CHANGELOG GENERATOR</div>
+          <div class="pane-desc">One click mines your entire day's coding sessions into a structured learning diary — what you learned, what you built, best insight, what to revisit, and tomorrow's focus.</div>
+        </div>
+        <div class="pane-badge" style="border-color:rgba(52,211,153,0.5);color:#34d399;background:rgba(52,211,153,0.08)">WORLD-FIRST</div>
+      </div>
+      <div class="btn-row">
+        <button class="btn" id="clGenBtn" onclick="clGenerate()">GENERATE TODAY'S LOG</button>
+        <button class="btn nova" onclick="clLoadHistory()">VIEW HISTORY</button>
+      </div>
+      <div id="clLoading" style="display:none;text-align:center;padding:40px;font-family:var(--mono);font-size:12px;color:var(--text-3);">
+        <span class="spinner"></span> Mining today's sessions into your learning diary...
+      </div>
+      <div id="clEntry" style="display:none;">
+        <div id="clTopics" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;"></div>
+        <div id="clText" style="font-family:var(--mono);font-size:12px;color:var(--text-2);line-height:1.8;padding:18px;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:4px;white-space:pre-wrap;max-height:420px;overflow-y:auto;"></div>
+      </div>
+      <div id="clEmpty" style="display:none;text-align:center;padding:40px;font-family:var(--mono);font-size:12px;color:var(--text-3);">No coding sessions found today yet. Start chatting in CodeBuddy and come back!</div>
+      <div id="clHistory" style="display:none;margin-top:10px;">
+        <div class="section-title">LEARNING DIARY - ALL ENTRIES</div>
+        <div id="clHistList"></div>
+      </div>
+    </div>
+
+    <!-- TAB: DEAD CODE -->
+    <div class="tab-pane" id="pane-deadcode">
+      <div class="pane-head">
+        <div class="pane-icon-wrap">⚰</div>
+        <div class="pane-title-block">
+          <div class="pane-num">FEATURE 18 - WORLD-FIRST</div>
+          <div class="pane-title">DEAD CODE ARCHAEOLOGIST</div>
+          <div class="pane-desc">Not just flagging dead code — explaining exactly WHY it's dead. Returns a full burial map with three severity levels and a visual call graph.</div>
+        </div>
+        <div class="pane-badge" style="border-color:rgba(168,85,247,0.5);color:var(--nova);background:rgba(168,85,247,0.08)">WORLD-FIRST</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:10px;">
+        <div style="flex:1;">
+          <div class="section-title" style="margin-bottom:6px;">LANGUAGE</div>
+          <select id="dcLang" class="input-field" style="min-height:0;padding:9px 12px;resize:none;">
+            <option value="python">Python</option>
+            <option value="javascript">JavaScript</option>
+            <option value="typescript">TypeScript</option>
+            <option value="java">Java</option>
+            <option value="go">Go</option>
+            <option value="cpp">C++</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+      </div>
+      <div class="section-title">PASTE YOUR CODE</div>
+      <textarea class="input-field" id="dcCode" style="min-height:140px;margin-bottom:10px;" placeholder="Paste your code here — AI will find dead functions, unreachable branches, and leftover fossils..."></textarea>
+      <div class="btn-row">
+        <button class="btn nova" id="dcScanBtn" onclick="dcScan()">SCAN FOR DEAD CODE</button>
+        <button class="btn" onclick="document.getElementById('dcCode').value='';document.getElementById('dcResult').innerHTML='';document.getElementById('dcSummaryBox').style.display='none'">CLEAR</button>
+      </div>
+      <div id="dcLoading" style="display:none;text-align:center;padding:24px;font-family:var(--mono);font-size:12px;color:var(--text-3);">
+        <span class="spinner"></span> Analyzing for dead code...
+      </div>
+      <div id="dcSummaryBox" style="display:none;margin-bottom:14px;padding:12px 16px;border:1px solid rgba(168,85,247,0.2);border-radius:4px;background:rgba(168,85,247,0.04);">
+        <div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--nova);margin-bottom:6px;">BURIAL REPORT</div>
+        <div id="dcSummary" style="font-family:var(--mono);font-size:12px;color:var(--text-2);line-height:1.6;"></div>
+      </div>
+      <div id="dcResult"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">
+        <span style="padding:5px 12px;border:1px solid rgba(255,107,43,0.3);border-radius:3px;font-family:var(--display);font-size:8px;color:rgba(255,107,43,0.8);">ZOMBIE - runs but has no effect</span>
+        <span style="padding:5px 12px;border:1px solid rgba(168,85,247,0.3);border-radius:3px;font-family:var(--display);font-size:8px;color:rgba(168,85,247,0.8);">GHOST - defined but never called</span>
+        <span style="padding:5px 12px;border:1px solid rgba(251,191,36,0.3);border-radius:3px;font-family:var(--display);font-size:8px;color:rgba(251,191,36,0.8);">FOSSIL - leftover from old version</span>
+      </div>
+    </div>
+
   </div><!-- /panel-body -->
 </div><!-- /panel-shell -->
 
@@ -921,12 +1077,30 @@ async function replayThought() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code })
     });
-    if (!res.ok) throw new Error(`API error ${res.status}`);
     const data = await res.json();
-    if (data.error) throw new Error(data.error);
 
     // Clear the placeholder
     document.getElementById('trTimeline').innerHTML = '';
+
+    if (data.error) {
+      // Show a friendly, informative error step instead of crashing
+      addThoughtStep({
+        label: 'AI TEMPORARILY UNAVAILABLE',
+        text: data.error,
+        type: 'error'
+      }, false);
+      addThoughtStep({
+        label: 'WHAT TO DO',
+        text: '💡 Free AI models sometimes get busy. Wait 10–15 seconds and click START REPLAY again. Your code is still pasted — no need to re-enter it.',
+        type: 'thinking'
+      }, true);
+      trAnimating = false;
+      btn.disabled = false;
+      btn.innerHTML = '▶ START REPLAY';
+      return;
+    }
+
+    if (!res.ok) throw new Error(`API error ${res.status}`);
 
     const steps = Array.isArray(data) ? data : (data.steps || [data]);
     steps.forEach((step, i) => {
@@ -941,7 +1115,16 @@ async function replayThought() {
     });
   } catch(err) {
     document.getElementById('trTimeline').innerHTML = '';
-    addThoughtStep({ label: 'ERROR', text: 'Could not reach the AI debugger: ' + err.message + '. Make sure you are logged in and the server is running.', type: 'error' }, true);
+    addThoughtStep({
+      label: 'CONNECTION ERROR',
+      text: err.message + ' — Make sure you are logged in and the server is running.',
+      type: 'error'
+    }, false);
+    addThoughtStep({
+      label: 'RETRY',
+      text: '💡 Check your internet connection, then click START REPLAY again.',
+      type: 'thinking'
+    }, true);
     trAnimating = false;
     btn.disabled = false;
     btn.innerHTML = '▶ START REPLAY';
@@ -1196,3 +1379,244 @@ function submitBlind(){
 </script>
 </body>
 </html>
+<script>
+/* ══ CALIBRATOR ══ */
+var _calState={quiz_id:null,questions:[],answers:{},currentQ:0,topic:'',self_rating:5};
+
+async function calStartQuiz(){
+  var topic=document.getElementById('calTopic').value.trim();
+  if(!topic){showCalErr('Enter a topic first');return;}
+  var rating=parseInt(document.getElementById('calSlider').value)||5;
+  _calState={quiz_id:null,questions:[],answers:{},currentQ:0,topic:topic,self_rating:rating};
+  document.getElementById('calSetup').style.display='none';
+  document.getElementById('calResult').style.display='none';
+  document.getElementById('calHistory').style.display='none';
+  document.getElementById('calQuiz').style.display='block';
+  document.getElementById('calQHead').textContent='Generating quiz on '+topic+'...';
+  document.getElementById('calQuestion').textContent='Building 5 questions — please wait...';
+  document.getElementById('calOptions').innerHTML='';
+  document.getElementById('calNextBtn').style.display='none';
+  document.getElementById('calSubmitBtn').style.display='none';
+  try{
+    var res=await fetch('/calibrate/quiz',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({topic:topic,self_rating:rating})});
+    var d=await res.json();
+    if(d.error){calReset();showCalErr(d.error);return;}
+    _calState.quiz_id=d.quiz_id;
+    _calState.questions=d.questions;
+    document.getElementById('calSelfRating').textContent=rating+'/10';
+    calRenderQuestion();
+  }catch(e){calReset();showCalErr('Network error: '+e.message);}
+}
+
+function calRenderQuestion(){
+  var q=_calState.questions[_calState.currentQ];
+  var total=_calState.questions.length;
+  document.getElementById('calProgress').style.width=((_calState.currentQ/total)*100)+'%';
+  document.getElementById('calQHead').textContent='QUESTION '+(_calState.currentQ+1)+' OF '+total+' - '+_calState.topic.toUpperCase();
+  document.getElementById('calQuestion').textContent=q.question;
+  var optsEl=document.getElementById('calOptions');
+  optsEl.innerHTML='';
+  var opts=q.options;
+  var keys=(typeof opts==='object'&&!Array.isArray(opts))?Object.keys(opts):['A','B','C','D'];
+  keys.forEach(function(k){
+    var btn=document.createElement('div');
+    btn.style.cssText='padding:10px 14px;border:1px solid var(--border);border-radius:3px;cursor:pointer;transition:all 0.15s;display:flex;gap:10px;align-items:flex-start;margin-bottom:2px;';
+    btn.innerHTML='<span style="font-family:var(--display);font-size:10px;font-weight:700;color:rgba(0,255,224,0.6);min-width:18px;flex-shrink:0;">'+k+'</span><span style="font-family:var(--mono);font-size:12px;color:var(--text-2);line-height:1.5;">'+opts[k]+'</span>';
+    btn.addEventListener('mouseenter',function(){if(!btn._sel)btn.style.background='rgba(0,255,224,0.04)';});
+    btn.addEventListener('mouseleave',function(){if(!btn._sel)btn.style.background='';});
+    btn.addEventListener('click',function(){calSelectOpt(k,btn);});
+    btn._key=k;
+    optsEl.appendChild(btn);
+  });
+  document.getElementById('calNextBtn').style.display='none';
+  document.getElementById('calSubmitBtn').style.display='none';
+}
+
+function calSelectOpt(key,btn){
+  var q=_calState.questions[_calState.currentQ];
+  _calState.answers[String(q.id)]=key;
+  document.querySelectorAll('#calOptions div').forEach(function(b){b.style.background='';b.style.borderColor='var(--border)';b._sel=false;});
+  btn.style.background='rgba(0,255,224,0.08)';btn.style.borderColor='rgba(0,255,224,0.4)';btn._sel=true;
+  var isLast=_calState.currentQ>=_calState.questions.length-1;
+  document.getElementById('calNextBtn').style.display=isLast?'none':'inline-block';
+  document.getElementById('calSubmitBtn').style.display=isLast?'inline-block':'none';
+}
+
+function calNextQ(){
+  var q=_calState.questions[_calState.currentQ];
+  if(!_calState.answers[String(q.id)])return;
+  _calState.currentQ++;
+  calRenderQuestion();
+}
+
+async function calSubmit(){
+  document.getElementById('calQuiz').style.display='none';
+  try{
+    var res=await fetch('/calibrate/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({quiz_id:_calState.quiz_id,answers:_calState.answers})});
+    var d=await res.json();
+    if(d.error){calReset();showCalErr(d.error);return;}
+    calShowResult(d);
+  }catch(e){calReset();showCalErr('Submit failed: '+e.message);}
+}
+
+function calShowResult(d){
+  document.getElementById('calResult').style.display='block';
+  document.getElementById('calScore').textContent=d.score+'%';
+  var bs=d.calibration==='overconfident'
+    ?'background:rgba(239,68,68,0.1);border-color:rgba(239,68,68,0.4);color:#f87171;'
+    :d.calibration==='underconfident'
+    ?'background:rgba(168,85,247,0.1);border-color:rgba(168,85,247,0.4);color:#a855f7;'
+    :'background:rgba(52,211,153,0.1);border-color:rgba(52,211,153,0.4);color:#34d399;';
+  var be=document.getElementById('calBadge');
+  be.style.cssText='font-family:var(--display);font-size:12px;font-weight:700;letter-spacing:2px;padding:12px 20px;border-radius:4px;text-align:center;margin-bottom:16px;border:1px solid;'+bs;
+  be.textContent=d.badge;
+  document.getElementById('calRSelf').textContent=d.self_rating+'/10';
+  document.getElementById('calRCorrect').textContent=d.correct_count+'/'+d.total;
+  var ge=document.getElementById('calRGap');
+  ge.textContent=(d.gap>=0?'+':'')+d.gap;
+  ge.style.color=d.gap<-20?'#f87171':d.gap>20?'#a855f7':'#34d399';
+  document.getElementById('calVerdict').textContent=d.verdict;
+  var bd=document.getElementById('calBreakdown');
+  bd.innerHTML='<div class="section-title">QUESTION BREAKDOWN</div>';
+  (d.per_question||[]).forEach(function(q){
+    var el=document.createElement('div');
+    el.style.cssText='padding:10px 12px;border-radius:3px;margin-bottom:6px;border:1px solid var(--border);background:rgba(0,0,0,0.2);';
+    el.innerHTML='<div style="font-family:var(--mono);font-size:11px;color:var(--text-2);margin-bottom:5px;line-height:1.5;">'+q.question+'</div>'
+      +(q.is_correct?'<span style="color:#34d399;font-family:var(--mono);font-size:10px;">Correct</span>'
+        :'<span style="color:#f87171;font-family:var(--mono);font-size:10px;">Wrong — you chose '+(q.chosen||'?')+', correct: '+q.correct+'</span>')
+      +(q.explanation?'<div style="font-family:var(--mono);font-size:10px;color:rgba(0,255,224,0.4);margin-top:4px;font-style:italic;">'+q.explanation+'</div>':'');
+    bd.appendChild(el);
+  });
+}
+
+function calReset(){
+  _calState={quiz_id:null,questions:[],answers:{},currentQ:0,topic:'',self_rating:5};
+  document.getElementById('calSetup').style.display='block';
+  document.getElementById('calQuiz').style.display='none';
+  document.getElementById('calResult').style.display='none';
+  document.getElementById('calHistory').style.display='none';
+  document.getElementById('calSelfRating').textContent='-';
+  document.getElementById('calScore').textContent='-';
+}
+
+async function calLoadHistory(){
+  document.getElementById('calSetup').style.display='none';
+  document.getElementById('calHistory').style.display='block';
+  var list=document.getElementById('calHistList');
+  list.innerHTML='<div style="font-family:var(--mono);font-size:11px;color:var(--text-3);padding:10px 0;">Loading...</div>';
+  try{
+    var d=await fetch('/calibrate/history').then(function(r){return r.json();});
+    if(!d.total){list.innerHTML='<div style="font-family:var(--mono);font-size:11px;color:var(--text-3);padding:10px 0;">No calibrations yet — take your first quiz above!</div>';return;}
+    list.innerHTML=(d.records||[]).map(function(r){
+      var gap=r.gap>=0?'+'+r.gap:String(r.gap);
+      var gc=r.gap<-20?'#f87171':r.gap>20?'#a855f7':'#34d399';
+      return '<div style="padding:10px 12px;border:1px solid var(--border);border-radius:3px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">'
+        +'<div><div style="font-family:var(--mono);font-size:12px;color:var(--text);">'+r.topic+'</div>'
+        +'<div style="font-family:var(--display);font-size:8px;color:var(--text-3);margin-top:3px;">'+(r.created_at||'').slice(0,10)+'</div></div>'
+        +'<div style="display:flex;gap:12px;">'
+        +'<span style="font-family:var(--display);font-size:10px;color:var(--text-2);">'+r.self_rating+'/10</span>'
+        +'<span style="font-family:var(--display);font-size:10px;color:var(--plasma);">'+r.actual_score+'%</span>'
+        +'<span style="font-family:var(--display);font-size:10px;color:'+gc+';">'+gap+'pts</span>'
+        +'</div></div>';
+    }).join('');
+  }catch(e){list.innerHTML='<div style="color:var(--fire);font-family:var(--mono);font-size:11px;">Failed to load.</div>';}
+}
+
+function showCalErr(msg){
+  var el=document.getElementById('calErr');if(!el)return;
+  el.textContent='Error: '+msg;el.style.display='block';
+  document.getElementById('calSetup').style.display='block';
+  setTimeout(function(){el.style.display='none';},6000);
+}
+
+/* ══ CHANGELOG ══ */
+async function clGenerate(){
+  var btn=document.getElementById('clGenBtn');
+  btn.disabled=true;btn.textContent='Generating...';
+  ['clEntry','clEmpty','clHistory'].forEach(function(id){document.getElementById(id).style.display='none';});
+  document.getElementById('clLoading').style.display='block';
+  try{
+    var d=await fetch('/changelog/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(function(r){return r.json();});
+    document.getElementById('clLoading').style.display='none';
+    if(!d.entry){
+      document.getElementById('clEmpty').style.display='block';
+    }else{
+      document.getElementById('clTopics').innerHTML=(d.topics||[]).map(function(t){
+        return '<span style="font-family:var(--mono);font-size:10px;padding:3px 10px;border:1px solid rgba(0,255,224,0.2);border-radius:2px;color:rgba(0,255,224,0.7);background:rgba(0,255,224,0.04);">'+t+'</span>';
+      }).join('');
+      document.getElementById('clText').textContent=d.entry;
+      document.getElementById('clEntry').style.display='block';
+    }
+  }catch(e){
+    document.getElementById('clLoading').style.display='none';
+    document.getElementById('clEmpty').textContent='Error: '+e.message;
+    document.getElementById('clEmpty').style.display='block';
+  }
+  btn.disabled=false;btn.textContent="GENERATE TODAY'S LOG";
+}
+
+async function clLoadHistory(){
+  ['clEntry','clEmpty'].forEach(function(id){document.getElementById(id).style.display='none';});
+  document.getElementById('clHistory').style.display='block';
+  var list=document.getElementById('clHistList');
+  list.innerHTML='<div style="font-family:var(--mono);font-size:11px;color:var(--text-3);padding:10px 0;">Loading...</div>';
+  try{
+    var d=await fetch('/changelog/history').then(function(r){return r.json();});
+    if(!d.total){list.innerHTML='<div style="font-family:var(--mono);font-size:11px;color:var(--text-3);padding:10px 0;">No entries yet — generate your first one above!</div>';return;}
+    list.innerHTML=(d.entries||[]).map(function(e){
+      var topics=(e.topics||[]).map(function(t){return '<span style="font-family:var(--mono);font-size:9px;padding:2px 7px;border:1px solid rgba(0,255,224,0.15);border-radius:2px;color:rgba(0,255,224,0.5);margin-right:4px;">'+t+'</span>';}).join('');
+      var preview=(e.entry||'').slice(0,300)+((e.entry||'').length>300?'...':'');
+      return '<div style="padding:14px 16px;border:1px solid var(--border);border-radius:4px;margin-bottom:8px;background:rgba(0,0,0,0.2);">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">'
+        +'<div style="font-family:var(--display);font-size:9px;letter-spacing:2px;color:var(--plasma);">'+(e.date||'')+'</div>'
+        +'<div>'+topics+'</div></div>'
+        +'<div style="font-family:var(--mono);font-size:11px;color:var(--text-2);line-height:1.7;white-space:pre-wrap;">'+preview+'</div></div>';
+    }).join('');
+  }catch(e){list.innerHTML='<div style="color:var(--fire);font-family:var(--mono);font-size:11px;">Failed to load history.</div>';}
+}
+
+/* ══ DEAD CODE ══ */
+async function dcScan(){
+  var code=document.getElementById('dcCode').value.trim();
+  var lang=document.getElementById('dcLang').value;
+  if(!code){showToast('Paste some code first',true);return;}
+  var btn=document.getElementById('dcScanBtn');
+  btn.disabled=true;btn.textContent='Scanning...';
+  document.getElementById('dcLoading').style.display='block';
+  document.getElementById('dcResult').innerHTML='';
+  document.getElementById('dcSummaryBox').style.display='none';
+  try{
+    var d=await fetch('/dead_code',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code,language:lang})}).then(function(r){return r.json();});
+    document.getElementById('dcLoading').style.display='none';
+    if(d.error){showToast(d.error,true);btn.disabled=false;btn.textContent='SCAN FOR DEAD CODE';return;}
+    var items=d.dead_blocks||[];
+    if(!items.length){
+      document.getElementById('dcResult').innerHTML='<div style="text-align:center;padding:24px;font-family:var(--mono);font-size:12px;color:#34d399;">No dead code found — clean codebase!</div>';
+    }else{
+      document.getElementById('dcSummary').textContent=d.summary||(items.length+' dead blocks found.');
+      document.getElementById('dcSummaryBox').style.display='block';
+      var typeMap={
+        zombie:{label:'ZOMBIE',color:'rgba(255,107,43,0.8)',border:'rgba(255,107,43,0.25)',bg:'rgba(255,107,43,0.06)'},
+        ghost:{label:'GHOST',color:'rgba(168,85,247,0.8)',border:'rgba(168,85,247,0.25)',bg:'rgba(168,85,247,0.06)'},
+        fossil:{label:'FOSSIL',color:'rgba(251,191,36,0.8)',border:'rgba(251,191,36,0.25)',bg:'rgba(251,191,36,0.06)'}
+      };
+      document.getElementById('dcResult').innerHTML='<div class="section-title">BURIAL MAP — '+items.length+' DEAD BLOCK'+(items.length!==1?'S':'')+'</div>'
+        +items.map(function(item){
+          var t=typeMap[(item.severity||item.type||'ghost').toLowerCase()]||typeMap.ghost;
+          return '<div style="padding:12px 14px;border:1px solid '+t.border+';border-radius:4px;background:'+t.bg+';margin-bottom:8px;">'
+            +'<div style="font-family:var(--mono);font-size:11px;font-weight:700;color:'+t.color+';margin-bottom:5px;">'
+            +t.label+' — '+(item.label||item.name||item.function||'unknown')
+            +(item.start_line?' <span style="color:var(--text-3);font-size:9px;">line '+item.start_line+'</span>':'')
+            +'</div>'
+            +'<div style="font-family:var(--mono);font-size:11px;color:var(--text-2);line-height:1.6;">'+(item.reason||item.why||'')+'</div>'
+            +(item.fix?'<div style="font-family:var(--mono);font-size:10px;color:rgba(0,255,224,0.5);margin-top:6px;font-style:italic;">Fix: '+item.fix+'</div>':'')
+            +'</div>';
+        }).join('');
+    }
+  }catch(e){
+    document.getElementById('dcLoading').style.display='none';
+    showToast('Scan failed: '+e.message,true);
+  }
+  btn.disabled=false;btn.textContent='SCAN FOR DEAD CODE';
+}
+</script>

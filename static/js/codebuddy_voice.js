@@ -515,6 +515,10 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
           <div class="cbCmd" onclick="triggerConvert()"><div class="cbCmdIcon">🔄</div><div class="cbCmdLabel">CONVERT LANG</div></div>
           <div class="cbCmd" onclick="analyzeUploadedFile()"><div class="cbCmdIcon">📁</div><div class="cbCmdLabel">ANALYZE FILE</div></div>
           <div class="cbCmd" onclick="CBVoice.startListening()"><div class="cbCmdIcon">🎤</div><div class="cbCmdLabel">SPEAK QUERY</div></div>
+          <div class="cbCmd" onclick="triggerMoodEngine()"><div class="cbCmdIcon">😤</div><div class="cbCmdLabel">MOOD ENGINE</div></div>
+          <div class="cbCmd" onclick="triggerCodeDNA()"><div class="cbCmdIcon">🧬</div><div class="cbCmdLabel">CODE DNA</div></div>
+          <div class="cbCmd" onclick="triggerDeadCode()"><div class="cbCmdIcon">⚰</div><div class="cbCmdLabel">DEAD CODE</div></div>
+          <div class="cbCmd" onclick="triggerChangelog()"><div class="cbCmdIcon">📓</div><div class="cbCmdLabel">CHANGELOG</div></div>
         </div>
         <div class="cbSymLabel">VOICE COMMAND REFERENCE</div>
         <div class="cbSymRow"><span class="cbSymPhrase">"Hey Buddy"</span><span class="cbSymResult">Wake Up</span></div>
@@ -523,32 +527,21 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
         <div class="cbSymRow"><span class="cbSymPhrase">"Explain code"</span><span class="cbSymResult">Narrate</span></div>
         <div class="cbSymRow"><span class="cbSymPhrase">"Write tests"</span><span class="cbSymResult">Unit tests</span></div>
         <div class="cbSymRow"><span class="cbSymPhrase">"Optimize"</span><span class="cbSymResult">Refactor</span></div>
+        <div class="cbSymRow"><span class="cbSymPhrase">"Mood engine"</span><span class="cbSymResult">Check mood</span></div>
+        <div class="cbSymRow"><span class="cbSymPhrase">"Code DNA"</span><span class="cbSymResult">Style DNA</span></div>
+        <div class="cbSymRow"><span class="cbSymPhrase">"Dead code"</span><span class="cbSymResult">Find dead</span></div>
         <div class="cbSymRow"><span class="cbSymPhrase">"Stop speaking"</span><span class="cbSymResult">Silence TTS</span></div>
       </div>
       <div class="cbPanelSection" id="cbTab-symbols">
         <div id="cbSymCtxWarn" style="display:none;background:rgba(255,107,43,0.1);border:1px solid rgba(255,107,43,0.3);border-radius:4px;padding:7px 10px;margin-bottom:10px;font-family:IBM Plex Mono,monospace;font-size:9px;color:#ff6b2b;line-height:1.6">
           ⚠ CODE CONTEXT is OFF — voice symbol substitution is disabled.<br>
-          Go to <strong>SETTINGS</strong> tab and turn CODE CONTEXT <strong>ON</strong> to use voice symbols.
+          Go to <strong>SETTINGS</strong> tab and turn CODE CONTEXT <strong>ON</strong>.
         </div>
         <div class="cbSymLabel">🎙 SAY THIS → GET CODE SYMBOL</div>
         <div style="font-family:IBM Plex Mono,monospace;font-size:9px;color:rgba(226,244,255,0.3);margin-bottom:10px;line-height:1.6">
-          Speak these phrases while coding by voice — or <strong style="color:rgba(0,255,224,0.5)">tap any row</strong> to insert the symbol directly into your message.
+          Tap any row to insert the symbol directly into your message.
         </div>
-        ${Object.entries(CODE_SYMBOLS_WITH_DESC).map(([k, [sym, desc]]) => `
-          <div class="cbSymRow" style="flex-direction:column;align-items:flex-start;gap:2px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.04);cursor:pointer;transition:background 0.15s;"
-               onclick="insertSymbolToInput(${JSON.stringify(sym)})"
-               onmouseenter="this.style.background='rgba(0,255,224,0.05)'"
-               onmouseleave="this.style.background='transparent'">
-            <div style="display:flex;justify-content:space-between;width:100%;align-items:center">
-              <span class="cbSymPhrase" style="font-size:10px">"${k}"</span>
-              <div style="display:flex;align-items:center;gap:6px">
-                <span style="font-family:IBM Plex Mono,monospace;font-size:8px;color:rgba(0,255,224,0.3);letter-spacing:1px">TAP</span>
-                <span class="cbSymResult" style="font-size:13px;min-width:36px;text-align:center">${sym.replace(/\n/g,'↵').replace(/\t/g,'→')}</span>
-              </div>
-            </div>
-            <span style="font-family:IBM Plex Mono,monospace;font-size:9px;color:rgba(0,255,224,0.4);margin-top:2px">${desc}</span>
-          </div>
-        `).join('')}
+        <div id="cbSymbolsList"></div>
       </div>
       <div class="cbPanelSection" id="cbTab-history">
         <div id="cbHistoryList" style="font-family:IBM Plex Mono,monospace;font-size:10px;color:rgba(226,244,255,0.3)">No voice interactions yet.</div>
@@ -612,6 +605,30 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
     </div>
   `;
     document.body.appendChild(panel);
+
+    // Populate symbols list dynamically (avoids inline event handler template literal bugs)
+    (function buildSymbolsList() {
+      const container = document.getElementById('cbSymbolsList');
+      if (!container) return;
+      Object.entries(CODE_SYMBOLS_WITH_DESC).forEach(([phrase, [sym, desc]]) => {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.04);cursor:pointer;transition:background 0.15s;';
+        row.addEventListener('mouseenter', () => row.style.background = 'rgba(0,255,224,0.05)');
+        row.addEventListener('mouseleave', () => row.style.background = 'transparent');
+        row.addEventListener('click', () => insertSymbolToInput(sym));
+        const displaySym = sym.replace(/\n/g,'↵').replace(/\t/g,'→').trim() || sym;
+        row.innerHTML = `
+          <div style="display:flex;justify-content:space-between;width:100%;align-items:center">
+            <span class="cbSymPhrase" style="font-size:10px">"${phrase}"</span>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-family:IBM Plex Mono,monospace;font-size:8px;color:rgba(0,255,224,0.3);letter-spacing:1px">TAP</span>
+              <span class="cbSymResult" style="font-size:13px;min-width:44px;text-align:center;padding:2px 8px">${displaySym}</span>
+            </div>
+          </div>
+          <span style="font-family:IBM Plex Mono,monospace;font-size:9px;color:rgba(0,255,224,0.4);margin-top:2px">${desc}</span>`;
+        container.appendChild(row);
+      });
+    })();
 
     document.getElementById('cbFileInput').addEventListener('change', handleFileSelect);
     document.getElementById('cbLangSel').addEventListener('change', e => CBVoice.setLang(e.target.value));
@@ -1254,6 +1271,69 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
     speak('Which programming language would you like to convert this code to?');
     setTranscript('Say the target language name...', 'interim');
     setTimeout(() => CBVoice.startListening(), 1500);
+  }
+
+  function triggerMoodEngine() {
+    fetch('/mood/history')
+      .then(r => r.json())
+      .then(d => {
+        const s = d.summary || {};
+        const dom = d.dominant_mood || 'neutral';
+        const emojis = {frustrated:'😤', confused:'🤔', confident:'💪', neutral:'😐'};
+        const msg = `${emojis[dom]||'😐'} Dominant mood: ${dom}. Frustrated ${s.frustrated||0} times, confident ${s.confident||0} times, confused ${s.confused||0} times.`;
+        speak(msg);
+        setTranscript('Mood: ' + dom.toUpperCase(), 'final');
+      })
+      .catch(() => speak('Could not load mood history. Make sure you are logged in.'));
+  }
+
+  function triggerCodeDNA() {
+    speak('Building your Code DNA profile from your coding history.');
+    fetch('/dna/build', { method: 'POST' })
+      .then(r => r.json())
+      .then(d => {
+        if (d.profile) {
+          const p = d.profile;
+          const traits = [p.naming_convention, p.indent_size ? p.indent_size + ' ' + p.indent_style : null, p.comment_style + ' comments'].filter(Boolean).join(', ');
+          speak('Your Code DNA: ' + traits + '. Style is now being applied to all AI responses.');
+        } else {
+          speak(d.error || 'Paste some code in chat first to build your DNA profile.');
+        }
+      })
+      .catch(() => speak('Code DNA build failed. Make sure you are logged in.'));
+  }
+
+  function triggerDeadCode() {
+    const lastCode = window.lastCodeBlock || '';
+    if (lastCode) {
+      speak('Scanning for dead code.');
+      setTranscript('Scanning dead code...', 'final');
+      if (typeof HUB !== 'undefined') {
+        HUB.open('deadcode');
+        setTimeout(() => {
+          const ta = document.getElementById('dc-code');
+          if (ta) { ta.value = lastCode; HUB.dcScan(); }
+        }, 400);
+      } else {
+        sendVoiceQuery('Scan this code for dead, unreachable, or unused code and explain why each block is dead:\n```\n' + lastCode + '\n```');
+      }
+    } else {
+      speak('No code found. Please open the Features Hub Dead Code tab and paste your code there.');
+      if (typeof HUB !== 'undefined') HUB.open('deadcode');
+    }
+  }
+
+  function triggerChangelog() {
+    speak('Generating your daily learning changelog.');
+    if (typeof HUB !== 'undefined') {
+      HUB.open('changelog');
+      setTimeout(() => { if (typeof HUB.clGenerate === 'function') HUB.clGenerate(); }, 400);
+    } else {
+      fetch('/changelog/generate', { method: 'POST', headers: {'Content-Type':'application/json'}, body: '{}' })
+        .then(r => r.json())
+        .then(d => { if (d.entry) speak('Changelog generated. Open the Features Hub to read it.'); else speak(d.message || 'No sessions found for today.'); })
+        .catch(() => speak('Changelog generation failed.'));
+    }
   }
 
   function clearConversation() {
