@@ -22,7 +22,7 @@
   --mono:'IBM Plex Mono',monospace; --display:'Orbitron',monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;background:var(--void);color:var(--text);font-family:var(--mono);overflow:hidden}
+html,body{height:100%;background:var(--void);color:var(--text);font-family:var(--mono);}
 
 .layout{display:flex;height:100vh;width:100vw}
 
@@ -46,6 +46,11 @@ html,body{height:100%;background:var(--void);color:var(--text);font-family:var(-
 #connectBtn{width:100%;padding:9px;background:rgba(168,85,247,0.12);border:1px solid rgba(168,85,247,0.35);border-radius:6px;color:var(--nova);font-family:var(--display);font-size:8px;font-weight:700;letter-spacing:1.5px;cursor:pointer;transition:all 0.2s}
 #connectBtn:hover{background:rgba(168,85,247,0.22);box-shadow:0 0 16px rgba(168,85,247,0.2)}
 #connectBtn.connected{background:rgba(255,107,43,0.12);border-color:rgba(255,107,43,0.35);color:var(--fire)}
+
+#videoBtn:hover{background:rgba(0,255,224,0.15);box-shadow:0 0 12px rgba(0,255,224,0.15);color:var(--plasma)}
+#videoBtn.video-on{background:rgba(0,255,224,0.12);border-color:rgba(0,255,224,0.4);color:var(--plasma)}
+#videoBtn.video-off{background:rgba(255,107,43,0.08);border-color:rgba(255,107,43,0.25);color:rgba(255,107,43,0.7)}
+
 
 .end-btn{display:block;width:calc(100% - 16px);margin:8px;padding:8px;background:rgba(255,107,43,0.08);border:1px solid rgba(255,107,43,0.2);border-radius:6px;color:rgba(255,107,43,0.6);font-family:var(--display);font-size:7px;font-weight:700;letter-spacing:1.5px;cursor:pointer;transition:all 0.2s}
 .end-btn:hover{background:rgba(255,107,43,0.15);color:var(--fire)}
@@ -138,6 +143,65 @@ html,body{height:100%;background:var(--void);color:var(--text);font-family:var(-
 .send-btn:hover{background:rgba(0,255,224,0.25);box-shadow:0 0 20px var(--plasma-glow)}
 .send-btn:disabled{opacity:0.35;cursor:not-allowed}
 .input-hint{margin-top:6px;font-family:var(--display);font-size:7px;letter-spacing:1.5px;color:var(--text-3)}
+
+/* ── CALL PANEL ─────────────────────────────────────────── */
+#connectOptions{display:flex;flex-direction:column;gap:6px}
+#connectVoiceBtn{width:100%;padding:9px;background:rgba(168,85,247,0.12);border:1px solid rgba(168,85,247,0.35);border-radius:6px;color:var(--nova);font-family:var(--display);font-size:8px;font-weight:700;letter-spacing:1.5px;cursor:pointer;transition:all 0.2s}
+#connectVoiceBtn:hover{background:rgba(168,85,247,0.25);box-shadow:0 0 14px rgba(168,85,247,0.2)}
+#connectVideoBtn{width:100%;padding:9px;background:rgba(0,255,224,0.07);border:1px solid rgba(0,255,224,0.25);border-radius:6px;color:var(--plasma);font-family:var(--display);font-size:8px;font-weight:700;letter-spacing:1.5px;cursor:pointer;transition:all 0.2s}
+#connectVideoBtn:hover{background:rgba(0,255,224,0.18);box-shadow:0 0 14px rgba(0,255,224,0.15)}
+#callControls{flex-direction:column;gap:6px}
+#callStatusBar{display:flex;align-items:center;gap:7px;padding:6px 9px;background:rgba(0,255,224,0.04);border:1px solid rgba(0,255,224,0.1);border-radius:4px;font-family:var(--display);font-size:8px;letter-spacing:1.2px;color:var(--plasma);margin-bottom:2px}
+#callStatusDot{width:7px;height:7px;border-radius:50%;flex-shrink:0;background:var(--plasma);box-shadow:0 0 6px var(--plasma);animation:callPulse 1.4s ease-in-out infinite}
+@keyframes callPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.5;transform:scale(0.75)}}
+.call-mini-btns{display:flex;gap:5px}
+.call-mini-btns button{flex:1;padding:7px 3px;border-radius:5px;font-family:var(--display);font-size:7px;font-weight:700;letter-spacing:0.8px;cursor:pointer;transition:all 0.15s;border:1px solid}
+#toggleMicBtn{background:rgba(168,85,247,0.1);border-color:rgba(168,85,247,0.3);color:var(--nova)}
+#toggleMicBtn.muted{background:rgba(255,107,43,0.1);border-color:rgba(255,107,43,0.35);color:var(--fire)}
+#toggleCamBtn{background:rgba(0,255,224,0.07);border-color:rgba(0,255,224,0.2);color:rgba(0,255,224,0.55)}
+#toggleCamBtn.cam-on{background:rgba(0,255,224,0.14);border-color:rgba(0,255,224,0.4);color:var(--plasma)}
+#expandVideoBtn{background:rgba(0,255,224,0.04);border-color:rgba(0,255,224,0.12);color:rgba(0,255,224,0.4)}
+#expandVideoBtn:hover{background:rgba(0,255,224,0.1);color:var(--plasma)}
+#endCallBtn{width:100%;padding:8px;background:rgba(255,107,43,0.1);border:1px solid rgba(255,107,43,0.3);border-radius:5px;color:var(--fire);font-family:var(--display);font-size:8px;font-weight:700;letter-spacing:1.5px;cursor:pointer;transition:all 0.15s;margin-top:2px}
+#endCallBtn:hover{background:rgba(255,107,43,0.22)}
+
+
+.va-spinner {
+  width: 36px; height: 36px;
+  border: 3px solid rgba(0,255,224,0.15);
+  border-top-color: var(--plasma);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 10px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── VIDEO OVERLAY ───────────────────────────────────────── */
+#videoCallOverlay{display:none;position:fixed;inset:0;background:rgba(2,4,8,0.93);z-index:200;flex-direction:column;align-items:center;justify-content:center;gap:20px;backdrop-filter:blur(8px)}
+#videoCallOverlay.show{display:flex}
+.video-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:880px;width:calc(100vw - 48px)}
+.video-slot{position:relative;aspect-ratio:16/9;background:#020408;border:1px solid rgba(0,255,224,0.12);border-radius:10px;overflow:hidden}
+.video-slot video{width:100%;height:100%;object-fit:cover;background:#020408;display:block}
+.video-slot video::-webkit-media-controls{display:none!important}
+.video-slot video::-webkit-media-controls-enclosure{display:none!important}
+.video-slot-label{position:absolute;bottom:8px;left:10px;font-family:var(--display);font-size:8px;font-weight:700;letter-spacing:1.5px;color:rgba(226,244,255,0.8);text-shadow:0 1px 6px rgba(0,0,0,0.9);padding:2px 7px;background:rgba(0,0,0,0.4);border-radius:3px}
+..video-slot-cam-off{display:flex;align-items:center;justify-content:center;position:absolute;inset:0;background:rgba(6,13,26,0.96);flex-direction:column;gap:10px;transition:opacity 0.3s ease;opacity:1;pointer-events:none}
+.video-slot-cam-off.visible{opacity:1}
+.video-slot-cam-off.hidden{opacity:0}
+.video-slot-cam-off span{font-size:34px}
+.video-slot-cam-off small{font-family:var(--display);font-size:8px;letter-spacing:2px;color:rgba(226,244,255,0.3)}
+.video-controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center}
+.vc-btn{padding:11px 22px;border-radius:7px;font-family:var(--display);font-size:9px;font-weight:700;letter-spacing:1.5px;cursor:pointer;transition:all 0.2s;border:1px solid}
+.vc-btn.vc-vid{background:rgba(0,255,224,0.1);border-color:rgba(0,255,224,0.35);color:var(--plasma)}
+.vc-btn.vc-vid:hover{background:rgba(0,255,224,0.2)}
+.vc-btn.vc-vid.off{background:rgba(255,107,43,0.1);border-color:rgba(255,107,43,0.35);color:var(--fire)}
+.vc-btn.vc-mic{background:rgba(168,85,247,0.1);border-color:rgba(168,85,247,0.35);color:var(--nova)}
+.vc-btn.vc-mic:hover{background:rgba(168,85,247,0.2)}
+.vc-btn.vc-mic.muted{background:rgba(255,107,43,0.1);border-color:rgba(255,107,43,0.35);color:var(--fire)}
+.vc-btn.vc-min{background:rgba(0,255,224,0.04);border-color:rgba(0,255,224,0.15);color:rgba(0,255,224,0.5)}
+.vc-btn.vc-min:hover{background:rgba(0,255,224,0.1);color:var(--plasma)}
+.vc-btn.vc-end{background:rgba(255,107,43,0.15);border-color:rgba(255,107,43,0.4);color:var(--fire)}
+.vc-btn.vc-end:hover{background:rgba(255,107,43,0.28)}
 </style>
 </head>
 <body>
@@ -160,9 +224,23 @@ html,body{height:100%;background:var(--void);color:var(--text);font-family:var(-
       {% endfor %}
     </div>
     <div class="voice-panel">
-      <div class="voice-label">🎤 VOICE CALL</div>
+      <div class="voice-label">📡 CALL</div>
       <div class="voice-users-list" id="voiceUsers"></div>
-      <button id="connectBtn" onclick="toggleVoice()">📞 CONNECT</button>
+      <div id="connectOptions">
+        <button id="connectVoiceBtn" onclick="connectCall('voice')">🎤 VOICE ONLY</button>
+        <button id="connectVideoBtn" onclick="connectCall('video')">📹 VIDEO CALL</button>
+      </div>
+      <div id="callControls" style="display:none">
+        <div id="callStatusBar"><span id="callStatusDot"></span><span id="callStatusText">CONNECTED</span></div>
+        <div class="call-mini-btns">
+          <button id="toggleMicBtn" onclick="inCallToggleMic()">🎤 MIC</button>
+          <button id="toggleCamBtn" onclick="inCallToggleCam()">📷 CAM</button>
+          <button id="expandVideoBtn" onclick="openVideoOverlay()">⛶ VIEW</button>
+        </div>
+        <button id="endCallBtn" onclick="hangUp()">📵 END CALL</button>
+      </div>
+    </div>
+
     </div>
     {% if username == room.host %}
     <button class="end-btn" onclick="endSession()">✕ END SESSION</button>
@@ -182,6 +260,13 @@ html,body{height:100%;background:var(--void);color:var(--text);font-family:var(-
     </div>
 
     <div class="chat-box" id="chatBox">
+      {% if not messages %}
+      <div style="text-align:center;padding:60px 20px;opacity:0.4">
+        <div style="font-size:40px;margin-bottom:16px">🤝</div>
+        <div style="font-family:var(--display);font-size:10px;letter-spacing:3px;color:var(--plasma)">LIVE SESSION ACTIVE</div>
+        <div style="font-family:var(--mono);font-size:12px;color:var(--text-3);margin-top:8px">Ask CodeBuddy anything — both of you see the answer in real time</div>
+      </div>
+      {% endif %}
       {% for msg in messages %}
         {% if msg.role == 'assistant' %}
         <div class="msg-row bot">
@@ -225,6 +310,36 @@ html,body{height:100%;background:var(--void);color:var(--text);font-family:var(-
       </div>
       <div class="input-hint">ENTER TO SEND · SHIFT+ENTER FOR NEW LINE · SESSION: {{ room_code|upper }}</div>
     </div>
+  </div>
+</div>
+
+<!-- VIDEO CALL OVERLAY -->
+<div id="videoCallOverlay">
+  <div style="font-family:var(--display);font-size:9px;font-weight:700;letter-spacing:3px;color:var(--plasma);opacity:0.6;margin-bottom:-8px">📹 VIDEO CALL</div>
+  <div class="video-grid" id="videoGrid">
+    <div class="video-slot" id="localSlot">
+      <video id="localVideo" autoplay muted playsinline disablepictureinpicture
+        style="opacity:0;transition:opacity 0.4s ease"></video>
+      <div class="video-slot-cam-off visible" id="localCamOff" style="display:flex;z-index:2">
+        <div id="localSpinner" class="va-spinner"></div>
+        <small id="localCamLabel">STARTING CAMERA…</small>
+      </div>
+      <div class="video-slot-label" id="localLabel">YOU</div>
+    </div>
+    <div class="video-slot" id="remoteSlot">
+      <video id="remoteVideo" autoplay playsinline></video>
+      <div class="video-slot-cam-off visible" id="remoteCamOff" style="display:flex">
+        <span>👤</span>
+        <small>WAITING FOR PEER…</small>
+      </div>
+      <div class="video-slot-label">REMOTE</div>
+    </div>
+  </div>
+  <div class="video-controls">
+    <button class="vc-btn vc-mic" id="vcMicBtn" onclick="vcToggleMic()">🎤 MIC ON</button>
+    <button class="vc-btn vc-vid" id="vcVidBtn" onclick="vcToggleCam()">📹 CAM ON</button>
+    <button class="vc-btn vc-min" onclick="closeVideoOverlay()">⊡ MINIMISE</button>
+    <button class="vc-btn vc-end" onclick="hangUp()">📵 END CALL</button>
   </div>
 </div>
 
@@ -491,68 +606,319 @@ function leaveSession() {
 }
 window.addEventListener('beforeunload', () => socket.emit('leave_collab', { room_code: ROOM_CODE, username: USERNAME }));
 
-// WebRTC
-let _pc = null, _localStream = null, _isConnected = false;
-const iceServers = [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }];
+// ═══════════════════════════════════════════════
+// WebRTC — Voice + Video Call
+// ═══════════════════════════════════════════════
+let _pc        = null;
+let _localStream = null;
+let _isConnected = false;
+let _videoEnabled = false;
+let _micMuted    = false;
+const iceServers = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' }
+];
 
-async function toggleVoice() {
-  if (_isConnected) { hangUp(); return; }
-  try {
-    _localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-    updateVoiceUser(USERNAME, true);
-    socket.emit('voice_state', { room_code: ROOM_CODE, username: USERNAME, active: true });
-    await startWebRTC(true);
-    _isConnected = true;
-    const btn = document.getElementById('connectBtn');
-    btn.textContent = '📵 DISCONNECT'; btn.classList.add('connected');
-  } catch(e) { addNotif('⚠ Microphone access denied'); }
+// ── Cam-off overlay helpers ──────────────────────────────
+function _hideCamOff(id, hide) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (hide) {
+    el.style.opacity = '0';
+    el.style.pointerEvents = 'none';
+    setTimeout(() => { el.style.display = 'none'; }, 350);
+  } else {
+    el.style.display = 'flex';
+    el.style.pointerEvents = '';
+    requestAnimationFrame(() => { el.style.opacity = '1'; });
+  }
 }
+function _showLocalVideo(stream) {
+  const vid    = document.getElementById('localVideo');
+  const label  = document.getElementById('localCamLabel');
+  const spinner = document.getElementById('localSpinner');
+
+  // Update status text while camera warms up
+  if (label)  label.textContent  = 'STARTING CAMERA…';
+  if (spinner) spinner.style.display = 'block';
+
+  vid.srcObject  = stream;
+  vid.muted      = true;
+  vid.playsInline = true;
+
+  let revealed = false;
+  function _reveal() {
+    if (revealed) return;
+    revealed = true;
+    // Fade video IN
+    vid.style.opacity = '1';
+    // Fade cam-off overlay OUT
+    _hideCamOff('localCamOff', true);
+    document.getElementById('localLabel').textContent = USERNAME.toUpperCase();
+  }
+
+  // Strategy 1 — requestVideoFrameCallback: fires exactly when first pixel frame renders
+  if (typeof vid.requestVideoFrameCallback === 'function') {
+    vid.requestVideoFrameCallback(_reveal);
+  }
+
+  // Strategy 2 — 'playing' event (broader browser support)
+  vid.addEventListener('playing', _reveal, { once: true });
+
+  // Strategy 3 — hard fallback after 2s (camera warmup can be slow)
+  const fallback = setTimeout(_reveal, 2000);
+
+  // Start playback — this is what actually triggers the camera
+  vid.play()
+    .then(() => {
+      // play() resolved — give it one more frame then reveal
+      requestAnimationFrame(() => requestAnimationFrame(_reveal));
+    })
+    .catch(err => {
+      clearTimeout(fallback);
+      console.warn('Video play() error:', err);
+      _reveal(); // reveal anyway so UI isn't stuck
+    });
+}
+
+// ── Entry point: called by VOICE ONLY or VIDEO CALL buttons ──
+async function connectCall(mode) {
+  if (_isConnected) return;
+  const withVideo = (mode === 'video');
+  try {
+    // Prefer exact front-facing camera — avoids Bluetooth/virtual device picker
+    let videoConstraints = false;
+    if (withVideo) {
+      videoConstraints = { facingMode: { ideal: 'user' }, width: { ideal: 1280 }, height: { ideal: 720 } };
+    }
+    _localStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true },
+      video: videoConstraints
+    });
+  } catch(e) {
+    addNotif('⚠ ' + (withVideo ? 'Camera/microphone' : 'Microphone') + ' access denied');
+    return;
+  }
+
+  _videoEnabled = withVideo;
+  _micMuted     = false;
+
+  updateVoiceUser(USERNAME, true);
+  socket.emit('voice_state', { room_code: ROOM_CODE, username: USERNAME, active: true, video: withVideo });
+
+  await startWebRTC(true);
+  _isConnected = true;
+
+  // Switch sidebar UI
+  document.getElementById('connectOptions').style.display = 'none';
+  document.getElementById('callControls').style.display   = 'flex';
+  document.getElementById('callStatusText').textContent   = withVideo ? 'VIDEO CONNECTED' : 'VOICE CONNECTED';
+
+  // Sync cam button highlight
+  const camBtn = document.getElementById('toggleCamBtn');
+  if (withVideo) {
+    camBtn.classList.add('cam-on');
+    camBtn.textContent = '📹 CAM';
+  } else {
+    camBtn.classList.remove('cam-on');
+    camBtn.textContent = '📷 CAM';
+  }
+
+  // Show video overlay immediately if video mode
+  if (withVideo) {
+    _showLocalVideo(_localStream);
+    openVideoOverlay();
+  }
+}
+
+// ── Hang up everything ──
 function hangUp() {
-  if (_pc) { _pc.close(); _pc = null; }
+  closeVideoOverlay();
+  if (_pc)          { _pc.close(); _pc = null; }
   if (_localStream) { _localStream.getTracks().forEach(t => t.stop()); _localStream = null; }
-  _isConnected = false;
-  const btn = document.getElementById('connectBtn');
-  btn.textContent = '📞 CONNECT'; btn.classList.remove('connected');
+  _isConnected  = false;
+  _videoEnabled = false;
+  _micMuted     = false;
+
+  // Reset sidebar
+  document.getElementById('callControls').style.display   = 'none';
+  document.getElementById('connectOptions').style.display = 'flex';
+  document.getElementById('toggleMicBtn').classList.remove('muted');
+  document.getElementById('toggleMicBtn').textContent = '🎤 MIC';
+  document.getElementById('toggleCamBtn').classList.remove('cam-on');
+  document.getElementById('toggleCamBtn').textContent = '📷 CAM';
+
+  // Reset video overlay
+  const lv = document.getElementById('localVideo');
+  const rv = document.getElementById('remoteVideo');
+  lv.srcObject = null; lv.style.opacity = '0';
+  rv.srcObject = null;
+  const lbl = document.getElementById('localCamLabel');
+  if (lbl) lbl.textContent = 'YOUR CAM IS OFF';
+  _hideCamOff('localCamOff', false);
+  _hideCamOff('remoteCamOff', false);
+
   updateVoiceUser(USERNAME, false);
   socket.emit('voice_state', { room_code: ROOM_CODE, username: USERNAME, active: false });
 }
+
+// ── Sidebar mic toggle ──
+function inCallToggleMic() {
+  if (!_localStream) return;
+  _micMuted = !_micMuted;
+  _localStream.getAudioTracks().forEach(t => t.enabled = !_micMuted);
+  const btn = document.getElementById('toggleMicBtn');
+  btn.textContent = _micMuted ? '🔇 MIC' : '🎤 MIC';
+  btn.classList.toggle('muted', _micMuted);
+  // Sync overlay mic button
+  const oBtn = document.getElementById('vcMicBtn');
+  if (oBtn) { oBtn.textContent = _micMuted ? '🔇 MIC OFF' : '🎤 MIC ON'; oBtn.classList.toggle('muted', _micMuted); }
+}
+
+// ── Sidebar cam toggle — turns video on/off mid-call ──
+async function inCallToggleCam() {
+  if (!_isConnected) return;
+  const camBtn = document.getElementById('toggleCamBtn');
+
+  if (!_videoEnabled) {
+    // Turn camera ON
+    try {
+      const vs = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'user' }, width: { ideal: 1280 }, height: { ideal: 720 } } });
+      const vt = vs.getVideoTracks()[0];
+      _localStream.addTrack(vt);
+      if (_pc) {
+        const sender = _pc.getSenders().find(s => s.track && s.track.kind === 'video');
+        if (sender) sender.replaceTrack(vt);
+        else        _pc.addTrack(vt, _localStream);
+      }
+      _videoEnabled = true;
+      camBtn.classList.add('cam-on');
+      camBtn.textContent = '📹 CAM';
+      // Show local feed in overlay
+      _showLocalVideo(_localStream);
+      document.getElementById('callStatusText').textContent = 'VIDEO CONNECTED';
+      openVideoOverlay();
+    } catch(e) { addNotif('⚠ Camera access denied'); }
+  } else {
+    // Toggle cam enabled/disabled
+    const tracks = _localStream.getVideoTracks();
+    const wasEnabled = tracks.length > 0 && tracks[0].enabled;
+    tracks.forEach(t => t.enabled = !wasEnabled);
+    _hideCamOff('localCamOff', wasEnabled);
+    const oVidBtn = document.getElementById('vcVidBtn');
+    if (oVidBtn) {
+      oVidBtn.textContent = wasEnabled ? '📷 CAM OFF' : '📹 CAM ON';
+      oVidBtn.classList.toggle('off', wasEnabled);
+    }
+  }
+}
+
+// ── Open / close the floating video overlay ──
+function openVideoOverlay() {
+  document.getElementById('videoCallOverlay').classList.add('show');
+  // Sync overlay buttons to current state
+  const mBtn = document.getElementById('vcMicBtn');
+  if (mBtn) { mBtn.textContent = _micMuted ? '🔇 MIC OFF' : '🎤 MIC ON'; mBtn.classList.toggle('muted', _micMuted); }
+  const vBtn = document.getElementById('vcVidBtn');
+  if (vBtn) {
+    const hasLiveVideo = _localStream && _localStream.getVideoTracks().some(t => t.enabled);
+    vBtn.textContent = hasLiveVideo ? '📹 CAM ON' : '📷 CAM OFF';
+    vBtn.classList.toggle('off', !hasLiveVideo);
+  }
+}
+function closeVideoOverlay() {
+  document.getElementById('videoCallOverlay').classList.remove('show');
+}
+
+// ── Overlay buttons ──
+function vcToggleMic() { inCallToggleMic(); }
+function vcToggleCam() { inCallToggleCam(); }
+
+// ── WebRTC core ──
 async function startWebRTC(isInitiator) {
   _pc = new RTCPeerConnection({ iceServers });
   if (_localStream) _localStream.getTracks().forEach(t => _pc.addTrack(t, _localStream));
+
   _pc.ontrack = e => {
-    let a = document.getElementById('remoteAudio');
-    if (!a) { a = document.createElement('audio'); a.id = 'remoteAudio'; a.autoplay = true; document.body.appendChild(a); }
-    a.srcObject = e.streams[0];
+    const track  = e.track;
+    const stream = e.streams[0];
+    if (track.kind === 'audio') {
+      let a = document.getElementById('remoteAudio');
+      if (!a) { a = document.createElement('audio'); a.id = 'remoteAudio'; a.autoplay = true; document.body.appendChild(a); }
+      a.srcObject = stream;
+    } else if (track.kind === 'video') {
+      const rv = document.getElementById('remoteVideo');
+      rv.srcObject = stream;
+      _hideCamOff('remoteCamOff', true);
+      // Auto-open overlay when remote video arrives
+      if (!document.getElementById('videoCallOverlay').classList.contains('show')) {
+        openVideoOverlay();
+      }
+    }
   };
-  _pc.onicecandidate = e => { if (e.candidate) socket.emit('webrtc_signal', { room_code: ROOM_CODE, type: 'candidate', candidate: e.candidate }); };
+
+  _pc.onicecandidate = e => {
+    if (e.candidate) socket.emit('webrtc_signal', { room_code: ROOM_CODE, type: 'candidate', candidate: e.candidate });
+  };
+
+  _pc.onconnectionstatechange = () => {
+    const state = _pc && _pc.connectionState;
+    const dot = document.getElementById('callStatusDot');
+    if (state === 'connected') {
+      dot && (dot.style.background = 'var(--plasma)');
+    } else if (state === 'disconnected' || state === 'failed') {
+      dot && (dot.style.background = 'var(--fire)');
+      addNotif('⚠ Peer disconnected');
+    }
+  };
+
   if (isInitiator) {
-    const offer = await _pc.createOffer();
+    const offer = await _pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
     await _pc.setLocalDescription(offer);
     socket.emit('webrtc_signal', { room_code: ROOM_CODE, type: 'offer', sdp: offer });
   }
 }
+
 async function handleWebRTCSignal(data) {
   if (data.type === 'offer') {
-    if (!_localStream) { try { _localStream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch(e) { return; } }
+    // Auto-answer: request mic (and camera if remote has video)
+    if (!_localStream) {
+      try {
+        _localStream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true },
+          video: false
+        });
+      } catch(e) { return; }
+    }
     if (!_pc) await startWebRTC(false);
     await _pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
     const answer = await _pc.createAnswer();
     await _pc.setLocalDescription(answer);
     socket.emit('webrtc_signal', { room_code: ROOM_CODE, type: 'answer', sdp: answer });
     _isConnected = true;
-    const btn = document.getElementById('connectBtn');
-    btn.textContent = '📵 DISCONNECT'; btn.classList.add('connected');
+    // Show call controls sidebar
+    document.getElementById('connectOptions').style.display = 'none';
+    document.getElementById('callControls').style.display   = 'flex';
+    document.getElementById('callStatusText').textContent   = 'CALL ACTIVE';
+    updateVoiceUser(USERNAME, true);
   } else if (data.type === 'answer') {
     if (_pc) await _pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
   } else if (data.type === 'candidate') {
-    if (_pc) await _pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+    if (_pc) try { await _pc.addIceCandidate(new RTCIceCandidate(data.candidate)); } catch(e) {}
   }
 }
+
 function updateVoiceUser(name, active) {
   const id = 'vu-' + name;
   let el = document.getElementById(id);
   if (active) {
-    if (!el) { el = document.createElement('div'); el.className = 'voice-user-row'; el.id = id; el.innerHTML = `<span>🎤</span><span>${name}</span>`; document.getElementById('voiceUsers').appendChild(el); }
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'voice-user-row';
+      el.id = id;
+      el.innerHTML = '<span>🎤</span><span>' + name + '</span>';
+      document.getElementById('voiceUsers').appendChild(el);
+    }
   } else { if (el) el.remove(); }
 }
 function removeVoiceUser(name) { const el = document.getElementById('vu-' + name); if (el) el.remove(); }

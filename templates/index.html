@@ -14,7 +14,7 @@
     return _orig(url, opts).then(function(res){
       if((res.type==='opaqueredirect'||res.status===302||res.status===0) &&
          typeof url==='string' && url.startsWith('/') &&
-         !url.includes('/tts') && !url.includes('/voice_clone/tts') &&
+         !url.includes('/tts') &&
          !url.includes('/login')){
         window.location.href = '/login';
         return Promise.reject(new Error('session_expired'));
@@ -3585,7 +3585,6 @@ async function runPython(code) {
     body.light #liveBtn .lb-dot { background: #0891b2 !important; box-shadow: 0 0 5px #0891b2 !important; }
     body.light #hubNavBtn { color: #0891b2 !important; border-color: rgba(8,145,178,0.4) !important; background: rgba(8,145,178,0.07) !important; }
     body.light #voiceLabBtn { color: #7c3aed !important; border-color: rgba(124,58,237,0.35) !important; background: rgba(124,58,237,0.06) !important; }
-    body.light #voiceCloneBtn { color: #7c3aed !important; border-color: rgba(124,58,237,0.3) !important; background: rgba(124,58,237,0.04) !important; }
     body.light #fp-topbtn { color: #0891b2 !important; border-color: rgba(8,145,178,0.25) !important; background: rgba(8,145,178,0.06) !important; }
 
     /* Profile / user dropdown */
@@ -3673,6 +3672,7 @@ async function runPython(code) {
     body.light .hub-feature-desc { color: rgba(12,42,58,0.6) !important; }
     body.light .hub-feature-icon { background: rgba(8,145,178,0.08) !important; border-color: rgba(8,145,178,0.2) !important; }
     body.light #hubBackdrop { background: rgba(8,145,178,0.1) !important; }
+    #mood-live-badge { transition: background 0.4s, border-color 0.4s, color 0.4s, transform 0.25s cubic-bezier(0.34,1.5,0.64,1); }
     body.light .hub-hdr { background: rgba(220,240,250,0.99) !important; border-bottom-color: rgba(8,145,178,0.14) !important; }
     body.light .hub-hdr-title { color: #0891b2 !important; }
     body.light .hub-close { color: rgba(12,42,58,0.5) !important; }
@@ -3726,7 +3726,7 @@ async function runPython(code) {
     body.light ::-webkit-scrollbar-thumb:hover { background: rgba(8,145,178,0.38) !important; }
 
     /* Voice clone panel */
-    body.light #voiceClonePanel { background: #e3f2fa !important; border-left-color: rgba(124,58,237,0.22) !important; }
+    body.light
     body.light .vc-hdr { background: rgba(218,238,250,0.98) !important; border-bottom-color: rgba(124,58,237,0.14) !important; }
     body.light .vc-label { color: rgba(12,42,58,0.4) !important; }
     body.light .vc-status { color: rgba(12,42,58,0.55) !important; }
@@ -3759,8 +3759,6 @@ async function runPython(code) {
     .lr-mode { font-family:var(--mono); font-size:10px; color:var(--text-2); }
 
     /* ── Voice Clone Panel ── */
-    #voiceClonePanel { display:none; position:fixed; right:0; top:0; bottom:0; width:min(400px,92vw); z-index:9997; background:#060d1a; border-left:1px solid rgba(168,85,247,0.2); flex-direction:column; box-shadow:-8px 0 40px rgba(0,0,0,0.7); }
-    #voiceClonePanel.show { display:flex; }
     .vc-hdr { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-bottom:1px solid rgba(168,85,247,0.12); flex-shrink:0; background:rgba(168,85,247,0.04); }
     .vc-hdr-title { font-family:var(--display); font-size:12px; font-weight:800; letter-spacing:3px; color:#a855f7; }
     .vc-body { flex:1; overflow-y:auto; padding:20px 18px; }
@@ -4024,9 +4022,7 @@ async function runPython(code) {
           style="border-color:rgba(168,85,247,0.4);color:#a855f7;background:rgba(168,85,247,0.08);">
           <div class="lb-dot" style="background:#a855f7;box-shadow:0 0 5px #a855f7"></div>VOICE LAB
         </button>
-        <button class="live-btn" id="voiceCloneBtn" onclick="window.VoiceClone&&VoiceClone.open()" title="Clone your voice">
-          <div class="lb-dot" id="vc-dot" style="background:rgba(168,85,247,0.3)"></div>🎙 MY VOICE
-        </button>
+
         <button id="fp-topbtn" onclick="FP.togglePanel()" title="Upload & edit code files">
           📁 <span id="fp-topbtn-lbl">FILE FORGE</span>
         </button>
@@ -4043,6 +4039,10 @@ async function runPython(code) {
           style="border-color:rgba(0,255,224,0.35);color:var(--plasma);background:rgba(0,255,224,0.06);font-weight:800;">
           <div class="lb-dot" style="background:var(--plasma);box-shadow:0 0 6px var(--plasma);animation:hbeat 1.4s ease infinite"></div>⚡ HUB
         </button>
+        <div id="mood-live-badge" onclick="HUB.open('mood')" title="Current mood — click to view history"
+          style="display:none;align-items:center;gap:5px;padding:5px 10px;border-radius:4px;border:1px solid rgba(0,255,224,0.2);background:rgba(0,255,224,0.04);cursor:pointer;font-family:var(--display);font-size:8px;font-weight:700;letter-spacing:1.5px;color:var(--text-2);transition:all 0.3s;white-space:nowrap">
+          <span id="mood-badge-emoji">😐</span><span id="mood-badge-label">MOOD</span>
+        </div>
         <div class="user-menu" id="userMenu">
           <div class="user-menu-btn" onclick="toggleUserMenu()">
             <div class="user-avatar-hex">
@@ -4065,7 +4065,7 @@ async function runPython(code) {
             <a class="udrop-item" href="/leaderboard" target="_blank"><span class="udrop-icon">🏆</span> LEADERBOARD</a>
             <div class="udrop-item" onclick="typeof CBVoice!=='undefined'&&CBVoice.installPWA()"><span class="udrop-icon">📲</span> INSTALL APP</div>
             <div class="udrop-divider"></div>
-            <a class="udrop-item logout" href="/logout" onclick="sessionStorage.clear();localStorage.clear();"><span class="udrop-icon">⏻</span> TERMINATE SESSION</a>
+            <a class="udrop-item logout" href="/logout" onclick="sessionStorage.clear();localStorage.clear();"><span class="udrop-icon">⏻</span> LOG OUT </a>
           </div>
         </div>
       </div>
@@ -4145,7 +4145,7 @@ async function runPython(code) {
                 <div class="ob-desc">Click the 🎙 mic button to speak your question. Click 🔊 PLAY on any answer to hear it spoken aloud. Supports Tamil, Hindi, Telugu, English and 16 more languages.</div>
                 <div class="ob-chips">
                   <span class="ob-chip" onclick="event.stopPropagation();document.getElementById('micBtn')&&document.getElementById('micBtn').click()">🎙 Start Speaking</span>
-                  <span class="ob-chip" onclick="event.stopPropagation();document.getElementById('voiceCloneBtn')&&document.getElementById('voiceCloneBtn').click()">🌐 Set Your Language</span>
+                  
                 </div>
               </div>
             </div>
@@ -4522,6 +4522,38 @@ async function runPython(code) {
     function updateStats(text, elapsed) { const tk = Math.round(text.length / 4); document.getElementById('st-tokens').textContent = tk; if (elapsed != null) document.getElementById('st-time').textContent = elapsed.toFixed(2) + 'S'; document.getElementById('st-msgs').textContent = sessionMsgCount; const tkp = Math.min(100, Math.round(tk / 4096 * 100)); document.getElementById('tk-fill').style.width = tkp + '%'; document.getElementById('tk-pct').textContent = tkp + '%'; const msp = Math.min(100, Math.round(sessionMsgCount / 50 * 100)); document.getElementById('ms-fill').style.width = msp + '%'; document.getElementById('ms-pct').textContent = sessionMsgCount + '/50'; document.getElementById('liveStream').textContent = text.slice(-100) || 'AWAITING…'; }
     function setProgress(p) { document.getElementById('pr-fill').style.width = p + '%'; document.getElementById('pr-pct').textContent = p + '%'; }
 
+    /* MOOD LIVE BADGE */
+    const _moodMeta = {
+      frustrated: { emoji: '😤', label: 'FRUSTRATED', col: '#ff6b2b', border: 'rgba(255,107,43,0.4)', bg: 'rgba(255,107,43,0.08)' },
+      confused:   { emoji: '😕', label: 'CONFUSED',   col: '#fbbf24', border: 'rgba(251,191,36,0.4)',  bg: 'rgba(251,191,36,0.08)' },
+      happy:      { emoji: '😊', label: 'HAPPY',       col: '#4ade80', border: 'rgba(74,222,128,0.4)', bg: 'rgba(74,222,128,0.08)' },
+      confident:  { emoji: '💪', label: 'CONFIDENT',   col: '#4ade80', border: 'rgba(74,222,128,0.4)', bg: 'rgba(74,222,128,0.08)' },
+      focused:    { emoji: '🎯', label: 'FOCUSED',     col: '#00ffe0', border: 'rgba(0,255,224,0.4)',  bg: 'rgba(0,255,224,0.06)' },
+      neutral:    { emoji: '😐', label: 'NEUTRAL',     col: '#94a3b8', border: 'rgba(148,163,184,0.3)', bg: 'rgba(148,163,184,0.05)' },
+    };
+    async function _fetchMoodBadge() {
+      try {
+        const r = await fetch('/mood/history?limit=1');
+        if (!r.ok) return;
+        const d = await r.json();
+        const latest = (d.history || [])[0];
+        if (!latest) return;
+        const mood = (latest.mood || 'neutral').toLowerCase();
+        const meta = _moodMeta[mood] || _moodMeta.neutral;
+        const badge = document.getElementById('mood-live-badge');
+        if (!badge) return;
+        badge.style.display = 'flex';
+        badge.style.borderColor = meta.border;
+        badge.style.background = meta.bg;
+        badge.style.color = meta.col;
+        document.getElementById('mood-badge-emoji').textContent = meta.emoji;
+        document.getElementById('mood-badge-label').textContent = meta.label;
+        // Pulse animation on change
+        badge.style.transform = 'scale(1.12)';
+        setTimeout(() => { badge.style.transform = 'scale(1)'; }, 300);
+      } catch {}
+    }
+
     /* HISTORY */
     function addHistory(role, text) { const list = document.getElementById('histList'); if (list.textContent.trim() === 'NO TRANSMISSIONS YET.') list.innerHTML = ''; const ts = new Date().toLocaleTimeString(); list.innerHTML += `<div class="hist-entry"><div class="hdot ${role}"></div><div class="htext"><span class="hmeta">${role === 'u' ? 'YOU' : 'AI'} · ${ts}</span>${text.slice(0, 90)}${text.length > 90 ? '…' : ''}</div></div>`; list.scrollTop = list.scrollHeight; }
 
@@ -4781,7 +4813,7 @@ async function runPython(code) {
         return;
       }
 
-      const ttsEP = (window._hasVoiceClone || window._hasCoquiVoice) ? '/voice_clone/tts' : '/tts';
+      const ttsEP = '/tts';
       const clean = text.replace(/```[\s\S]*?```/g,'code block.')
         .replace(/`[^`]+`/g,'code').replace(/#{1,6}\s+/g,'')
         .replace(/\*\*([^*]+)\*\*/g,'$1').replace(/\*([^*]+)\*/g,'$1')
@@ -5052,6 +5084,8 @@ async function runPython(code) {
         }
         setProgress(100); setTimeout(ensurePlayBars, 100); updateStats(full, (Date.now() - t0) / 1000);
         addHistory('b', full);
+        // Update live mood badge from server
+        _fetchMoodBadge();
         // sessionMsgCount counts user messages only; check <= 1 to trigger title refresh after first user message
         if (sessionMsgCount <= 1 && currentChatId) {
           fetch('/get_chat_title/' + currentChatId).then(r => r.json()).then(d => {
@@ -5206,7 +5240,7 @@ async function runPython(code) {
       }, 0);
     }
     function renameChat(id) { const n = prompt('ENTER NEW SESSION NAME:'); if (!n) return; fetch('/rename_chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: id, title: n }) }).then(() => location.reload()); }
-    function deleteChat(id) { if (!confirm('TERMINATE SESSION?')) return; fetch('/delete_chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: id }) }).then(() => location.reload()); }
+    function deleteChat(id) { if (!confirm('LOG OUT?')) return; fetch('/delete_chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: id }) }).then(() => location.reload()); }
     function shareChat(id) { fetch('/share_chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: id }) }).then(r => r.json()).then(d => alert('SHARE URL: ' + d.share_url)); }
 
     function collaborateChat(id) {
@@ -6221,6 +6255,7 @@ Hints used: ${IV.hintCount} | Skipped: ${IV.skipCount} | Best streak: ${IV.maxSt
          Fires 750ms after typing stops
       ════════════════════════════ */
       function _fpOnInput() {
+        const ed = document.getElementById('fp-editor');
         const linesBefore = ed.value.slice(0, ed.selectionStart).split('\n');
         document.getElementById('fp-lines').textContent = `${_lines(ed.value)} lines`;
         _hideAC();
@@ -6580,6 +6615,642 @@ Hints used: ${IV.hintCount} | Skipped: ${IV.skipCount} | Best streak: ${IV.maxSt
       e.preventDefault();
     });
   </script>
+  <!-- ══════════════════════════════════════════════════════════
+     VIDEO ANALYZER PANEL
+══════════════════════════════════════════════════════════ -->
+<style>
+  #videoAnalyzerPanel {
+    display:none;position:fixed;right:0;top:0;bottom:0;
+    width:min(480px,95vw);z-index:9998;
+    background:#060d1a;
+    border-left:1px solid rgba(0,255,224,0.15);
+    flex-direction:column;
+    box-shadow:-10px 0 50px rgba(0,0,0,0.8);
+  }
+  #videoAnalyzerPanel.show { display:flex; }
+  .va-hdr {
+    display:flex;align-items:center;justify-content:space-between;
+    padding:16px 18px;border-bottom:1px solid rgba(0,255,224,0.1);
+    background:rgba(0,255,224,0.025);flex-shrink:0;
+  }
+  .va-hdr-title {
+    font-family:var(--display);font-size:12px;font-weight:800;
+    letter-spacing:3px;color:var(--plasma);display:flex;align-items:center;gap:8px
+  }
+  .va-body { flex:1;overflow-y:auto;padding:18px; }
+  .va-section { margin-bottom:20px; }
+  .va-label {
+    font-family:var(--display);font-size:8px;font-weight:700;
+    letter-spacing:2px;color:var(--text-3);margin-bottom:8px;
+    display:flex;align-items:center;gap:6px;
+  }
+  .va-label::before { content:'';display:inline-block;width:3px;height:12px;border-radius:2px;background:var(--plasma);flex-shrink:0; }
+
+  /* Drop zone */
+  #va-dropzone {
+    border:2px dashed rgba(0,255,224,0.2);border-radius:8px;
+    padding:28px 20px;text-align:center;cursor:pointer;
+    background:rgba(0,255,224,0.015);transition:all 0.2s;
+  }
+  #va-dropzone:hover,#va-dropzone.over {
+    border-color:rgba(0,255,224,0.5);background:rgba(0,255,224,0.05);
+    box-shadow:inset 0 0 20px rgba(0,255,224,0.04);
+  }
+  #va-dropzone .va-drop-icon { font-size:32px;margin-bottom:8px; }
+  #va-dropzone .va-drop-lbl {
+    font-family:var(--display);font-size:9px;font-weight:700;
+    letter-spacing:2px;color:var(--plasma);display:block;margin-bottom:4px;
+  }
+  #va-dropzone .va-drop-sub { font-family:var(--mono);font-size:10px;color:var(--text-3); }
+
+  /* File badge */
+  #va-file-badge {
+    display:none;padding:8px 12px;border:1px solid rgba(0,255,224,0.15);
+    border-radius:4px;background:rgba(0,255,224,0.03);
+    align-items:center;gap:8px;margin-top:8px;
+  }
+  #va-file-badge.show { display:flex; }
+  .va-fname { font-family:var(--mono);font-size:11px;color:var(--plasma);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+  .va-fsize { font-family:var(--display);font-size:8px;color:var(--text-3);flex-shrink:0; }
+  .va-fx { background:none;border:none;color:var(--text-3);cursor:pointer;font-size:14px; }
+  .va-fx:hover { color:var(--fire); }
+
+  /* Question input */
+  #va-question {
+    width:100%;background:rgba(0,255,224,0.03);
+    border:1px solid rgba(0,255,224,0.1);border-radius:4px;
+    color:var(--text);font-family:var(--mono);font-size:12px;
+    padding:10px 12px;outline:none;resize:vertical;min-height:70px;
+    transition:border-color 0.2s;
+  }
+  #va-question:focus { border-color:rgba(0,255,224,0.3); }
+  #va-question::placeholder { color:var(--text-3); }
+
+  /* Analyze button */
+  #va-analyze-btn {
+    width:100%;padding:12px;margin-top:4px;
+    background:rgba(0,255,224,0.08);
+    border:1px solid rgba(0,255,224,0.35);border-radius:6px;
+    color:var(--plasma);font-family:var(--display);font-size:9px;
+    font-weight:700;letter-spacing:2px;cursor:pointer;transition:all 0.2s;
+    display:flex;align-items:center;justify-content:center;gap:8px;
+  }
+  #va-analyze-btn:hover { background:rgba(0,255,224,0.15);box-shadow:0 0 20px rgba(0,255,224,0.2); }
+  #va-analyze-btn:disabled { opacity:0.35;cursor:not-allowed; }
+
+  /* Result */
+  #va-result {
+    display:none;margin-top:14px;padding:14px;
+    border:1px solid rgba(0,255,224,0.1);border-radius:6px;
+    background:rgba(2,4,8,0.8);
+    font-family:var(--mono);font-size:12px;color:var(--text-2);
+    line-height:1.75;white-space:pre-wrap;word-break:break-word;
+    max-height:360px;overflow-y:auto;
+  }
+  #va-result.show { display:block; }
+  #va-result::-webkit-scrollbar { width:3px; }
+  #va-result::-webkit-scrollbar-thumb { background:var(--border-hi); }
+
+  /* Progress bar */
+  #va-progress {
+    display:none;height:2px;border-radius:1px;
+    background:rgba(0,255,224,0.08);overflow:hidden;margin:8px 0;
+  }
+  #va-progress.show { display:block; }
+  #va-progress-fill {
+    height:100%;width:0%;
+    background:linear-gradient(90deg,var(--plasma),var(--nova));
+    transition:width 0.3s;border-radius:1px;animation:va-pulse 1.5s ease infinite;
+  }
+  @keyframes va-pulse { 0%,100%{opacity:1}50%{opacity:0.6} }
+
+  /* How it works list */
+  .va-how-list { font-family:var(--mono);font-size:10.5px;color:var(--text-3);line-height:2.1;padding-left:4px; }
+  .va-how-list li { list-style:none;position:relative;padding-left:16px; }
+  .va-how-list li::before { content:'▸';position:absolute;left:0;color:var(--plasma);opacity:0.6; }
+
+  /* "Send to Chat" button */
+  #va-send-chat-btn {
+    display:none;width:100%;padding:9px;margin-top:8px;
+    background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.3);
+    border-radius:4px;color:var(--nova);font-family:var(--display);
+    font-size:8px;font-weight:700;letter-spacing:2px;cursor:pointer;transition:all 0.2s;
+  }
+  #va-send-chat-btn:hover { background:rgba(168,85,247,0.15); }
+  #va-send-chat-btn.show { display:block; }
+
+  /* Topbar button */
+  #videoAnalyzerBtn {
+    display:flex;align-items:center;gap:5px;padding:0 11px;height:34px;
+    border:1px solid rgba(0,255,224,0.15);background:rgba(0,255,224,0.03);
+    color:rgba(226,244,255,0.4);font-family:var(--display);font-size:8px;
+    font-weight:700;letter-spacing:1.5px;cursor:pointer;border-radius:2px;transition:all 0.2s;
+  }
+  #videoAnalyzerBtn:hover { border-color:rgba(0,255,224,0.45);color:var(--plasma);background:rgba(0,255,224,0.07); }
+  #videoAnalyzerBtn.loaded { border-color:rgba(74,222,128,0.4);color:#4ade80;background:rgba(74,222,128,0.05); }
+  /* Tab switcher */
+  .va-tabs { display:flex;border:1px solid rgba(0,255,224,0.12);border-radius:6px;overflow:hidden;margin-bottom:18px;flex-shrink:0; }
+  .va-tab { flex:1;padding:9px 0;border:none;background:transparent;font-family:var(--display);font-size:8px;font-weight:700;letter-spacing:1.5px;cursor:pointer;transition:all 0.2s;color:rgba(226,244,255,0.35); }
+  .va-tab + .va-tab { border-left:1px solid rgba(0,255,224,0.1); }
+  .va-tab.active { background:rgba(0,255,224,0.1);color:var(--plasma); }
+  .va-tab:hover:not(.active) { background:rgba(0,255,224,0.05);color:rgba(226,244,255,0.6); }
+
+  /* Link input row */
+  .va-link-row { display:flex;gap:8px;align-items:stretch; }
+  #va-link-input {
+    flex:1;background:rgba(0,255,224,0.03);border:1px solid rgba(0,255,224,0.12);
+    border-radius:4px;padding:10px 14px;font-family:var(--mono);font-size:12px;
+    color:var(--text);outline:none;transition:border-color 0.2s;
+  }
+  #va-link-input:focus { border-color:rgba(0,255,224,0.35); }
+  #va-link-input::placeholder { color:var(--text-3); }
+  #va-link-go {
+    padding:0 16px;background:rgba(0,255,224,0.1);border:1px solid rgba(0,255,224,0.3);
+    border-radius:4px;color:var(--plasma);font-family:var(--display);font-size:8px;
+    font-weight:700;letter-spacing:1.5px;cursor:pointer;white-space:nowrap;transition:all 0.2s;
+  }
+  #va-link-go:hover { background:rgba(0,255,224,0.2);box-shadow:0 0 12px rgba(0,255,224,0.15); }
+  .va-link-hint { margin-top:7px;font-family:var(--mono);font-size:10px;color:rgba(226,244,255,0.28);line-height:1.5; }
+
+  /* Link detection badge */
+  #va-link-badge {
+    display:none;margin-top:10px;padding:8px 12px;border-radius:4px;
+    font-family:var(--display);font-size:9px;letter-spacing:1.5px;border:1px solid transparent;
+  }
+  #va-link-badge.prog { display:block;border-color:rgba(74,222,128,0.4);color:#4ade80;background:rgba(74,222,128,0.06); }
+  #va-link-badge.noprog { display:block;border-color:rgba(255,107,43,0.4);color:var(--fire);background:rgba(255,107,43,0.06); }
+
+</style>
+
+<!-- Topbar button — inject via JS since we can't easily edit the static HTML here -->
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // Add VIDEO button to topbar
+  const fpBtn = document.getElementById('fp-topbtn');
+  if (fpBtn && fpBtn.parentElement) {
+    const btn = document.createElement('button');
+    btn.id = 'videoAnalyzerBtn';
+    btn.title = 'Analyze programming videos';
+    btn.innerHTML = '🎬 VIDEO';
+    btn.onclick = () => VideoAnalyzer.open();
+    fpBtn.insertAdjacentElement('afterend', btn);
+  }
+});
+</script>
+
+<!-- VIDEO ANALYZER PANEL HTML -->
+<div id="videoAnalyzerPanel">
+  <div class="va-hdr">
+    <div class="va-hdr-title">
+      <span>🎬</span> VIDEO ANALYZER
+    </div>
+    <button onclick="VideoAnalyzer.close()" style="background:none;border:none;color:rgba(226,244,255,0.3);font-size:20px;cursor:pointer;line-height:1;padding:0 4px;">✕</button>
+  </div>
+
+  <div class="va-body">
+
+    <!-- TAB SWITCHER -->
+    <div class="va-tabs">
+      <button id="va-tab-upload" class="va-tab active" onclick="VideoAnalyzer.switchTab('upload')">
+        📹 UPLOAD FILE
+      </button>
+      <button id="va-tab-link" class="va-tab" onclick="VideoAnalyzer.switchTab('link')">
+        🔗 ANALYZE LINK
+      </button>
+    </div>
+
+    <!-- UPLOAD TAB -->
+    <div id="va-panel-upload">
+      <div class="va-section">
+        <div class="va-label">UPLOAD VIDEO</div>
+        <div id="va-dropzone"
+          onclick="document.getElementById('va-file-input').click()"
+          ondragover="event.preventDefault();this.classList.add('over')"
+          ondragleave="this.classList.remove('over')"
+          ondrop="VideoAnalyzer.handleDrop(event)">
+          <div class="va-drop-icon">📹</div>
+          <span class="va-drop-lbl">DROP VIDEO OR CLICK TO BROWSE</span>
+          <span class="va-drop-sub">MP4 · WebM · MOV · AVI · Max 100MB</span>
+        </div>
+        <input type="file" id="va-file-input" accept="video/*,.mp4,.webm,.mov,.avi,.ogg"
+          style="display:none" onchange="VideoAnalyzer.handleFile(this)"/>
+        <div id="va-file-badge">
+          <span class="va-fname" id="va-fname">—</span>
+          <span class="va-fsize" id="va-fsize">—</span>
+          <button class="va-fx" onclick="VideoAnalyzer.clearFile()">✕</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- LINK TAB -->
+    <div id="va-panel-link" style="display:none">
+      <div class="va-section">
+        <div class="va-label">VIDEO OR PAGE URL</div>
+        <div class="va-link-row">
+          <input id="va-link-input" type="url"
+            placeholder="https://youtube.com/watch?v=... or any URL"
+            onkeydown="if(event.key==='Enter')VideoAnalyzer.analyzeLink()"/>
+          <button id="va-link-go" onclick="VideoAnalyzer.analyzeLink()">🔍 ANALYZE</button>
+        </div>
+        <div class="va-link-hint">
+          YouTube · GitHub · CodePen · Replit · any coding article or tutorial
+        </div>
+        <div id="va-link-badge"></div>
+      </div>
+    </div>
+
+    <!-- Question (shared) -->
+    <div class="va-section">
+      <div class="va-label">YOUR QUESTION (OPTIONAL)</div>
+      <textarea id="va-question" placeholder="Ask anything about this video&#10;e.g. 'What does this Python code do?'&#10;or 'Explain the algorithm shown'&#10;or leave blank for full analysis"></textarea>
+    </div>
+
+    <!-- Analyze button -->
+    <button id="va-analyze-btn" onclick="VideoAnalyzer.analyze()">
+      <span id="va-btn-icon">🔍</span>
+      <span id="va-btn-label">ANALYZE VIDEO</span>
+    </button>
+
+    <!-- Progress -->
+    <div id="va-progress"><div id="va-progress-fill"></div></div>
+    <div id="va-status" style="font-family:var(--display);font-size:8px;color:var(--text-3);letter-spacing:1.5px;margin-top:4px;min-height:14px"></div>
+
+    <!-- Result -->
+    <div id="va-result"></div>
+    <button id="va-send-chat-btn" onclick="VideoAnalyzer.sendToChat()">💬 SEND ANALYSIS TO CHAT</button>
+
+    <!-- How it works -->
+    <div class="va-section" style="margin-top:20px">
+      <div class="va-label">HOW IT WORKS</div>
+      <ul class="va-how-list">
+        <li>Upload a video file OR paste a YouTube/tutorial URL</li>
+        <li>AI identifies if it's programming-related content</li>
+        <li>Detects language: Python, JS, React, SQL, etc.</li>
+        <li>Explains code, patterns, and concepts shown</li>
+        <li>Ask specific questions about the video content</li>
+        <li>Non-programming content is politely declined</li>
+      </ul>
+      <div style="margin-top:10px;padding:8px 10px;background:rgba(0,255,224,0.03);border:1px solid rgba(0,255,224,0.1);border-radius:4px;font-family:var(--mono);font-size:10px;color:rgba(0,255,224,0.5);line-height:1.6">
+        ✅ ffmpeg is auto-detected from your system.<br>
+        Your ffmpeg at <code style="color:var(--plasma)">Downloads\ffmpeg-8.0.1-essentials_build\bin</code> will be used automatically.
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const VideoAnalyzer = (() => {
+  let _file = null;
+  let _lastAnalysis = '';
+  let _progressTimer = null;
+  let _activeTab = 'upload';
+
+  function switchTab(tab) {
+    _activeTab = tab;
+    const isUpload = (tab === 'upload');
+    document.getElementById('va-panel-upload').style.display = isUpload ? '' : 'none';
+    document.getElementById('va-panel-link').style.display   = isUpload ? 'none' : '';
+    document.getElementById('va-tab-upload').classList.toggle('active',  isUpload);
+    document.getElementById('va-tab-link').classList.toggle('active',   !isUpload);
+    document.getElementById('va-btn-icon').textContent  = isUpload ? '🔍' : '🔗';
+    document.getElementById('va-btn-label').textContent = isUpload ? 'ANALYZE VIDEO' : 'ANALYZE LINK';
+    // Clear results + status when switching tabs
+    document.getElementById('va-result').innerHTML = '';
+    document.getElementById('va-result').classList.remove('show');
+    document.getElementById('va-send-chat-btn').classList.remove('show');
+    document.getElementById('va-progress').classList.remove('show');
+    setStatus('');
+    const badge = document.getElementById('va-link-badge');
+    if (badge) { badge.className = 'va-link-badge'; badge.textContent = ''; }
+  }
+
+  async function analyzeLink() {
+    const url = document.getElementById('va-link-input').value.trim();
+    if (!url) { setStatus('⚠ Paste a URL first'); return; }
+    if (!/^https?:\/\/.+/.test(url)) { setStatus('⚠ Invalid URL — must start with http(s)://'); return; }
+
+    const btn = document.getElementById('va-analyze-btn');
+    const badge = document.getElementById('va-link-badge');
+    badge.style.display = 'none';
+    btn.disabled = true;
+    document.getElementById('va-btn-icon').textContent = '⏳';
+    document.getElementById('va-btn-label').textContent = 'ANALYZING LINK…';
+    document.getElementById('va-result').textContent = '';
+    document.getElementById('va-result').classList.remove('show');
+    document.getElementById('va-send-chat-btn').classList.remove('show');
+
+    const progDiv  = document.getElementById('va-progress');
+    const progFill = document.getElementById('va-progress-fill');
+    progDiv.classList.add('show');
+    progFill.style.width = '0%';
+    let prog = 0;
+    _progressTimer = setInterval(() => { prog = Math.min(prog + 3, 85); progFill.style.width = prog + '%'; }, 350);
+
+    setStatus('🔗 Fetching and analyzing link…');
+
+    const question = document.getElementById('va-question').value.trim();
+    try {
+      const payload = { url };
+      if (question) payload.question = question;
+      if (typeof currentChatId !== 'undefined' && currentChatId) payload.conversation_id = currentChatId;
+
+      const response = await fetch('/analyze_link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.status === 404) {
+        // Fallback: use Claude API directly in browser to analyze the URL
+        clearInterval(_progressTimer);
+        setStatus('🧠 Analyzing via AI (client-side)…');
+        await analyzeLinkClientSide(url, question);
+        return;
+      }
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Server error ' + response.status);
+      }
+
+      const data = await response.json();
+      _showLinkBadge(badge, data.is_programming, data.detected_type);
+
+      clearInterval(_progressTimer);
+      progFill.style.width = '100%';
+      setTimeout(() => { progDiv.classList.remove('show'); progFill.style.width = '0%'; }, 900);
+
+      const resultEl = document.getElementById('va-result');
+      resultEl.innerHTML = typeof marked !== 'undefined' ? marked.parse(data.analysis || '') : (data.analysis || '');
+      resultEl.classList.add('show');
+      _lastAnalysis = data.analysis || '';
+      if (_lastAnalysis.trim()) {
+        document.getElementById('va-send-chat-btn').classList.add('show');
+        setStatus('✅ Link analysis complete');
+      } else { setStatus('⚠ No response'); }
+
+    } catch(e) {
+      clearInterval(_progressTimer);
+      progDiv.classList.remove('show');
+      if (e.message && e.message.includes('analyze_link')) {
+        await analyzeLinkClientSide(url, question);
+      } else {
+        setStatus('⚠ ' + e.message);
+      }
+    }
+
+    btn.disabled = false;
+    document.getElementById('va-btn-icon').textContent = '🔗';
+    document.getElementById('va-btn-label').textContent = 'ANALYZE LINK';
+  }
+
+  async function analyzeLinkClientSide(url, question) {
+    // Client-side fallback using Anthropic API via the app proxy endpoint or direct
+    const resultEl = document.getElementById('va-result');
+    resultEl.innerHTML = '';
+    resultEl.classList.add('show');
+    const badge = document.getElementById('va-link-badge');
+    badge.className = '';
+    badge.textContent = '';
+
+    const prompt = `You are CodeBuddy, a programming assistant. A user has shared this URL:
+
+${url}
+
+${question ? `Their question: ${question}\n` : ''}
+Your tasks:
+1. Examine the URL carefully. Is this URL related to programming/coding (e.g. YouTube tutorial, GitHub repo, CodePen, documentation, article about code, etc.)?
+2. If YES: Identify what programming topics it covers (language, framework, concepts), explain what the content likely teaches or demonstrates, and answer the user's question if any.
+3. If NO: Politely explain this appears unrelated to programming and decline to analyze further.
+
+Start your response with one of:
+- "✅ PROGRAMMING CONTENT DETECTED" (if it's coding-related)
+- "❌ NOT PROGRAMMING CONTENT" (if it's not)
+
+Then give your full analysis.`;
+
+    try {
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+      const data = await resp.json();
+      const text = (data.content || []).map(c => c.text || '').join('');
+      const isProg = text.includes('✅ PROGRAMMING CONTENT DETECTED');
+      _showLinkBadge(badge, isProg, isProg ? 'Programming content' : 'Not programming');
+
+      const progDiv = document.getElementById('va-progress');
+      const progFill = document.getElementById('va-progress-fill');
+      progFill.style.width = '100%';
+      setTimeout(() => { progDiv.classList.remove('show'); progFill.style.width = '0%'; }, 900);
+
+      _lastAnalysis = text;
+      resultEl.innerHTML = typeof marked !== 'undefined' ? marked.parse(text) : text;
+      if (text.trim()) {
+        document.getElementById('va-send-chat-btn').classList.add('show');
+        setStatus('✅ Analysis complete');
+      }
+    } catch(err) {
+      setStatus('⚠ Could not analyze link: ' + err.message);
+      resultEl.innerHTML = '<span style="color:var(--fire)">⚠ Analysis failed. Ensure your server is running.</span>';
+    }
+
+    const btn = document.getElementById('va-analyze-btn');
+    btn.disabled = false;
+    document.getElementById('va-btn-icon').textContent = '🔗';
+    document.getElementById('va-btn-label').textContent = 'ANALYZE LINK';
+  }
+
+  function _showLinkBadge(badge, isProg, detectedType) {
+    badge.className = isProg ? 'prog' : 'noprog';
+    badge.textContent = isProg
+      ? '✅ PROGRAMMING CONTENT — ' + (detectedType || 'Coding resource').toUpperCase()
+      : '❌ NOT PROGRAMMING CONTENT — Analysis declined';
+  }
+
+  function open() {
+    document.getElementById('videoAnalyzerPanel').classList.add('show');
+  }
+  function close() {
+    document.getElementById('videoAnalyzerPanel').classList.remove('show');
+  }
+
+  function handleDrop(e) {
+    e.preventDefault();
+    document.getElementById('va-dropzone').classList.remove('over');
+    const f = e.dataTransfer?.files[0];
+    if (f) loadFile(f);
+  }
+  function handleFile(input) {
+    const f = input.files[0];
+    if (f) loadFile(f);
+    input.value = '';
+  }
+  function loadFile(file) {
+    // Validate type
+    if (!file.type.startsWith('video/') && !['mp4','webm','mov','avi','ogg'].some(ext => file.name.toLowerCase().endsWith('.'+ext))) {
+      setStatus('⚠ Not a video file. Upload MP4, WebM, MOV, or AVI.'); return;
+    }
+    if (file.size > 100 * 1024 * 1024) {
+      setStatus('⚠ File too large. Max 100MB.'); return;
+    }
+    _file = file;
+    document.getElementById('va-fname').textContent = file.name;
+    document.getElementById('va-fsize').textContent = (file.size / (1024*1024)).toFixed(1) + 'MB';
+    document.getElementById('va-file-badge').classList.add('show');
+    document.getElementById('videoAnalyzerBtn').classList.add('loaded');
+    setStatus('✅ Video loaded — click ANALYZE');
+    // Clear previous result
+    document.getElementById('va-result').textContent = '';
+    document.getElementById('va-result').classList.remove('show');
+    document.getElementById('va-send-chat-btn').classList.remove('show');
+  }
+  function clearFile() {
+    _file = null;
+    document.getElementById('va-file-badge').classList.remove('show');
+    document.getElementById('va-fname').textContent = '—';
+    document.getElementById('va-fsize').textContent = '—';
+    document.getElementById('videoAnalyzerBtn').classList.remove('loaded');
+    setStatus('');
+    document.getElementById('va-result').textContent = '';
+    document.getElementById('va-result').classList.remove('show');
+    document.getElementById('va-send-chat-btn').classList.remove('show');
+  }
+
+  async function analyze() {
+    if (_activeTab === 'link') { analyzeLink(); return; }
+    if (!_file) { setStatus('⚠ Upload a video first'); return; }
+
+    const btn = document.getElementById('va-analyze-btn');
+    const question = document.getElementById('va-question').value.trim();
+    btn.disabled = true;
+    document.getElementById('va-btn-icon').textContent = '⏳';
+    document.getElementById('va-btn-label').textContent = 'ANALYZING…';
+    document.getElementById('va-result').textContent = '';
+    document.getElementById('va-result').classList.remove('show');
+    document.getElementById('va-send-chat-btn').classList.remove('show');
+
+    // Animated progress bar
+    const progDiv = document.getElementById('va-progress');
+    const progFill = document.getElementById('va-progress-fill');
+    progDiv.classList.add('show');
+    progFill.style.width = '0%';
+    let prog = 0;
+    _progressTimer = setInterval(() => {
+      prog = Math.min(prog + 2, 88);
+      progFill.style.width = prog + '%';
+    }, 400);
+
+    setStatus('📤 Uploading video…');
+
+    const fd = new FormData();
+    fd.append('video', _file, _file.name);
+    if (question) fd.append('question', question);
+    if (typeof currentChatId !== 'undefined' && currentChatId) {
+      fd.append('conversation_id', currentChatId);
+    }
+
+    try {
+      const response = await fetch('/analyze_video', { method: 'POST', body: fd });
+
+      if (response.status === 404) {
+        throw new Error('Route /analyze_video missing — replace app.py with updated version and restart python app.py');
+      }
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Server error ' + response.status);
+      }
+
+      setStatus('🧠 AI analyzing frames…');
+      const resultEl = document.getElementById('va-result');
+      resultEl.innerHTML = '';
+      resultEl.classList.add('show');
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let full = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        full += chunk;
+        // Render markdown as it streams
+        resultEl.innerHTML = typeof marked !== 'undefined' ? marked.parse(full) : full;
+        resultEl.scrollTop = resultEl.scrollHeight;
+        // Enhance code blocks as they appear
+        resultEl.querySelectorAll('pre code:not([data-highlighted])').forEach(block => {
+          try { hljs.highlightElement(block); block.setAttribute('data-highlighted','1'); } catch(e){}
+        });
+      }
+
+      _lastAnalysis = full;
+      clearInterval(_progressTimer);
+      progFill.style.width = '100%';
+      setTimeout(() => { progDiv.classList.remove('show'); progFill.style.width='0%'; }, 1000);
+
+      if (full.trim()) {
+        document.getElementById('va-send-chat-btn').classList.add('show');
+        setStatus('✅ Analysis complete');
+      } else {
+        setStatus('⚠ No response received');
+      }
+
+    } catch(e) {
+      clearInterval(_progressTimer);
+      progDiv.classList.remove('show');
+      setStatus('⚠ Error: ' + e.message);
+      const isRoute = e.message.includes('404') || e.message.includes('missing');
+      let helpTxt = isRoute
+        ? '<br><br><b style="color:#a855f7">Fix:</b> Use the updated <code>app.py</code> (has <code>/analyze_video</code> route) and run <code>python app.py</code>'
+        : '<br><br>Check <code>python app.py</code> is running and <code>OPENROUTER_API_KEY</code> is set in <code>.env</code>';
+      document.getElementById('va-result').innerHTML =
+        '<span style="color:var(--fire)">⚠ ' + e.message + '</span>' + helpTxt;
+      document.getElementById('va-result').classList.add('show');
+    }
+
+    btn.disabled = false;
+    document.getElementById('va-btn-icon').textContent = '🔍';
+    document.getElementById('va-btn-label').textContent = 'ANALYZE VIDEO';
+  }
+
+  function sendToChat() {
+    if (!_lastAnalysis || typeof currentChatId === 'undefined' || !currentChatId) {
+      if (typeof currentChatId === 'undefined' || !currentChatId) {
+        alert('Initialize a chat session first, then analyze the video again.');
+      }
+      return;
+    }
+    // Add the analysis as a bot message in the current chat
+    const chatBox = document.getElementById('chatBox');
+    if (typeof makeMsgRow === 'function' && chatBox) {
+      const emp = document.getElementById('emptyState');
+      if (emp) emp.remove();
+      const row = makeMsgRow('bot', '');
+      const bc = row.querySelector('.bubble-content');
+      bc.innerHTML = '<strong style="color:var(--plasma);font-family:var(--display);font-size:9px;letter-spacing:2px">📹 VIDEO ANALYSIS</strong><br><br>'
+        + (typeof marked !== 'undefined' ? marked.parse(_lastAnalysis) : _lastAnalysis);
+      chatBox.appendChild(row);
+      if (typeof enhanceCodeBlocks === 'function') enhanceCodeBlocks(row.querySelector('.bubble-forge'));
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+    close();
+  }
+
+  function setStatus(msg) {
+    const el = document.getElementById('va-status');
+    if (el) el.textContent = msg;
+  }
+
+  return { open, close, handleDrop, handleFile, clearFile, analyze, sendToChat, switchTab, analyzeLink };
+})();
+window.VideoAnalyzer = VideoAnalyzer;
+</script>
 
   <!-- ═══════════════════════════════════════════════════════════
        FEATURES HUB — CSS
@@ -6921,6 +7592,12 @@ Hints used: ${IV.hintCount} | Skipped: ${IV.skipCount} | Best streak: ${IV.maxSt
         <div class="hub-tab" onclick="HUB.tab('deadcode',this)">⚰ DEAD CODE</div>
         <div class="hub-tab" onclick="HUB.tab('mood',this)">😤 MOOD ENGINE</div>
         <div class="hub-tab" onclick="HUB.tab('dna',this)">🧬 CODE DNA</div>
+        <div class="hub-tab" onclick="HUB.tab('prophecy',this)">🔮 BUG PROPHECY</div>
+        <div class="hub-tab" onclick="HUB.tab('cogload',this)">🧠 COGNITIVE LOAD</div>
+        <div class="hub-tab" onclick="HUB.tab('naming',this)">✏️ NAMING AI</div>
+        <div class="hub-tab" onclick="HUB.tab('duck',this)">🦆 RUBBER DUCK</div>
+        <div class="hub-tab" onclick="HUB.tab('timemachine',this)">⏳ TIME MACHINE</div>
+        <div class="hub-tab" onclick="HUB.tab('focuszone',this)">🎯 FOCUS ZONE</div>
       </div>
       <button class="hub-tab-arrow right" id="hubTabRight" onclick="HUB.scrollTabs(1)">▶</button>
     </div>
@@ -7236,6 +7913,131 @@ def find_max(arr):
         <div id="dna-profile-display"></div>
       </div>
 
+      <!-- BUG PROPHECY ENGINE -->
+      <div class="hub-panel" id="hub-prophecy">
+        <div class="hub-feature-header">
+          <div class="hub-feature-icon">🔮</div>
+          <div class="hub-feature-meta">
+            <div class="hub-feature-label">WORLD-FIRST</div>
+            <div class="hub-feature-title">BUG PROPHECY ENGINE</div>
+            <div class="hub-feature-desc">Predicts where your next bug will appear — before you write it. Built from your personal bug history: error types, languages, and code constructs that historically precede your failures.</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+          <button class="hub-btn" id="proph-build-btn" onclick="HUB.prophBuild()">🔮 BUILD MY PROPHECY MODEL</button>
+          <button class="hub-btn purple" onclick="HUB.prophMe()">📊 VIEW MY PROFILE</button>
+        </div>
+        <div id="proph-status" style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-bottom:14px">Build your model first — AI scans your chat history for error patterns and bug signatures.</div>
+        <div id="proph-profile" style="margin-bottom:14px"></div>
+        <div id="proph-predict-area">
+          <div class="hub-section-title">PREDICT BUGS IN NEW CODE</div>
+          <textarea id="proph-code" class="hub-textarea" placeholder="Paste code — AI cross-references with your bug history and predicts likely bug locations…" style="height:120px"></textarea>
+          <button class="hub-btn" id="proph-predict-btn" onclick="HUB.prophPredict()" style="margin-top:8px">⚡ PREDICT MY BUGS</button>
+          <div id="proph-predictions" style="margin-top:14px"></div>
+        </div>
+      </div>
+
+      <!-- COGNITIVE LOAD METER -->
+      <div class="hub-panel" id="hub-cogload">
+        <div class="hub-feature-header">
+          <div class="hub-feature-icon">🧠</div>
+          <div class="hub-feature-meta">
+            <div class="hub-feature-label">WORLD-FIRST</div>
+            <div class="hub-feature-title">COGNITIVE LOAD METER</div>
+            <div class="hub-feature-desc">Scores your code's mental weight 1–10. Identifies nesting depth, unclear naming, magic numbers, cyclomatic complexity — and delivers specific refactoring actions to reduce the load.</div>
+          </div>
+        </div>
+        <select id="cogload-lang" class="hub-select" style="margin-bottom:10px">
+          <option value="python">Python</option><option value="javascript">JavaScript</option>
+          <option value="typescript">TypeScript</option><option value="java">Java</option>
+          <option value="cpp">C++</option><option value="rust">Rust</option><option value="go">Go</option>
+        </select>
+        <textarea id="cogload-code" class="hub-textarea" placeholder="Paste any code — get an objective cognitive load score and a prioritised refactoring plan…" style="height:150px"></textarea>
+        <button class="hub-btn" id="cogload-btn" onclick="HUB.cogloadAnalyze()" style="margin-top:10px">🧠 MEASURE COGNITIVE LOAD</button>
+        <div id="cogload-result" class="hub-result" style="margin-top:14px"></div>
+      </div>
+
+      <!-- AI NAMING ASSISTANT -->
+      <div class="hub-panel" id="hub-naming">
+        <div class="hub-feature-header">
+          <div class="hub-feature-icon">✏️</div>
+          <div class="hub-feature-meta">
+            <div class="hub-feature-label">WORLD-FIRST</div>
+            <div class="hub-feature-title">AI NAMING ASSISTANT</div>
+            <div class="hub-feature-desc">Renames temp, x, foo, data2 into meaningful names — using your DNA naming convention and deep context analysis of what each variable actually does in the code.</div>
+          </div>
+        </div>
+        <select id="naming-lang" class="hub-select" style="margin-bottom:10px">
+          <option value="python">Python</option><option value="javascript">JavaScript</option>
+          <option value="typescript">TypeScript</option><option value="java">Java</option>
+          <option value="cpp">C++</option><option value="rust">Rust</option>
+        </select>
+        <textarea id="naming-code" class="hub-textarea" placeholder="Paste code with poor names — temp, x, foo, data2, val… AI renames everything with meaningful, context-aware names." style="height:150px"></textarea>
+        <button class="hub-btn" id="naming-btn" onclick="HUB.namingSuggest()" style="margin-top:10px">✏️ SUGGEST BETTER NAMES</button>
+        <div id="naming-result" class="hub-result" style="margin-top:14px"></div>
+      </div>
+
+      <!-- RUBBER DUCK DEBUG MODE -->
+      <div class="hub-panel" id="hub-duck">
+        <div class="hub-feature-header">
+          <div class="hub-feature-icon">🦆</div>
+          <div class="hub-feature-meta">
+            <div class="hub-feature-label">WORLD-FIRST</div>
+            <div class="hub-feature-title">RUBBER DUCK DEBUG MODE</div>
+            <div class="hub-feature-desc">When active, CodeBuddy NEVER gives answers — only asks Socratic questions to guide you to find the bug yourself. Auto-expires after 30 min of silence.</div>
+          </div>
+        </div>
+        <div id="duck-status-card" style="padding:20px;border-radius:8px;border:1px solid rgba(0,255,224,0.12);background:rgba(0,255,224,0.02);margin-bottom:16px;text-align:center">
+          <div id="duck-status-icon" style="font-size:44px;margin-bottom:10px;line-height:1">🦆</div>
+          <div id="duck-status-label" style="font-family:var(--display);font-size:12px;font-weight:800;letter-spacing:2px;color:var(--text-2);margin-bottom:6px">CHECKING STATUS…</div>
+          <div id="duck-status-desc" style="font-family:var(--mono);font-size:11px;color:var(--text-3);line-height:1.6"></div>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:20px">
+          <button class="hub-btn" id="duck-start-btn" onclick="HUB.duckStart()" style="min-width:160px">🦆 ACTIVATE DUCK MODE</button>
+          <button class="hub-btn fire" id="duck-stop-btn" onclick="HUB.duckStop()" style="min-width:160px;display:none">⛔ DEACTIVATE</button>
+        </div>
+        <div style="padding:14px 16px;border:1px solid rgba(168,85,247,0.12);border-radius:6px;background:rgba(168,85,247,0.03)">
+          <div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--nova);margin-bottom:8px">HOW IT WORKS</div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);line-height:1.8">While Duck Mode is active, every AI reply becomes a <strong style="color:rgba(226,244,255,0.7)">question</strong>:<br>"What does this return when input is empty?"<br>"Have you checked what happens on line 47 when x is None?"<br><br>Explaining your problem out loud almost always reveals the bug. The AI just steers you there.</div>
+        </div>
+      </div>
+
+      <!-- TIME MACHINE -->
+      <div class="hub-panel" id="hub-timemachine">
+        <div class="hub-feature-header">
+          <div class="hub-feature-icon">⏳</div>
+          <div class="hub-feature-meta">
+            <div class="hub-feature-label">WORLD-FIRST</div>
+            <div class="hub-feature-title">PAIR PROGRAMMER TIME MACHINE</div>
+            <div class="hub-feature-desc">Paste any final code — AI reverse-engineers the full edit timeline. What it looked like at each stage, what problem each change solved, what the dev was thinking.</div>
+          </div>
+        </div>
+        <select id="tm-lang" class="hub-select" style="margin-bottom:10px">
+          <option value="python">Python</option><option value="javascript">JavaScript</option>
+          <option value="typescript">TypeScript</option><option value="java">Java</option>
+          <option value="cpp">C++</option><option value="go">Go</option><option value="rust">Rust</option>
+        </select>
+        <textarea id="tm-code" class="hub-textarea" placeholder="// Paste any final code — AI will reconstruct the full development timeline from scratch to here…" style="height:160px"></textarea>
+        <button class="hub-btn" id="tm-btn" onclick="HUB.timeMachine()" style="margin-top:10px">⏳ RECONSTRUCT TIMELINE</button>
+        <div id="tm-result" class="hub-result" style="margin-top:14px"></div>
+      </div>
+
+      <!-- FOCUS ZONE -->
+      <div class="hub-panel" id="hub-focuszone">
+        <div class="hub-feature-header">
+          <div class="hub-feature-icon">🎯</div>
+          <div class="hub-feature-meta">
+            <div class="hub-feature-label">WORLD-FIRST</div>
+            <div class="hub-feature-title">FOCUS ZONE DETECTOR</div>
+            <div class="hub-feature-desc">Analyses timestamps of every message you've ever sent to find when YOU code most productively — by hour of day and day of week.</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:16px">
+          <button class="hub-btn" id="fz-btn" onclick="HUB.focusZone()">🎯 ANALYSE MY FOCUS ZONES</button>
+        </div>
+        <div id="fz-result"></div>
+      </div>
+
     </div><!-- /hub-body -->
   </div><!-- /featuresHub -->
 
@@ -7276,6 +8078,9 @@ def find_max(arr):
       if (name === 'changelog')  clLoadHistory();
       if (name === 'mood')       loadMoodHistory();
       if (name === 'dna')        dnaView();
+      if (name === 'prophecy')   prophMe();
+      if (name === 'duck')       duckStatus();
+      if (name === 'focuszone')  focusZone();
     }
     function scrollTabs(dir) {
       const bar = document.getElementById('hubTabBar');
@@ -8129,6 +8934,330 @@ def find_max(arr):
       document.getElementById('dna-profile-display').innerHTML = html;
     }
 
+    /* ══════════════════════════════════════════════════════
+       BUG PROPHECY ENGINE
+    ══════════════════════════════════════════════════════ */
+    async function prophBuild() {
+      _setBtn('proph-build-btn', true, 'ANALYSING BUG HISTORY…');
+      document.getElementById('proph-status').textContent = 'Scanning your chat history for error patterns…';
+      try {
+        const r = await fetch('/prophecy/build', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+        const d = await r.json();
+        if (d.error) { hubToast(d.error, 'err'); document.getElementById('proph-status').textContent = 'Build failed: ' + d.error; return; }
+        hubToast('Prophecy model built!', 'ok');
+        document.getElementById('proph-status').textContent = '✅ Prophecy model built from your bug history.';
+        _renderProphProfile(d.model || d);
+      } catch(e) { hubToast('Build failed: ' + e.message, 'err'); }
+      _setBtn('proph-build-btn', false, '🔮 BUILD MY PROPHECY MODEL');
+    }
+    async function prophMe() {
+      try {
+        const r = await fetch('/prophecy/me');
+        if (!r.ok) return;
+        const d = await r.json();
+        if (d.model || d.top_bug_types) {
+          document.getElementById('proph-status').textContent = 'Your current prophecy model:';
+          _renderProphProfile(d.model || d);
+        } else {
+          document.getElementById('proph-status').textContent = d.message || 'No prophecy model yet — click BUILD to generate one.';
+        }
+      } catch {}
+    }
+    function _renderProphProfile(model) {
+      if (!model) return;
+      const el = document.getElementById('proph-profile');
+      const bugs = model.top_bug_types || model.common_errors || [];
+      const langs = model.affected_languages || model.languages || [];
+      let html = '';
+      if (bugs.length) {
+        html += `<div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--fire);margin-bottom:8px">YOUR TOP BUG TYPES</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">${bugs.map(b => `<span class="hub-badge fire">${b}</span>`).join('')}</div>`;
+      }
+      if (langs.length) {
+        html += `<div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--text-3);margin-bottom:8px">AFFECTED LANGUAGES</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">${langs.map(l => `<span class="hub-badge cyan">${l}</span>`).join('')}</div>`;
+      }
+      if (model.risk_summary || model.summary) {
+        html += `<div style="font-family:var(--mono);font-size:11.5px;color:var(--text-2);line-height:1.7;padding:12px 14px;border-left:3px solid var(--fire);background:rgba(255,107,43,0.03);border-radius:0 4px 4px 0">${(model.risk_summary || model.summary).replace(/</g,'&lt;')}</div>`;
+      }
+      el.innerHTML = html || '<div style="font-family:var(--mono);font-size:11px;color:var(--text-3)">Model built — paste code below to predict bugs.</div>';
+    }
+    async function prophPredict() {
+      const code = (document.getElementById('proph-code').value || '').trim();
+      if (!code) { hubToast('Paste some code to predict bugs in', 'warn'); return; }
+      _setBtn('proph-predict-btn', true, 'PREDICTING…');
+      document.getElementById('proph-predictions').innerHTML = '';
+      try {
+        const r = await fetch('/prophecy/predict', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code })
+        });
+        const d = await r.json();
+        if (d.error) { hubToast(d.error, 'err'); return; }
+        const preds = d.predictions || d.risks || [];
+        if (!preds.length) {
+          document.getElementById('proph-predictions').innerHTML = '<div style="font-family:var(--mono);font-size:11px;color:#4ade80;padding:10px 0">✅ No high-risk patterns detected in this code.</div>';
+        } else {
+          document.getElementById('proph-predictions').innerHTML = preds.map(p => {
+            const risk = p.probability || p.risk || 0;
+            const pct = Math.round(risk * 100) || risk;
+            const col = pct > 70 ? '#ff6b2b' : pct > 40 ? '#fbbf24' : '#4ade80';
+            return `<div style="padding:12px 14px;border:1px solid ${col}28;border-radius:6px;background:rgba(2,4,8,0.6);margin-bottom:8px;border-left:3px solid ${col}">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                <span style="font-family:var(--display);font-size:10px;font-weight:800;color:${col}">${(p.bug_type||p.type||'Bug').replace(/</g,'&lt;')}</span>
+                <span style="font-family:var(--display);font-size:11px;font-weight:900;color:${col}">${pct}%</span>
+              </div>
+              <div style="font-family:var(--mono);font-size:11px;color:var(--text-2);line-height:1.6">${(p.explanation||p.reason||'').replace(/</g,'&lt;')}</div>
+              ${p.location ? `<div style="font-family:var(--mono);font-size:9.5px;color:var(--text-3);margin-top:5px">📍 ${p.location.replace(/</g,'&lt;')}</div>` : ''}
+            </div>`;
+          }).join('');
+        }
+      } catch(e) { hubToast('Prediction failed: ' + e.message, 'err'); }
+      _setBtn('proph-predict-btn', false, '⚡ PREDICT MY BUGS');
+    }
+
+    /* ══════════════════════════════════════════════════════
+       COGNITIVE LOAD METER
+    ══════════════════════════════════════════════════════ */
+    async function cogloadAnalyze() {
+      const code = (document.getElementById('cogload-code').value || '').trim();
+      const lang = document.getElementById('cogload-lang').value || 'python';
+      if (!code) { hubToast('Paste some code first', 'warn'); return; }
+      _setBtn('cogload-btn', true, 'MEASURING…');
+      const res = document.getElementById('cogload-result');
+      res.classList.remove('show'); res.innerHTML = '';
+      try {
+        const r = await fetch('/cognitive_load', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code, language: lang })
+        });
+        const d = await r.json();
+        if (d.error) { hubToast(d.error, 'err'); return; }
+        const score = d.score || d.cognitive_load || 0;
+        const col = score >= 8 ? '#ff6b2b' : score >= 5 ? '#fbbf24' : '#4ade80';
+        const label = score >= 8 ? 'CRITICAL' : score >= 6 ? 'HIGH' : score >= 4 ? 'MODERATE' : 'LOW';
+        const issues = d.issues || d.factors || [];
+        const suggestions = d.suggestions || d.refactoring_suggestions || [];
+        res.innerHTML = `
+          <div style="display:flex;align-items:center;gap:20px;margin-bottom:16px;flex-wrap:wrap">
+            <div style="text-align:center">
+              <div style="font-family:var(--display);font-size:56px;font-weight:900;color:${col};text-shadow:0 0 30px ${col}40;line-height:1">${score}</div>
+              <div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:${col};opacity:0.8">/10 LOAD</div>
+            </div>
+            <div>
+              <div style="font-family:var(--display);font-size:14px;font-weight:800;color:${col};letter-spacing:2px;margin-bottom:4px">${label}</div>
+              <div style="font-family:var(--mono);font-size:11px;color:var(--text-3)">Cognitive complexity score</div>
+            </div>
+          </div>
+          ${d.summary ? `<div style="font-family:var(--mono);font-size:11.5px;color:var(--text-2);line-height:1.7;margin-bottom:14px">${d.summary.replace(/</g,'&lt;')}</div>` : ''}
+          ${issues.length ? `<div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--text-3);margin-bottom:8px">COMPLEXITY FACTORS</div>
+            <div style="margin-bottom:14px">${issues.map(i => `<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:5px"><span style="color:var(--fire);flex-shrink:0">▸</span><span style="font-family:var(--mono);font-size:11px;color:var(--text-2)">${(i.description||i||'').toString().replace(/</g,'&lt;')}</span></div>`).join('')}</div>` : ''}
+          ${suggestions.length ? `<div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--plasma);margin-bottom:8px">REFACTORING ACTIONS</div>
+            <div>${suggestions.map(s => `<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:5px"><span style="color:var(--plasma);flex-shrink:0">→</span><span style="font-family:var(--mono);font-size:11px;color:var(--text-2)">${(s.description||s||'').toString().replace(/</g,'&lt;')}</span></div>`).join('')}</div>` : ''}
+        `;
+        res.classList.add('show');
+      } catch(e) { res.textContent = 'Analysis failed: ' + e.message; res.classList.add('show'); }
+      _setBtn('cogload-btn', false, '🧠 MEASURE COGNITIVE LOAD');
+    }
+
+    /* ══════════════════════════════════════════════════════
+       AI NAMING ASSISTANT
+    ══════════════════════════════════════════════════════ */
+    async function namingSuggest() {
+      const code = (document.getElementById('naming-code').value || '').trim();
+      const lang = document.getElementById('naming-lang').value || 'python';
+      if (!code) { hubToast('Paste code with poor names first', 'warn'); return; }
+      _setBtn('naming-btn', true, 'ANALYSING…');
+      const res = document.getElementById('naming-result');
+      res.classList.remove('show'); res.innerHTML = '';
+      try {
+        const r = await fetch('/naming/suggest', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code, language: lang })
+        });
+        const d = await r.json();
+        if (d.error) { hubToast(d.error, 'err'); return; }
+        const renames = d.renames || d.suggestions || [];
+        const renamed_code = d.renamed_code || d.refactored_code || '';
+        res.innerHTML = `
+          ${renames.length ? `<div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--plasma);margin-bottom:10px">NAME CHANGES (${renames.length})</div>
+          <div style="margin-bottom:14px">${renames.map(item => `<div style="display:flex;align-items:center;gap:10px;padding:7px 10px;border:1px solid rgba(0,255,224,0.07);border-radius:5px;margin-bottom:6px;background:rgba(0,255,224,0.01)">
+            <span style="font-family:var(--mono);font-size:11px;color:var(--fire);text-decoration:line-through">${(item.old_name||item.original||'').replace(/</g,'&lt;')}</span>
+            <span style="color:var(--text-3)">→</span>
+            <span style="font-family:var(--mono);font-size:11px;color:var(--plasma);font-weight:700">${(item.new_name||item.suggested||'').replace(/</g,'&lt;')}</span>
+            ${item.reason ? `<span style="font-family:var(--mono);font-size:9.5px;color:var(--text-3);margin-left:auto">${item.reason.replace(/</g,'&lt;')}</span>` : ''}
+          </div>`).join('')}</div>` : ''}
+          ${renamed_code ? `<div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--text-3);margin-bottom:8px">RENAMED CODE</div>
+          <div style="position:relative">
+            <pre style="background:rgba(0,0,0,0.4);border:1px solid rgba(0,255,224,0.1);border-radius:6px;padding:14px;font-family:var(--mono);font-size:11px;color:var(--text-2);line-height:1.6;overflow-x:auto;white-space:pre-wrap;word-break:break-word;max-height:300px;overflow-y:auto">${renamed_code.replace(/</g,'&lt;')}</pre>
+            <button class="code-btn" onclick="navigator.clipboard.writeText(${JSON.stringify(renamed_code)}).then(()=>hubToast('Copied!','ok'))" style="position:absolute;top:8px;right:8px;font-size:8px">COPY</button>
+          </div>` : ''}
+          ${d.explanation ? `<div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-top:12px;line-height:1.7;font-style:italic">${d.explanation.replace(/</g,'&lt;')}</div>` : ''}
+        `;
+        res.classList.add('show');
+      } catch(e) { res.textContent = 'Failed: ' + e.message; res.classList.add('show'); }
+      _setBtn('naming-btn', false, '✏️ SUGGEST BETTER NAMES');
+    }
+
+    /* ══════════════════════════════════════════════════════
+       RUBBER DUCK DEBUG MODE
+    ══════════════════════════════════════════════════════ */
+    async function duckStatus() {
+      try {
+        const cid = (typeof currentChatId !== 'undefined' && currentChatId) ? currentChatId : 0;
+        const r = await fetch('/duck/status/' + cid);
+        if (!r.ok) { _renderDuckStatus({active: false}); return; }
+        const d = await r.json();
+        _renderDuckStatus(d);
+      } catch { _renderDuckStatus({active: false}); }
+    }
+    function _renderDuckStatus(d) {
+      const active = d.active || false;
+      const icon = document.getElementById('duck-status-icon');
+      const label = document.getElementById('duck-status-label');
+      const desc = document.getElementById('duck-status-desc');
+      const startBtn = document.getElementById('duck-start-btn');
+      const stopBtn = document.getElementById('duck-stop-btn');
+      const card = document.getElementById('duck-status-card');
+      if (active) {
+        icon.textContent = '🦆';
+        label.textContent = 'DUCK MODE ACTIVE';
+        label.style.color = 'var(--plasma)';
+        card.style.borderColor = 'rgba(0,255,224,0.4)';
+        card.style.background = 'rgba(0,255,224,0.04)';
+        desc.innerHTML = 'CodeBuddy will <strong style="color:rgba(226,244,255,0.8)">only ask questions</strong> — no solutions until you stop.<br>' + (d.started_at ? `<span style="opacity:0.6">Started: ${d.started_at.slice(11,16)}</span>` : '');
+        startBtn.style.display = 'none';
+        stopBtn.style.display = '';
+      } else {
+        icon.textContent = '🦆';
+        label.textContent = 'DUCK MODE INACTIVE';
+        label.style.color = 'var(--text-2)';
+        card.style.borderColor = 'rgba(0,255,224,0.12)';
+        card.style.background = 'rgba(0,255,224,0.02)';
+        desc.textContent = 'AI responses are normal — answers and solutions as usual.';
+        startBtn.style.display = '';
+        stopBtn.style.display = 'none';
+      }
+    }
+    async function duckStart() {
+      const cid = (typeof currentChatId !== 'undefined' && currentChatId) ? currentChatId : null;
+      if (!cid) { hubToast('Open a chat first, then activate Duck Mode', 'warn'); return; }
+      try {
+        const r = await fetch('/duck/start', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({conversation_id: cid}) });
+        const d = await r.json();
+        if (d.error) { hubToast(d.error, 'err'); return; }
+        hubToast('🦆 Duck Mode activated! AI will only ask questions now.', 'ok');
+        _renderDuckStatus({ active: true, started_at: new Date().toISOString() });
+      } catch(e) { hubToast('Failed: ' + e.message, 'err'); }
+    }
+    async function duckStop() {
+      const cid = (typeof currentChatId !== 'undefined' && currentChatId) ? currentChatId : null;
+      try {
+        const r = await fetch('/duck/stop', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({conversation_id: cid}) });
+        const d = await r.json();
+        hubToast('Duck Mode deactivated. Normal responses resumed.', 'ok');
+        _renderDuckStatus({ active: false });
+      } catch(e) { hubToast('Failed: ' + e.message, 'err'); }
+    }
+
+    /* ══════════════════════════════════════════════════════
+       TIME MACHINE — Pair Programmer Timeline Reconstructor
+    ══════════════════════════════════════════════════════ */
+    async function timeMachine() {
+      const code = (document.getElementById('tm-code').value || '').trim();
+      const lang = document.getElementById('tm-lang').value || 'python';
+      if (!code) { hubToast('Paste your final code first', 'warn'); return; }
+      _setBtn('tm-btn', true, 'RECONSTRUCTING…');
+      const res = document.getElementById('tm-result');
+      res.classList.remove('show'); res.innerHTML = '';
+      try {
+        const r = await fetch('/time_machine', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code, language: lang })
+        });
+        const d = await r.json();
+        if (d.error) { hubToast(d.error, 'err'); return; }
+        const stages = d.stages || d.timeline || [];
+        if (!stages.length) {
+          res.innerHTML = `<div style="font-family:var(--mono);font-size:11.5px;color:var(--text-2);line-height:1.7">${(d.analysis||d.result||JSON.stringify(d,null,2)).replace(/</g,'&lt;')}</div>`;
+        } else {
+          const stageColors = ['#00ffe0','#a855f7','#fbbf24','#4ade80','#ff6b2b','#38bdf8'];
+          res.innerHTML = stages.map((s, i) => {
+            const col = stageColors[i % stageColors.length];
+            return `<div style="padding:12px 14px;border:1px solid ${col}28;border-radius:6px;background:rgba(2,4,8,0.6);margin-bottom:10px;border-left:3px solid ${col}">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:7px;flex-wrap:wrap">
+                <span style="font-family:var(--display);font-size:9px;font-weight:900;letter-spacing:2px;color:${col}">STAGE ${i+1}</span>
+                <span style="font-family:var(--display);font-size:10px;font-weight:800;color:var(--text)">${(s.stage_name||s.name||'Edit').replace(/</g,'&lt;')}</span>
+              </div>
+              ${s.what_changed ? `<div style="font-family:var(--mono);font-size:11px;color:var(--text-2);line-height:1.6;margin-bottom:6px"><strong style="color:var(--plasma)">What changed:</strong> ${s.what_changed.replace(/</g,'&lt;')}</div>` : ''}
+              ${s.why ? `<div style="font-family:var(--mono);font-size:11px;color:var(--text-3);line-height:1.6;margin-bottom:6px"><strong style="color:${col}">Why:</strong> ${s.why.replace(/</g,'&lt;')}</div>` : ''}
+              ${s.developer_thought ? `<div style="font-family:var(--mono);font-size:10.5px;color:var(--text-3);font-style:italic">💭 ${s.developer_thought.replace(/</g,'&lt;')}</div>` : ''}
+              ${s.code_snapshot ? `<details style="margin-top:8px"><summary style="font-family:var(--display);font-size:8px;letter-spacing:1px;color:var(--text-3);cursor:pointer">VIEW CODE AT THIS STAGE</summary><pre style="font-family:var(--mono);font-size:10.5px;color:var(--text-2);background:rgba(0,0,0,0.4);padding:10px;border-radius:4px;overflow-x:auto;white-space:pre-wrap;margin-top:6px">${s.code_snapshot.replace(/</g,'&lt;')}</pre></details>` : ''}
+            </div>`;
+          }).join('');
+        }
+        res.classList.add('show');
+      } catch(e) { res.textContent = 'Failed: ' + e.message; res.classList.add('show'); }
+      _setBtn('tm-btn', false, '⏳ RECONSTRUCT TIMELINE');
+    }
+
+    /* ══════════════════════════════════════════════════════
+       FOCUS ZONE DETECTOR
+    ══════════════════════════════════════════════════════ */
+    async function focusZone() {
+      _setBtn('fz-btn', true, 'ANALYSING…');
+      const res = document.getElementById('fz-result');
+      res.innerHTML = '<span style="font-family:var(--mono);font-size:10px;color:var(--text-3)">Scanning your session timestamps…</span>';
+      try {
+        const r = await fetch('/focus_zone');
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const d = await r.json();
+        if (!d.hourly_heatmap || !d.hourly_heatmap.length) {
+          res.innerHTML = `<div style="font-family:var(--mono);font-size:11.5px;color:var(--text-3);padding:16px;text-align:center">${d.insights[0] || 'Not enough data yet — keep coding!'}</div>`;
+          _setBtn('fz-btn', false, '🎯 ANALYSE MY FOCUS ZONES');
+          return;
+        }
+        const dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+        const maxH = Math.max(...d.hourly_heatmap.map(h => h.count), 1);
+        const maxD = Math.max(...d.daily_heatmap.map(x => x.count), 1);
+        let html = `
+          <div style="padding:14px 16px;border:1px solid rgba(0,255,224,0.12);border-radius:8px;background:rgba(0,255,224,0.02);margin-bottom:16px">
+            <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:10px">
+              <div><div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--text-3)">PEAK WINDOW</div>
+                <div style="font-family:var(--display);font-size:18px;font-weight:900;color:var(--plasma);margin-top:2px">${d.peak_window||'—'}</div></div>
+              <div><div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--text-3)">TOTAL MESSAGES</div>
+                <div style="font-family:var(--display);font-size:18px;font-weight:900;color:var(--nova);margin-top:2px">${(d.total_messages||0).toLocaleString()}</div></div>
+            </div>
+            <div style="font-family:var(--mono);font-size:11px;color:var(--text-2);line-height:1.7">${d.ai_recommendation||''}</div>
+          </div>
+          <div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--text-3);margin-bottom:8px">HOURLY HEATMAP (24h)</div>
+          <div style="display:grid;grid-template-columns:repeat(24,1fr);gap:2px;margin-bottom:16px">
+            ${d.hourly_heatmap.map(h => {
+              const pct = Math.round((h.count / maxH) * 100);
+              const col = pct > 70 ? '#00ffe0' : pct > 40 ? '#a855f7' : pct > 15 ? '#4a5568' : '#1a202c';
+              return `<div title="${h.label}: ${h.count} msgs" style="height:32px;background:${col};border-radius:2px;opacity:${0.3 + pct/140};position:relative;cursor:default"></div>`;
+            }).join('')}
+          </div>
+          <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:9px;color:var(--text-3);margin-bottom:16px">
+            <span>12am</span><span>6am</span><span>12pm</span><span>6pm</span><span>12am</span>
+          </div>
+          <div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--text-3);margin-bottom:8px">DAILY HEATMAP</div>
+          <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:16px">
+            ${d.daily_heatmap.map(x => {
+              const pct = Math.round((x.count / maxD) * 100);
+              const col = pct > 70 ? '#00ffe0' : pct > 40 ? '#a855f7' : pct > 15 ? '#4a5568' : '#1a202c';
+              return `<div style="text-align:center"><div title="${x.label}: ${x.count} msgs" style="height:40px;background:${col};border-radius:4px;opacity:${0.3 + pct/140};margin-bottom:4px"></div>
+                <div style="font-family:var(--mono);font-size:9px;color:var(--text-3)">${dayNames[x.day]||x.short||''}</div></div>`;
+            }).join('')}
+          </div>
+          <div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--text-3);margin-bottom:8px">INSIGHTS</div>
+          ${(d.insights||[]).map(ins => `<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:6px"><span style="color:var(--plasma);flex-shrink:0">▸</span><span style="font-family:var(--mono);font-size:11.5px;color:var(--text-2);line-height:1.6">${ins}</span></div>`).join('')}
+        `;
+        res.innerHTML = html;
+      } catch(e) { res.innerHTML = `<span style="color:var(--fire);font-family:var(--mono);font-size:10px">Failed: ${e.message}</span>`; }
+      _setBtn('fz-btn', false, '🎯 ANALYSE MY FOCUS ZONES');
+    }
+
     /* ── keyboard close ── */
     document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
 
@@ -8144,7 +9273,17 @@ def find_max(arr):
       dcScan,
       loadMoodHistory,
       dnaBuild, dnaView,
+      prophBuild, prophMe, prophPredict,
+      cogloadAnalyze,
+      namingSuggest,
+      autopsyAnalyze: ()=>{}, autopsyLoadHistory: ()=>{},
+      duckStart, duckStop,
+      timeMachine,
+      focusZone,
+      videoAnalyze: ()=>{},
+      vcStatus: ()=>{}, vcUpload: ()=>{}, vcSpeak: ()=>{}, vcDelete: ()=>{},
       searchChats, openSearchResult,
+      loadBookmarks, analyzeComplexity, generateRoadmap, voiceFix, voiceFixMic,
       _battleId: () => _battleId,
     };
   })();
@@ -8166,845 +9305,9 @@ def find_max(arr):
   </script>
 
 
-  <!-- ══════════════════ VOICE CLONE PANEL ══════════════════ -->
-  <div id="voiceClonePanel">
-    <div class="vc-hdr">
-      <div class="vc-hdr-title">🎙 MY VOICE CLONE</div>
-      <button onclick="VoiceClone.close()" style="background:none;border:none;color:rgba(226,244,255,0.35);font-size:20px;cursor:pointer;line-height:1;padding:0 4px;">✕</button>
-    </div>
-    <div class="vc-body">
 
-      <div class="vc-section">
-        <div class="vc-label">YOUR VOICE PROFILE</div>
-        <div id="vc-profile-status" class="vc-status">Checking…</div>
-        <div id="vc-profile-card" class="vc-profile-card" style="display:none">
-          <div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:#a855f7;margin-bottom:8px">✅ VOICE ANALYSED — LANGUAGE LOCKED</div>
-          <div id="vc-profile-info" style="font-family:var(--mono);font-size:10px;color:var(--text-3);margin-bottom:6px"></div>
-          <div id="vc-lang-badge" style="display:inline-block;padding:4px 10px;background:rgba(168,85,247,0.12);border:1px solid rgba(168,85,247,0.35);border-radius:12px;font-family:var(--display);font-size:9px;font-weight:700;letter-spacing:1px;color:#c084fc;margin-bottom:12px"></div>
-          <div style="font-family:var(--mono);font-size:10px;color:rgba(226,244,255,0.3);margin-bottom:12px">PLAY buttons will speak AI answers in this language</div>
-          <div style="display:flex;gap:8px">
-            <button onclick="VoiceClone.test()" style="flex:1;padding:9px;background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.3);color:#a855f7;font-family:var(--display);font-size:8px;font-weight:700;letter-spacing:2px;cursor:pointer;border-radius:4px;transition:all 0.15s">▶ TEST</button>
-            <button onclick="VoiceClone.deleteProfile()" style="padding:9px 14px;background:rgba(255,107,43,0.06);border:1px solid rgba(255,107,43,0.22);color:#ff6b2b;font-family:var(--display);font-size:8px;font-weight:700;letter-spacing:2px;cursor:pointer;border-radius:4px">✕ DELETE</button>
-          </div>
-        </div>
-      </div>
 
-      <div class="vc-section">
-        <div class="vc-label">RECORD YOUR VOICE (5–15 SEC)</div>
-        <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-bottom:14px;line-height:1.8">
-          Speak <strong style="color:rgba(226,244,255,0.7)">naturally in any language</strong> — Tamil, Hindi, English, Telugu or any other.<br>
-          Your language is detected from your speech and locked for all voice output.
-        </div>
-        <button class="vc-record-btn" id="vc-record-btn" onclick="VoiceClone.toggleRecord()">
-          <span id="vc-rec-icon">🎙</span><span id="vc-rec-label">TAP TO RECORD</span>
-        </button>
-        <div class="vc-waveform" id="vc-waveform" style="display:none">
-          <div class="vc-bar" id="vcb0" style="height:8px"></div><div class="vc-bar" id="vcb1" style="height:16px"></div>
-          <div class="vc-bar" id="vcb2" style="height:24px"></div><div class="vc-bar" id="vcb3" style="height:18px"></div>
-          <div class="vc-bar" id="vcb4" style="height:30px"></div><div class="vc-bar" id="vcb5" style="height:14px"></div>
-          <div class="vc-bar" id="vcb6" style="height:22px"></div><div class="vc-bar" id="vcb7" style="height:28px"></div>
-          <div class="vc-bar" id="vcb8" style="height:12px"></div><div class="vc-bar" id="vcb9" style="height:20px"></div>
-        </div>
-        <div id="vc-rec-status" class="vc-status" style="margin-top:8px"></div>
-      </div>
 
-      <div class="vc-section">
-        <div class="vc-label">OR UPLOAD AUDIO FILE</div>
-        <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-bottom:10px">WAV · MP3 · OGG · WebM &middot; 5–30 seconds</div>
-        <input type="file" id="vc-file-input" accept="audio/*,.wav,.mp3,.ogg,.webm,.m4a" style="display:none" onchange="VoiceClone.handleFile(this)">
-        <div class="vc-record-btn" onclick="document.getElementById('vc-file-input').click()">📂 CHOOSE AUDIO FILE</div>
-        <div id="vc-upload-status" class="vc-status" style="margin-top:8px"></div>
-      </div>
-
-      <div class="vc-section">
-        <div class="vc-label">HOW IT WORKS</div>
-        <div style="font-family:var(--mono);font-size:11px;color:var(--text-3);line-height:2">
-          1. Record 5–15 sec of your voice in any language<br>
-          2. AI <strong style="color:#a855f7">detects your language</strong> automatically<br>
-          3. Every 🔊 PLAY button speaks the AI answer in <strong style="color:#a855f7">your language</strong><br>
-          4. Works with Tamil, Hindi, Telugu, Malayalam, English &amp; 16 more
-        </div>
-        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
-          <button onclick="VoiceClone.diagnose()" style="padding:7px 12px;background:rgba(0,255,224,0.05);border:1px solid rgba(0,255,224,0.2);border-radius:4px;color:rgba(0,255,224,0.6);font-family:var(--display);font-size:7px;font-weight:700;letter-spacing:1.5px;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='rgba(0,255,224,0.12)'" onmouseout="this.style.background='rgba(0,255,224,0.05)'">🔧 DIAGNOSE VOICE</button>
-          <button onclick="VoiceClone.testTamil()" style="padding:7px 12px;background:rgba(168,85,247,0.05);border:1px solid rgba(168,85,247,0.2);border-radius:4px;color:rgba(168,85,247,0.6);font-family:var(--display);font-size:7px;font-weight:700;letter-spacing:1.5px;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='rgba(168,85,247,0.12)'" onmouseout="this.style.background='rgba(168,85,247,0.05)'">🔊 TEST TAMIL</button>
-          <button onclick="VoiceClone.testMalayalam()" style="padding:7px 12px;background:rgba(168,85,247,0.05);border:1px solid rgba(168,85,247,0.2);border-radius:4px;color:rgba(168,85,247,0.6);font-family:var(--display);font-size:7px;font-weight:700;letter-spacing:1.5px;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='rgba(168,85,247,0.12)'" onmouseout="this.style.background='rgba(168,85,247,0.05)'">🔊 TEST MALAYALAM</button>
-        </div>
-        <div id="vc-diag-result" style="display:none;margin-top:10px;padding:10px 12px;background:rgba(2,4,8,0.8);border:1px solid rgba(0,255,224,0.1);border-radius:4px;font-family:var(--mono);font-size:10px;color:var(--text-2);line-height:1.8;white-space:pre-wrap"></div>
-      </div>
-
-    </div>
-  </div>
-
-  <script>
-  /* ════════════════════════════════════════════════════
-     VOICE CLONE ENGINE
-  ════════════════════════════════════════════════════ */
-  window._hasVoiceClone = false;
-
-  const VoiceClone = (() => {
-    let _rec = null, _chunks = [], _stream = null, _waveTimer = null;
-    let _sttRec = null, _transcript = '', _sttLang = '';
-
-    function open() {
-      document.getElementById('voiceClonePanel').classList.add('show');
-      checkStatus();
-    }
-    function close() {
-      document.getElementById('voiceClonePanel').classList.remove('show');
-    }
-
-    async function checkStatus() {
-      const st = document.getElementById('vc-profile-status');
-      const card = document.getElementById('vc-profile-card');
-      const dot = document.getElementById('vc-dot');
-      if (st) st.textContent = 'Checking profile…';
-      try {
-        const r = await fetch('/voice_clone/status', { redirect: 'manual' });
-        if (r.type === 'opaqueredirect' || r.status === 0) { if (st) st.textContent = 'Session expired — please refresh.'; return; }
-        if (!r.ok) {
-          if (st) st.textContent = '⚠ Backend not reachable. Start: python app.py';
-          return;
-        }
-        const d = await r.json();
-        window._hasVoiceClone = !!d.has_profile;
-        window._hasCoquiVoice = !!d.has_profile;
-        if (d.has_profile) {
-          if (st) st.textContent = '';
-          if (card) card.style.display = 'block';
-
-          // Show detected language in the badge
-          const langName = d.detected_lang_name || 'Unknown';
-          const langCode = d.detected_lang || 'en-US';
-          const badge = document.getElementById('vc-lang-badge');
-          if (badge) badge.textContent = '🌐 ' + langName.toUpperCase();
-
-          const info = document.getElementById('vc-profile-info');
-          if (info) info.textContent = 'Created: ' + (d.created_at ? d.created_at.slice(0,10) : 'unknown');
-
-          // Tell CBVoice about the detected language — all speak() calls use this lang
-          window._vcDetectedLang = langCode;
-          if (window.CBVoice && typeof window.CBVoice.setDetectedLang === 'function') {
-            window.CBVoice.setDetectedLang(langCode, langName);
-          } else {
-            // CBVoice not loaded yet — sync selectors manually
-            ['cbLangSel', 'cbLangSel2', 'voiceLang'].forEach(id => {
-              const el = document.getElementById(id);
-              if (el) { const opt = [...el.options].find(o => o.value === langCode); if (opt) el.value = langCode; }
-            });
-          }
-
-          if (dot) { dot.style.background = '#a855f7'; dot.style.boxShadow = '0 0 8px #a855f7'; }
-          const vcBtn = document.getElementById('voiceCloneBtn');
-          if (vcBtn) { vcBtn.style.borderColor = 'rgba(168,85,247,0.7)'; vcBtn.style.color = '#c084fc'; }
-        } else {
-          if (st) st.textContent = 'No voice profile yet. Record or upload audio below.';
-          if (card) card.style.display = 'none';
-          window._hasVoiceClone = false;
-          window._vcDetectedLang = null;
-        }
-      } catch(e) {
-        if (st) st.textContent = '⚠ Backend not running. Start: python app.py';
-        window._hasVoiceClone = false;
-        window._vcDetectedLang = null;
-        setTimeout(checkStatus, 5000); // auto-retry
-      }
-    }
-
-    async function toggleRecord() {
-      if (_rec && _rec.state === 'recording') { stopRecord(); return; }
-      const st = document.getElementById('vc-rec-status');
-      _transcript = ''; _sttLang = '';
-      try {
-        _stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        _chunks = [];
-        const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg';
-        _rec = new MediaRecorder(_stream, { mimeType });
-        _rec.ondataavailable = e => { if (e.data.size > 0) _chunks.push(e.data); };
-        _rec.onstop = () => uploadBlob(new Blob(_chunks, { type: mimeType }), 'voice_sample.webm', 'rec');
-        _rec.start(100);
-
-        // ── Run Speech Recognition simultaneously to get transcript ──────────
-        // This is how we detect the language — from the actual words you say.
-        const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (SpeechRec) {
-          _sttRec = new SpeechRec();
-          _sttRec.continuous = true;
-          _sttRec.interimResults = true;
-          _sttRec.maxAlternatives = 1;
-          // Start with no lang set — browser auto-detects from speech
-          const _uiLang = typeof getLangRaw === 'function' ? getLangRaw() : 'en-US';
-          _sttRec.lang = _uiLang === 'ta-en' ? 'ta-IN' : _uiLang;
-          _sttRec.onresult = e => {
-            let full = '';
-            for (let i = 0; i < e.results.length; i++) {
-              full += e.results[i][0].transcript + ' ';
-            }
-            _transcript = full.trim();
-            // Browser exposes detected language on the result
-            if (e.results[0] && e.results[0][0]) {
-              // Try to get lang from recognition object
-              _sttLang = _sttRec.lang || '';
-            }
-            if (st) st.textContent = '🔴 Heard: "' + _transcript.slice(0, 60) + ((_transcript.length > 60) ? '…' : '') + '"';
-          };
-          _sttRec.onerror = () => {}; // silent — transcript is best-effort
-          try { _sttRec.start(); window._vcSttRec = _sttRec; } catch(e) {}
-        }
-
-        const btn = document.getElementById('vc-record-btn');
-        if (btn) btn.classList.add('recording');
-        document.getElementById('vc-rec-icon').textContent = '⏹';
-        document.getElementById('vc-rec-label').textContent = 'RECORDING — TAP TO STOP';
-        document.getElementById('vc-waveform').style.display = 'flex';
-        if (st) st.textContent = '🔴 Recording… speak in your language naturally.';
-        animateWave(true);
-        setTimeout(() => { if (_rec && _rec.state === 'recording') stopRecord(); }, 20000);
-      } catch(e) {
-        if (st) st.textContent = '⚠ Mic access denied: ' + e.message;
-      }
-    }
-
-    function stopRecord() {
-      if (_rec && _rec.state === 'recording') _rec.stop();
-      if (_stream) _stream.getTracks().forEach(t => t.stop());
-      _rec = null; _stream = null;
-      // Stop STT recognition
-      if (_sttRec) { try { _sttRec.stop(); } catch(e) {} _sttRec = null; }
-      const btn = document.getElementById('vc-record-btn');
-      if (btn) btn.classList.remove('recording');
-      document.getElementById('vc-rec-icon').textContent = '🎙';
-      document.getElementById('vc-rec-label').textContent = 'TAP TO RECORD';
-      document.getElementById('vc-waveform').style.display = 'none';
-      animateWave(false);
-      const st = document.getElementById('vc-rec-status');
-      if (st) st.textContent = '⏳ Detecting language from your voice…';
-    }
-
-    function animateWave(on) {
-      clearInterval(_waveTimer);
-      if (!on) return;
-      const bars = Array.from({length:10}, (_,i) => document.getElementById('vcb' + i));
-      _waveTimer = setInterval(() => {
-        bars.forEach(b => { if (b) b.style.height = (5 + Math.random() * 28) + 'px'; });
-      }, 110);
-    }
-
-    function handleFile(input) {
-      const f = input.files[0]; if (!f) return;
-      const st = document.getElementById('vc-upload-status');
-      if (st) st.textContent = '⏳ Uploading ' + f.name + '…';
-      uploadBlob(f, f.name, 'upload');
-    }
-
-    async function uploadBlob(blob, name, source) {
-      const fd = new FormData();
-      fd.append('audio', blob, name);
-
-      // Always send UI language as reliable hint
-      const _uiLangHint = typeof getLangRaw === 'function' ? getLangRaw() : 'en-US';
-      if (_uiLangHint && _uiLangHint !== 'en-US') fd.append('lang_hint', _uiLangHint);
-      if (source === 'rec' && _transcript) {
-        fd.append('transcript', _transcript);
-        if (_sttLang && _sttLang !== 'en-US') fd.append('lang_hint', _sttLang);
-      }
-
-      const recSt = document.getElementById('vc-rec-status');
-      const upSt = document.getElementById('vc-upload-status');
-
-      const analysingMsg = '🔍 Detecting your language…';
-      if (source === 'rec' && recSt) recSt.textContent = analysingMsg;
-      if (source === 'upload' && upSt) upSt.textContent = analysingMsg;
-
-      try {
-        const r = await fetch('/voice_clone/upload', { method: 'POST', body: fd, redirect: 'manual' });
-        const d = await r.json();
-        if (d.error) {
-          const msg = '⚠ ' + d.error;
-          if (source === 'rec' && recSt) recSt.textContent = msg;
-          if (source === 'upload' && upSt) upSt.textContent = msg;
-          return;
-        }
-
-        // Show detected language prominently
-        const langName = d.detected_lang_name || 'English';
-        const langCode = d.detected_lang || 'en-US';
-        const successMsg = '✅ Language detected: ' + langName + '. PLAY will now speak AI answers in ' + langName + '.';
-        if (source === 'rec' && recSt) recSt.textContent = successMsg;
-        if (source === 'upload' && upSt) upSt.textContent = successMsg;
-
-        window._hasVoiceClone = true;
-        window._hasCoquiVoice = true;
-        window._vcDetectedLang = langCode;
-
-        // Auto-set the language selector to detected language
-        ['cbLangSel', 'cbLangSel2', 'voiceLang'].forEach(id => {
-          const el = document.getElementById(id);
-          if (el) { const opt = [...el.options].find(o => o.value === langCode); if (opt) el.value = langCode; }
-        });
-        // Tell CBVoice about the detected language — locks all speak() calls to this lang
-        if (window.CBVoice && typeof window.CBVoice.setDetectedLang === 'function') {
-          window.CBVoice.setDetectedLang(langCode, langName);
-        } else {
-          // CBVoice not loaded yet — set globals directly
-          window._vcDetectedLang = langCode;
-          window._hasVoiceClone = true;
-        }
-
-        setTimeout(checkStatus, 600);
-        if (typeof hubToast === 'function') {
-          hubToast('🎙 ' + langName + ' detected! All PLAY output now in ' + langName + '.', 'ok');
-        }
-      } catch(e) {
-        const msg = '⚠ Upload failed: ' + e.message;
-        if (recSt) recSt.textContent = msg;
-        if (upSt) upSt.textContent = msg;
-      }
-    }
-
-    async function test() {
-      const st = document.getElementById('vc-profile-status');
-      const langCode = window._vcDetectedLang || (typeof getLangRaw === 'function' ? getLangRaw() : 'en-US');
-      // Test sentences per language
-      const TEST_SENTENCES = {
-        'ta-IN': 'வணக்கம்! கோட் பட்டி உங்கள் மொழியில் பேசுகிறது. இது சரியாக உள்ளதா?',
-        'ta-en': 'Vanakkam! CodeBuddy ungal mozhiyil pesugiradu. Correct-a irukka?',
-        'hi-IN': 'नमस्ते! कोड बडी आपकी भाषा में बोल रहा है। क्या यह सही है?',
-        'te-IN': 'నమస్కారం! కోడ్ బడ్డీ మీ భాషలో మాట్లాడుతోంది. సరిగ్గా ఉందా?',
-        'kn-IN': 'ನಮಸ್ಕಾರ! ಕೋಡ್ ಬಡ್ಡಿ ನಿಮ್ಮ ಭಾಷೆಯಲ್ಲಿ ಮಾತನಾಡುತ್ತಿದೆ. ಸರಿಯಾಗಿದೆಯೇ?',
-        'ml-IN': 'നമസ്കാരം! കോഡ് ബഡ്ഡി നിങ്ങളുടെ ഭാഷയിൽ സംസാരിക്കുന്നു. ശരിയാണോ?',
-        'en-US': 'Hello! CodeBuddy is speaking in your detected language. Does this sound correct?',
-        'fr-FR': 'Bonjour! CodeBuddy parle dans votre langue détectée. Est-ce correct?',
-        'de-DE': 'Hallo! CodeBuddy spricht in Ihrer erkannten Sprache. Klingt das richtig?',
-        'es-ES': '¡Hola! CodeBuddy habla en tu idioma detectado. ¿Suena correcto?',
-      };
-      const testText = TEST_SENTENCES[langCode] || TEST_SENTENCES['en-US'];
-      if (st) st.textContent = '⏳ Testing voice output in detected language…';
-      try {
-        const r = await fetch('/voice_clone/tts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: testText, lang: langCode })
-        });
-        if (!r.ok) { if (st) st.textContent = '⚠ Test failed (' + r.status + ')'; return; }
-        const blob = await r.blob();
-        const url = URL.createObjectURL(blob);
-        const a = new Audio(url);
-        a.onended = () => {
-          if (st) st.textContent = '✅ Voice output working in your detected language!';
-          URL.revokeObjectURL(url);
-        };
-        if (st) st.textContent = '🔊 Playing AI voice in your language…';
-        a.play();
-      } catch(e) { if (st) st.textContent = '⚠ ' + e.message; }
-    }
-
-    async function deleteProfile() {
-      if (!confirm('Delete your voice profile? This cannot be undone.')) return;
-
-      // ── Call backend to DELETE files from disk ────────────────────────────
-      // Without this, the .json + .webm files stay on disk and the profile
-      // comes back every time the page reloads or the panel is reopened.
-      try {
-        await fetch('/voice_clone/delete', { method: 'POST' });
-      } catch(e) {
-        console.warn('voice_clone/delete failed:', e);
-      }
-
-      // ── Clear all client-side state ───────────────────────────────────────
-      window._hasVoiceClone = false;
-      window._vcDetectedLang = null;
-      if (window.CBVoice && typeof window.CBVoice.setDetectedLang === 'function') {
-        // Reset voice engine back to UI language selector
-        window.CBVoice.setDetectedLang(null, null);
-      }
-
-      const card = document.getElementById('vc-profile-card');
-      if (card) card.style.display = 'none';
-      const badge = document.getElementById('vc-lang-badge');
-      if (badge) badge.textContent = '';
-      const st = document.getElementById('vc-profile-status');
-      if (st) st.textContent = 'Profile deleted. Record a new one below.';
-      document.getElementById('vc-rec-status') && (document.getElementById('vc-rec-status').textContent = '');
-      document.getElementById('vc-upload-status') && (document.getElementById('vc-upload-status').textContent = '');
-
-      const dot = document.getElementById('vc-dot');
-      if (dot) { dot.style.background = 'rgba(168,85,247,0.3)'; dot.style.boxShadow = ''; }
-      const vcBtn = document.getElementById('voiceCloneBtn');
-      if (vcBtn) { vcBtn.style.borderColor = 'rgba(168,85,247,0.3)'; vcBtn.style.color = '#a855f7'; }
-    }
-
-    // Auto-check status on page load
-    setTimeout(checkStatus, 1800);
-
-    async function diagnose() {
-      const diagEl = document.getElementById('vc-diag-result');
-      if (!diagEl) return;
-      diagEl.style.display = 'block';
-      diagEl.textContent = '🔍 Running diagnostics…';
-      try {
-        const r = await fetch('/tts/diagnose');
-        const d = await r.json();
-        let out = '';
-        out += `gTTS installed: ${d.gtts_installed ? '✅' : '❌'} (v${d.gtts_version || '?'})\n`;
-        out += `click version: ${d.click_version || '?'} ${d.click_version && d.click_version >= '8.1' ? '✅' : '⚠ may conflict'}\n`;
-        out += `Tamil TTS: ${d.test_tamil ? '✅ working' : '❌ BROKEN'} ${d.test_tamil_error ? '→ '+d.test_tamil_error : ''}\n`;
-        out += `Malayalam TTS: ${d.test_malayalam ? '✅ working' : '❌ BROKEN'} ${d.test_malayalam_error ? '→ '+d.test_malayalam_error : ''}\n`;
-        out += `English TTS: ${d.test_english ? '✅ working' : '❌ BROKEN'}\n`;
-        out += `Voice profile: ${d.profile_exists ? '✅ ' + (d.profile_lang_name||'?') : 'none'}\n`;
-        if (!d.test_tamil || !d.test_malayalam) {
-          out += `\n⚠ FIX: pip install click==8.1.8 gtts --upgrade`;
-        }
-        diagEl.textContent = out;
-      } catch(e) {
-        diagEl.textContent = '⚠ Diagnose failed: ' + e.message + '\nMake sure python app.py is running.';
-      }
-    }
-
-    async function testTamil() {
-      const st = document.getElementById('vc-profile-status');
-      if (st) st.textContent = '⏳ Testing Tamil TTS…';
-      try {
-        const r = await fetch('/tts', {
-          method: 'POST', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({text: 'வணக்கம்! இது தமிழ் குரல் சோதனை. கோட் பட்டி உங்களுக்கு உதவுகிறது.', lang: 'ta-IN'})
-        });
-        if (!r.ok) { if (st) st.textContent = '❌ Tamil TTS failed: HTTP ' + r.status; return; }
-        const blob = await r.blob();
-        const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-        audio.onended = () => { if (st) st.textContent = '✅ Tamil TTS working!'; URL.revokeObjectURL(url); };
-        audio.play().then(() => { if (st) st.textContent = '🔊 Playing Tamil test…'; }).catch(() => { if (st) st.textContent = '❌ Audio playback failed'; });
-      } catch(e) { if (st) st.textContent = '❌ Tamil test failed: ' + e.message; }
-    }
-
-    async function testMalayalam() {
-      const st = document.getElementById('vc-profile-status');
-      if (st) st.textContent = '⏳ Testing Malayalam TTS…';
-      try {
-        const r = await fetch('/tts', {
-          method: 'POST', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({text: 'നമസ്കാരം! ഇത് മലയാളം ശബ്ദ പരിശോധനയാണ്. കോഡ് ബഡ്ഡി നിങ്ങളെ സഹായിക്കുന്നു.', lang: 'ml-IN'})
-        });
-        if (!r.ok) { if (st) st.textContent = '❌ Malayalam TTS failed: HTTP ' + r.status; return; }
-        const blob = await r.blob();
-        const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-        audio.onended = () => { if (st) st.textContent = '✅ Malayalam TTS working!'; URL.revokeObjectURL(url); };
-        audio.play().then(() => { if (st) st.textContent = '🔊 Playing Malayalam test…'; }).catch(() => { if (st) st.textContent = '❌ Audio playback failed'; });
-      } catch(e) { if (st) st.textContent = '❌ Malayalam test failed: ' + e.message; }
-    }
-
-    return { open, close, checkStatus, toggleRecord, handleFile, test, deleteProfile, diagnose, testTamil, testMalayalam };
-  })();
-  window.VoiceClone = VoiceClone;
-  </script>
-
-<!-- ══════════════════════════════════════════════════════════
-     VIDEO ANALYZER PANEL
-══════════════════════════════════════════════════════════ -->
-<style>
-  #videoAnalyzerPanel {
-    display:none;position:fixed;right:0;top:0;bottom:0;
-    width:min(480px,95vw);z-index:9998;
-    background:#060d1a;
-    border-left:1px solid rgba(0,255,224,0.15);
-    flex-direction:column;
-    box-shadow:-10px 0 50px rgba(0,0,0,0.8);
-  }
-  #videoAnalyzerPanel.show { display:flex; }
-  .va-hdr {
-    display:flex;align-items:center;justify-content:space-between;
-    padding:16px 18px;border-bottom:1px solid rgba(0,255,224,0.1);
-    background:rgba(0,255,224,0.025);flex-shrink:0;
-  }
-  .va-hdr-title {
-    font-family:var(--display);font-size:12px;font-weight:800;
-    letter-spacing:3px;color:var(--plasma);display:flex;align-items:center;gap:8px
-  }
-  .va-body { flex:1;overflow-y:auto;padding:18px; }
-  .va-section { margin-bottom:20px; }
-  .va-label {
-    font-family:var(--display);font-size:8px;font-weight:700;
-    letter-spacing:2px;color:var(--text-3);margin-bottom:8px;
-    display:flex;align-items:center;gap:6px;
-  }
-  .va-label::before { content:'';display:inline-block;width:3px;height:12px;border-radius:2px;background:var(--plasma);flex-shrink:0; }
-
-  /* Drop zone */
-  #va-dropzone {
-    border:2px dashed rgba(0,255,224,0.2);border-radius:8px;
-    padding:28px 20px;text-align:center;cursor:pointer;
-    background:rgba(0,255,224,0.015);transition:all 0.2s;
-  }
-  #va-dropzone:hover,#va-dropzone.over {
-    border-color:rgba(0,255,224,0.5);background:rgba(0,255,224,0.05);
-    box-shadow:inset 0 0 20px rgba(0,255,224,0.04);
-  }
-  #va-dropzone .va-drop-icon { font-size:32px;margin-bottom:8px; }
-  #va-dropzone .va-drop-lbl {
-    font-family:var(--display);font-size:9px;font-weight:700;
-    letter-spacing:2px;color:var(--plasma);display:block;margin-bottom:4px;
-  }
-  #va-dropzone .va-drop-sub { font-family:var(--mono);font-size:10px;color:var(--text-3); }
-
-  /* File badge */
-  #va-file-badge {
-    display:none;padding:8px 12px;border:1px solid rgba(0,255,224,0.15);
-    border-radius:4px;background:rgba(0,255,224,0.03);
-    align-items:center;gap:8px;margin-top:8px;
-  }
-  #va-file-badge.show { display:flex; }
-  .va-fname { font-family:var(--mono);font-size:11px;color:var(--plasma);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
-  .va-fsize { font-family:var(--display);font-size:8px;color:var(--text-3);flex-shrink:0; }
-  .va-fx { background:none;border:none;color:var(--text-3);cursor:pointer;font-size:14px; }
-  .va-fx:hover { color:var(--fire); }
-
-  /* Question input */
-  #va-question {
-    width:100%;background:rgba(0,255,224,0.03);
-    border:1px solid rgba(0,255,224,0.1);border-radius:4px;
-    color:var(--text);font-family:var(--mono);font-size:12px;
-    padding:10px 12px;outline:none;resize:vertical;min-height:70px;
-    transition:border-color 0.2s;
-  }
-  #va-question:focus { border-color:rgba(0,255,224,0.3); }
-  #va-question::placeholder { color:var(--text-3); }
-
-  /* Analyze button */
-  #va-analyze-btn {
-    width:100%;padding:12px;margin-top:4px;
-    background:rgba(0,255,224,0.08);
-    border:1px solid rgba(0,255,224,0.35);border-radius:6px;
-    color:var(--plasma);font-family:var(--display);font-size:9px;
-    font-weight:700;letter-spacing:2px;cursor:pointer;transition:all 0.2s;
-    display:flex;align-items:center;justify-content:center;gap:8px;
-  }
-  #va-analyze-btn:hover { background:rgba(0,255,224,0.15);box-shadow:0 0 20px rgba(0,255,224,0.2); }
-  #va-analyze-btn:disabled { opacity:0.35;cursor:not-allowed; }
-
-  /* Result */
-  #va-result {
-    display:none;margin-top:14px;padding:14px;
-    border:1px solid rgba(0,255,224,0.1);border-radius:6px;
-    background:rgba(2,4,8,0.8);
-    font-family:var(--mono);font-size:12px;color:var(--text-2);
-    line-height:1.75;white-space:pre-wrap;word-break:break-word;
-    max-height:360px;overflow-y:auto;
-  }
-  #va-result.show { display:block; }
-  #va-result::-webkit-scrollbar { width:3px; }
-  #va-result::-webkit-scrollbar-thumb { background:var(--border-hi); }
-
-  /* Progress bar */
-  #va-progress {
-    display:none;height:2px;border-radius:1px;
-    background:rgba(0,255,224,0.08);overflow:hidden;margin:8px 0;
-  }
-  #va-progress.show { display:block; }
-  #va-progress-fill {
-    height:100%;width:0%;
-    background:linear-gradient(90deg,var(--plasma),var(--nova));
-    transition:width 0.3s;border-radius:1px;animation:va-pulse 1.5s ease infinite;
-  }
-  @keyframes va-pulse { 0%,100%{opacity:1}50%{opacity:0.6} }
-
-  /* How it works list */
-  .va-how-list { font-family:var(--mono);font-size:10.5px;color:var(--text-3);line-height:2.1;padding-left:4px; }
-  .va-how-list li { list-style:none;position:relative;padding-left:16px; }
-  .va-how-list li::before { content:'▸';position:absolute;left:0;color:var(--plasma);opacity:0.6; }
-
-  /* "Send to Chat" button */
-  #va-send-chat-btn {
-    display:none;width:100%;padding:9px;margin-top:8px;
-    background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.3);
-    border-radius:4px;color:var(--nova);font-family:var(--display);
-    font-size:8px;font-weight:700;letter-spacing:2px;cursor:pointer;transition:all 0.2s;
-  }
-  #va-send-chat-btn:hover { background:rgba(168,85,247,0.15); }
-  #va-send-chat-btn.show { display:block; }
-
-  /* Topbar button */
-  #videoAnalyzerBtn {
-    display:flex;align-items:center;gap:5px;padding:0 11px;height:34px;
-    border:1px solid rgba(0,255,224,0.15);background:rgba(0,255,224,0.03);
-    color:rgba(226,244,255,0.4);font-family:var(--display);font-size:8px;
-    font-weight:700;letter-spacing:1.5px;cursor:pointer;border-radius:2px;transition:all 0.2s;
-  }
-  #videoAnalyzerBtn:hover { border-color:rgba(0,255,224,0.45);color:var(--plasma);background:rgba(0,255,224,0.07); }
-  #videoAnalyzerBtn.loaded { border-color:rgba(74,222,128,0.4);color:#4ade80;background:rgba(74,222,128,0.05); }
-</style>
-
-<!-- Topbar button — inject via JS since we can't easily edit the static HTML here -->
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-  // Add VIDEO button to topbar
-  const fpBtn = document.getElementById('fp-topbtn');
-  if (fpBtn && fpBtn.parentElement) {
-    const btn = document.createElement('button');
-    btn.id = 'videoAnalyzerBtn';
-    btn.title = 'Analyze programming videos';
-    btn.innerHTML = '🎬 VIDEO';
-    btn.onclick = () => VideoAnalyzer.open();
-    fpBtn.insertAdjacentElement('afterend', btn);
-  }
-});
-</script>
-
-<!-- VIDEO ANALYZER PANEL HTML -->
-<div id="videoAnalyzerPanel">
-  <div class="va-hdr">
-    <div class="va-hdr-title">
-      <span>🎬</span> VIDEO ANALYZER
-    </div>
-    <button onclick="VideoAnalyzer.close()" style="background:none;border:none;color:rgba(226,244,255,0.3);font-size:20px;cursor:pointer;line-height:1;padding:0 4px;">✕</button>
-  </div>
-
-  <div class="va-body">
-
-    <!-- Upload -->
-    <div class="va-section">
-      <div class="va-label">UPLOAD VIDEO</div>
-      <div id="va-dropzone"
-        onclick="document.getElementById('va-file-input').click()"
-        ondragover="event.preventDefault();this.classList.add('over')"
-        ondragleave="this.classList.remove('over')"
-        ondrop="VideoAnalyzer.handleDrop(event)">
-        <div class="va-drop-icon">📹</div>
-        <span class="va-drop-lbl">DROP VIDEO OR CLICK TO BROWSE</span>
-        <span class="va-drop-sub">MP4 · WebM · MOV · AVI · Max 100MB</span>
-      </div>
-      <input type="file" id="va-file-input" accept="video/*,.mp4,.webm,.mov,.avi,.ogg"
-        style="display:none" onchange="VideoAnalyzer.handleFile(this)"/>
-      <div id="va-file-badge">
-        <span class="va-fname" id="va-fname">—</span>
-        <span class="va-fsize" id="va-fsize">—</span>
-        <button class="va-fx" onclick="VideoAnalyzer.clearFile()">✕</button>
-      </div>
-    </div>
-
-    <!-- Question -->
-    <div class="va-section">
-      <div class="va-label">YOUR QUESTION (OPTIONAL)</div>
-      <textarea id="va-question" placeholder="Ask anything about this video&#10;e.g. 'What does this Python code do?'&#10;or 'Explain the algorithm shown'&#10;or leave blank for full analysis"></textarea>
-    </div>
-
-    <!-- Analyze button -->
-    <button id="va-analyze-btn" onclick="VideoAnalyzer.analyze()">
-      <span id="va-btn-icon">🔍</span>
-      <span id="va-btn-label">ANALYZE VIDEO</span>
-    </button>
-
-    <!-- Progress -->
-    <div id="va-progress"><div id="va-progress-fill"></div></div>
-    <div id="va-status" style="font-family:var(--display);font-size:8px;color:var(--text-3);letter-spacing:1.5px;margin-top:4px;min-height:14px"></div>
-
-    <!-- Result -->
-    <div id="va-result"></div>
-    <button id="va-send-chat-btn" onclick="VideoAnalyzer.sendToChat()">💬 SEND ANALYSIS TO CHAT</button>
-
-    <!-- How it works -->
-    <div class="va-section" style="margin-top:20px">
-      <div class="va-label">HOW IT WORKS</div>
-      <ul class="va-how-list">
-        <li>Upload any programming tutorial or coding video</li>
-        <li>AI extracts key frames and identifies the content</li>
-        <li>Detects language: Python, JS, React, SQL, etc.</li>
-        <li>Explains code, patterns, and concepts shown</li>
-        <li>Ask specific questions about the video content</li>
-        <li>Non-programming videos are politely declined</li>
-      </ul>
-      <div style="margin-top:10px;padding:8px 10px;background:rgba(0,255,224,0.03);border:1px solid rgba(0,255,224,0.1);border-radius:4px;font-family:var(--mono);font-size:10px;color:rgba(0,255,224,0.5);line-height:1.6">
-        ✅ ffmpeg is auto-detected from your system.<br>
-        Your ffmpeg at <code style="color:var(--plasma)">Downloads\ffmpeg-8.0.1-essentials_build\bin</code> will be used automatically.
-      </div>
-    </div>
-
-  </div>
-</div>
-
-<script>
-const VideoAnalyzer = (() => {
-  let _file = null;
-  let _lastAnalysis = '';
-  let _progressTimer = null;
-
-  function open() {
-    document.getElementById('videoAnalyzerPanel').classList.add('show');
-  }
-  function close() {
-    document.getElementById('videoAnalyzerPanel').classList.remove('show');
-  }
-
-  function handleDrop(e) {
-    e.preventDefault();
-    document.getElementById('va-dropzone').classList.remove('over');
-    const f = e.dataTransfer?.files[0];
-    if (f) loadFile(f);
-  }
-  function handleFile(input) {
-    const f = input.files[0];
-    if (f) loadFile(f);
-    input.value = '';
-  }
-  function loadFile(file) {
-    // Validate type
-    if (!file.type.startsWith('video/') && !['mp4','webm','mov','avi','ogg'].some(ext => file.name.toLowerCase().endsWith('.'+ext))) {
-      setStatus('⚠ Not a video file. Upload MP4, WebM, MOV, or AVI.'); return;
-    }
-    if (file.size > 100 * 1024 * 1024) {
-      setStatus('⚠ File too large. Max 100MB.'); return;
-    }
-    _file = file;
-    document.getElementById('va-fname').textContent = file.name;
-    document.getElementById('va-fsize').textContent = (file.size / (1024*1024)).toFixed(1) + 'MB';
-    document.getElementById('va-file-badge').classList.add('show');
-    document.getElementById('videoAnalyzerBtn').classList.add('loaded');
-    setStatus('✅ Video loaded — click ANALYZE');
-    // Clear previous result
-    document.getElementById('va-result').textContent = '';
-    document.getElementById('va-result').classList.remove('show');
-    document.getElementById('va-send-chat-btn').classList.remove('show');
-  }
-  function clearFile() {
-    _file = null;
-    document.getElementById('va-file-badge').classList.remove('show');
-    document.getElementById('va-fname').textContent = '—';
-    document.getElementById('va-fsize').textContent = '—';
-    document.getElementById('videoAnalyzerBtn').classList.remove('loaded');
-    setStatus('');
-    document.getElementById('va-result').textContent = '';
-    document.getElementById('va-result').classList.remove('show');
-    document.getElementById('va-send-chat-btn').classList.remove('show');
-  }
-
-  async function analyze() {
-    if (!_file) { setStatus('⚠ Upload a video first'); return; }
-
-    const btn = document.getElementById('va-analyze-btn');
-    const question = document.getElementById('va-question').value.trim();
-    btn.disabled = true;
-    document.getElementById('va-btn-icon').textContent = '⏳';
-    document.getElementById('va-btn-label').textContent = 'ANALYZING…';
-    document.getElementById('va-result').textContent = '';
-    document.getElementById('va-result').classList.remove('show');
-    document.getElementById('va-send-chat-btn').classList.remove('show');
-
-    // Animated progress bar
-    const progDiv = document.getElementById('va-progress');
-    const progFill = document.getElementById('va-progress-fill');
-    progDiv.classList.add('show');
-    progFill.style.width = '0%';
-    let prog = 0;
-    _progressTimer = setInterval(() => {
-      prog = Math.min(prog + 2, 88);
-      progFill.style.width = prog + '%';
-    }, 400);
-
-    setStatus('📤 Uploading video…');
-
-    const fd = new FormData();
-    fd.append('video', _file, _file.name);
-    if (question) fd.append('question', question);
-    if (typeof currentChatId !== 'undefined' && currentChatId) {
-      fd.append('conversation_id', currentChatId);
-    }
-
-    try {
-      const response = await fetch('/analyze_video', { method: 'POST', body: fd });
-
-      if (response.status === 404) {
-        throw new Error('Route /analyze_video missing — replace app.py with updated version and restart python app.py');
-      }
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.error || 'Server error ' + response.status);
-      }
-
-      setStatus('🧠 AI analyzing frames…');
-      const resultEl = document.getElementById('va-result');
-      resultEl.innerHTML = '';
-      resultEl.classList.add('show');
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let full = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        full += chunk;
-        // Render markdown as it streams
-        resultEl.innerHTML = typeof marked !== 'undefined' ? marked.parse(full) : full;
-        resultEl.scrollTop = resultEl.scrollHeight;
-        // Enhance code blocks as they appear
-        resultEl.querySelectorAll('pre code:not([data-highlighted])').forEach(block => {
-          try { hljs.highlightElement(block); block.setAttribute('data-highlighted','1'); } catch(e){}
-        });
-      }
-
-      _lastAnalysis = full;
-      clearInterval(_progressTimer);
-      progFill.style.width = '100%';
-      setTimeout(() => { progDiv.classList.remove('show'); progFill.style.width='0%'; }, 1000);
-
-      if (full.trim()) {
-        document.getElementById('va-send-chat-btn').classList.add('show');
-        setStatus('✅ Analysis complete');
-      } else {
-        setStatus('⚠ No response received');
-      }
-
-    } catch(e) {
-      clearInterval(_progressTimer);
-      progDiv.classList.remove('show');
-      setStatus('⚠ Error: ' + e.message);
-      const isRoute = e.message.includes('404') || e.message.includes('missing');
-      let helpTxt = isRoute
-        ? '<br><br><b style="color:#a855f7">Fix:</b> Use the updated <code>app.py</code> (has <code>/analyze_video</code> route) and run <code>python app.py</code>'
-        : '<br><br>Check <code>python app.py</code> is running and <code>OPENROUTER_API_KEY</code> is set in <code>.env</code>';
-      document.getElementById('va-result').innerHTML =
-        '<span style="color:var(--fire)">⚠ ' + e.message + '</span>' + helpTxt;
-      document.getElementById('va-result').classList.add('show');
-    }
-
-    btn.disabled = false;
-    document.getElementById('va-btn-icon').textContent = '🔍';
-    document.getElementById('va-btn-label').textContent = 'ANALYZE VIDEO';
-  }
-
-  function sendToChat() {
-    if (!_lastAnalysis || typeof currentChatId === 'undefined' || !currentChatId) {
-      if (typeof currentChatId === 'undefined' || !currentChatId) {
-        alert('Initialize a chat session first, then analyze the video again.');
-      }
-      return;
-    }
-    // Add the analysis as a bot message in the current chat
-    const chatBox = document.getElementById('chatBox');
-    if (typeof makeMsgRow === 'function' && chatBox) {
-      const emp = document.getElementById('emptyState');
-      if (emp) emp.remove();
-      const row = makeMsgRow('bot', '');
-      const bc = row.querySelector('.bubble-content');
-      bc.innerHTML = '<strong style="color:var(--plasma);font-family:var(--display);font-size:9px;letter-spacing:2px">📹 VIDEO ANALYSIS</strong><br><br>'
-        + (typeof marked !== 'undefined' ? marked.parse(_lastAnalysis) : _lastAnalysis);
-      chatBox.appendChild(row);
-      if (typeof enhanceCodeBlocks === 'function') enhanceCodeBlocks(row.querySelector('.bubble-forge'));
-      chatBox.scrollTop = chatBox.scrollHeight;
-    }
-    close();
-  }
-
-  function setStatus(msg) {
-    const el = document.getElementById('va-status');
-    if (el) el.textContent = msg;
-  }
-
-  return { open, close, handleDrop, handleFile, clearFile, analyze, sendToChat };
-})();
-window.VideoAnalyzer = VideoAnalyzer;
-</script>
 
 <!-- ═══════════════════════════════════════════════════════════════
      FEATURE MODALS — CalibQuiz · DeadCode · Changelog

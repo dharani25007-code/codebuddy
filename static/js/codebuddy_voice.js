@@ -256,43 +256,43 @@
 
   // CODE_SYMBOLS_WITH_DESC: [symbol, description] for the SYMBOLS tab UI
   const CODE_SYMBOLS_WITH_DESC = {
-    'arrow function':        [' => ',  'Arrow function — shorthand for function()'],
-    'arrow':                 [' => ',  'Same as arrow function'],
-    'equals equals':         [' === ', 'Strict equality — checks value AND type'],
-    'not equals':            [' !== ', 'Strict inequality — true if different value or type'],
-    'greater than or equal': [' >= ',  'Comparison — true if left is bigger or same'],
-    'less than or equal':    [' <= ',  'Comparison — true if left is smaller or same'],
-    'double pipe':           [' || ',  'Logical OR — true if either side is true'],
-    'double ampersand':      [' && ',  'Logical AND — true only if both sides are true'],
-    'spread operator':       ['...',   'Spread — expands array/object into individual items'],
-    'optional chain':        ['?.',    'Optional chain — safely access property, null if missing'],
-    'nullish coalescing':    [' ?? ',  'Nullish — use right side only if left is null/undefined'],
-    'plus equals':           [' += ',  'Add and assign — x += 3 means x = x + 3'],
-    'minus equals':          [' -= ',  'Subtract and assign — x -= 3 means x = x - 3'],
-    'times equals':          [' *= ',  'Multiply and assign — x *= 2 means x = x * 2'],
-    'divide equals':         [' /= ',  'Divide and assign — x /= 2 means x = x / 2'],
-    'open bracket':          ['[',     'Start of array or index access'],
-    'close bracket':         [']',     'End of array or index access'],
-    'open brace':            ['{',     'Start of object, block, or function body'],
-    'close brace':           ['}',     'End of object, block, or function body'],
-    'open paren':            ['(',     'Start of function call or expression group'],
-    'close paren':           [')',     'End of function call or expression group'],
-    'semicolon':             [';',     'Statement terminator — ends a line of code'],
-    'colon':                 [':',     'Key-value separator in objects'],
-    'dot':                   ['.',     'Property accessor — obj.property'],
-    'comma':                 [',',     'Separator — between items in list, function args'],
-    'hash':                  ['#',     'Private class field prefix, or CSS ID selector'],
-    'at sign':               ['@',     'Decorator syntax — @decorator before class/method'],
-    'dollar sign':           ['$',     'Variable prefix in template literals: ${var}'],
-    'backtick':              ['`',     'Template literal — allows ${expressions} inside'],
-    'double quote':          ['"',     'String delimiter'],
-    'single quote':          ["'",     'String delimiter'],
-    'console log':           ['console.log()', 'Print to browser DevTools console'],
-    'console error':         ['console.error()', 'Print error (red) to console'],
-    'return statement':      ['return ', 'Return a value from a function'],
-    'const variable':        ['const ', 'Declare constant — cannot be reassigned'],
-    'let variable':          ['let ',   'Declare block-scoped variable — can be reassigned'],
-    'async function':        ['async function ', 'Declare async function — can use await inside'],
+    'arrow function': [' => ', 'Arrow function — shorthand for function()'],
+    'arrow': [' => ', 'Same as arrow function'],
+    'equals equals': [' === ', 'Strict equality — checks value AND type'],
+    'not equals': [' !== ', 'Strict inequality — true if different value or type'],
+    'greater than or equal': [' >= ', 'Comparison — true if left is bigger or same'],
+    'less than or equal': [' <= ', 'Comparison — true if left is smaller or same'],
+    'double pipe': [' || ', 'Logical OR — true if either side is true'],
+    'double ampersand': [' && ', 'Logical AND — true only if both sides are true'],
+    'spread operator': ['...', 'Spread — expands array/object into individual items'],
+    'optional chain': ['?.', 'Optional chain — safely access property, null if missing'],
+    'nullish coalescing': [' ?? ', 'Nullish — use right side only if left is null/undefined'],
+    'plus equals': [' += ', 'Add and assign — x += 3 means x = x + 3'],
+    'minus equals': [' -= ', 'Subtract and assign — x -= 3 means x = x - 3'],
+    'times equals': [' *= ', 'Multiply and assign — x *= 2 means x = x * 2'],
+    'divide equals': [' /= ', 'Divide and assign — x /= 2 means x = x / 2'],
+    'open bracket': ['[', 'Start of array or index access'],
+    'close bracket': [']', 'End of array or index access'],
+    'open brace': ['{', 'Start of object, block, or function body'],
+    'close brace': ['}', 'End of object, block, or function body'],
+    'open paren': ['(', 'Start of function call or expression group'],
+    'close paren': [')', 'End of function call or expression group'],
+    'semicolon': [';', 'Statement terminator — ends a line of code'],
+    'colon': [':', 'Key-value separator in objects'],
+    'dot': ['.', 'Property accessor — obj.property'],
+    'comma': [',', 'Separator — between items in list, function args'],
+    'hash': ['#', 'Private class field prefix, or CSS ID selector'],
+    'at sign': ['@', 'Decorator syntax — @decorator before class/method'],
+    'dollar sign': ['$', 'Variable prefix in template literals: ${var}'],
+    'backtick': ['`', 'Template literal — allows ${expressions} inside'],
+    'double quote': ['"', 'String delimiter'],
+    'single quote': ["'", 'String delimiter'],
+    'console log': ['console.log()', 'Print to browser DevTools console'],
+    'console error': ['console.error()', 'Print error (red) to console'],
+    'return statement': ['return ', 'Return a value from a function'],
+    'const variable': ['const ', 'Declare constant — cannot be reassigned'],
+    'let variable': ['let ', 'Declare block-scoped variable — can be reassigned'],
+    'async function': ['async function ', 'Declare async function — can use await inside'],
   };
 
 
@@ -616,7 +616,7 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
         row.addEventListener('mouseenter', () => row.style.background = 'rgba(0,255,224,0.05)');
         row.addEventListener('mouseleave', () => row.style.background = 'transparent');
         row.addEventListener('click', () => insertSymbolToInput(sym));
-        const displaySym = sym.replace(/\n/g,'↵').replace(/\t/g,'→').trim() || sym;
+        const displaySym = sym.replace(/\n/g, '↵').replace(/\t/g, '→').trim() || sym;
         row.innerHTML = `
           <div style="display:flex;justify-content:space-between;width:100%;align-items:center">
             <span class="cbSymPhrase" style="font-size:10px">"${phrase}"</span>
@@ -657,9 +657,9 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
     const el = document.getElementById('message');
     if (!el) return;
     const start = el.selectionStart ?? el.value.length;
-    const end   = el.selectionEnd   ?? el.value.length;
+    const end = el.selectionEnd ?? el.value.length;
     const before = el.value.slice(0, start);
-    const after  = el.value.slice(end);
+    const after = el.value.slice(end);
     el.value = before + sym + after;
     // Restore cursor right after the inserted symbol
     const newPos = start + sym.length;
@@ -832,7 +832,7 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
     const isTanglish = (effectiveLang === 'ta-en');
     const effectiveRate = isTanglish ? Math.min(STATE.rate, 0.85) : Math.min(Math.max(STATE.rate, 0.5), 2.0);
 
-    if (_pendingController) { try { _pendingController.abort(); } catch(e){} }
+    if (_pendingController) { try { _pendingController.abort(); } catch (e) { } }
     _pendingController = new AbortController();
     fetch((window._hasCoquiVoice || window._hasVoiceClone) ? '/voice_clone/tts' : '/tts', {
       method: 'POST',
@@ -841,58 +841,58 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
       signal: _pendingController.signal,
       redirect: 'manual'  // CRITICAL: prevent 302 login redirect from causing page navigation
     })
-    .then(res => {
-      // If redirected to login (session expired), fail silently - don't navigate away
-      if (res.type === 'opaqueredirect' || res.status === 0) {
-        throw new Error('Session expired - please refresh');
-      }
-      if (!res.ok) return res.json().catch(() => ({})).then(err => { throw new Error(err.error || 'TTS error ' + res.status); });
-      return res.blob();
-    })
-    .then(blob => {
-      // Cancel browser TTS again in case it started while fetch was in flight
-      if (STATE.synth) STATE.synth.cancel();
-      const url = URL.createObjectURL(blob);
-      if (_currentAudio) { try { _currentAudio.pause(); _currentAudio.src = ''; } catch(e){} _currentAudio = null; }
-      _currentAudio = new Audio(url);
-      _currentAudio.volume = STATE.volume;
-      _currentAudio.playbackRate = effectiveRate;
-      _currentAudio.onended = () => {
+      .then(res => {
+        // If redirected to login (session expired), fail silently - don't navigate away
+        if (res.type === 'opaqueredirect' || res.status === 0) {
+          throw new Error('Session expired - please refresh');
+        }
+        if (!res.ok) return res.json().catch(() => ({})).then(err => { throw new Error(err.error || 'TTS error ' + res.status); });
+        return res.blob();
+      })
+      .then(blob => {
+        // Cancel browser TTS again in case it started while fetch was in flight
+        if (STATE.synth) STATE.synth.cancel();
+        const url = URL.createObjectURL(blob);
+        if (_currentAudio) { try { _currentAudio.pause(); _currentAudio.src = ''; } catch (e) { } _currentAudio = null; }
+        _currentAudio = new Audio(url);
+        _currentAudio.volume = STATE.volume;
+        _currentAudio.playbackRate = effectiveRate;
+        _currentAudio.onended = () => {
+          STATE.isSpeaking = false; setStatus('IDLE', 'idle');
+          animateWaveformSpeak(false); URL.revokeObjectURL(url); _currentAudio = null;
+          if (typeof STATE.onSpeakEnd === 'function') { STATE.onSpeakEnd(); STATE.onSpeakEnd = null; }
+        };
+        _currentAudio.onerror = () => {
+          STATE.isSpeaking = false; setStatus('IDLE', 'idle');
+          animateWaveformSpeak(false); _currentAudio = null;
+          if (typeof STATE.onSpeakEnd === 'function') { STATE.onSpeakEnd(); STATE.onSpeakEnd = null; }
+        };
+        _pendingController = null;
+        const _pp = _currentAudio.play();
+        if (_pp) _pp.then(() => {
+          if (typeof STATE.onSpeakStart === 'function') { STATE.onSpeakStart(); STATE.onSpeakStart = null; }
+        }).catch(err => {
+          STATE.isSpeaking = false; setStatus('IDLE', 'idle');
+          animateWaveformSpeak(false); _currentAudio = null;
+          setTranscript('⚠ Click 🔊 PLAY to hear audio (autoplay blocked)', 'cmd');
+          if (typeof STATE.onSpeakEnd === 'function') { STATE.onSpeakEnd(); STATE.onSpeakEnd = null; }
+        });
+      })
+      .catch(err => {
+        if (err && err.name === 'AbortError') return; // intentionally cancelled, don't fall back
+        console.warn('CBVoice: gTTS failed (' + err.message + ') — no browser TTS fallback (prevents double voice)');
         STATE.isSpeaking = false; setStatus('IDLE', 'idle');
-        animateWaveformSpeak(false); URL.revokeObjectURL(url); _currentAudio = null;
-        if (typeof STATE.onSpeakEnd === 'function') { STATE.onSpeakEnd(); STATE.onSpeakEnd = null; }
-      };
-      _currentAudio.onerror = () => {
-        STATE.isSpeaking = false; setStatus('IDLE', 'idle');
-        animateWaveformSpeak(false); _currentAudio = null;
-        if (typeof STATE.onSpeakEnd === 'function') { STATE.onSpeakEnd(); STATE.onSpeakEnd = null; }
-      };
-      _pendingController = null;
-      const _pp = _currentAudio.play();
-      if (_pp) _pp.then(() => {
-        if (typeof STATE.onSpeakStart === 'function') { STATE.onSpeakStart(); STATE.onSpeakStart = null; }
-      }).catch(err => {
-        STATE.isSpeaking = false; setStatus('IDLE', 'idle');
-        animateWaveformSpeak(false); _currentAudio = null;
-        setTranscript('⚠ Click 🔊 PLAY to hear audio (autoplay blocked)', 'cmd');
-        if (typeof STATE.onSpeakEnd === 'function') { STATE.onSpeakEnd(); STATE.onSpeakEnd = null; }
+        animateWaveformSpeak(false);
+        // Do NOT call speakBrowser() here — it plays female voice over gTTS = double voice bug
       });
-    })
-    .catch(err => {
-      if (err && err.name === 'AbortError') return; // intentionally cancelled, don't fall back
-      console.warn('CBVoice: gTTS failed (' + err.message + ') — no browser TTS fallback (prevents double voice)');
-      STATE.isSpeaking = false; setStatus('IDLE', 'idle');
-      animateWaveformSpeak(false);
-      // Do NOT call speakBrowser() here — it plays female voice over gTTS = double voice bug
-    });
   }
 
-    function speak(text, forceLang) {
+  function speak(text, forceLang) {
     if (!text) return;
 
     // ── Stop EVERYTHING first — prevents any double-voice overlap ────────────
     if (_currentAudio) { _currentAudio.pause(); _currentAudio = null; }
-    if (_pendingController) { try { _pendingController.abort(); } catch(e){} _pendingController = null; }
+    if (_pendingController) { try { _pendingController.abort(); } catch (e) { } _pendingController = null; }
     if (STATE.synth) { STATE.synth.cancel(); }
     STATE.currentUtterance = null;
     STATE.isSpeaking = false;
@@ -953,30 +953,30 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
           body: JSON.stringify({ text: clean, lang: activeLang }),
           redirect: 'manual'
         })
-        .then(r => {
-          if (r.type === 'opaqueredirect' || r.status === 0) throw new Error('Session expired');
-          if (!r.ok) throw new Error('HTTP ' + r.status);
-          return r.json();
-        })
-        .then(data => {
-          if (data.error && retries > 0) {
-            // Rate limited — retry after 1.5s
-            setTimeout(() => translateWithRetry(retries - 1), 1500);
-            return;
-          }
-          const translated = (data.translated || clean).trim();
-          setTranscript('\ud83c\udf10 Translated \u2192 ' + activeLang, 'cmd');
-          _speakViaGTTS(translated, activeLang);
-        })
-        .catch(err => {
-          if (retries > 0) {
-            setTimeout(() => translateWithRetry(retries - 1), 1500);
-          } else {
-            // Translation failed after retries — speak English as last resort
-            setTranscript('\u26a0 Translation unavailable \u2014 speaking in English', 'cmd');
-            _speakViaGTTS(clean, 'en-US');
-          }
-        });
+          .then(r => {
+            if (r.type === 'opaqueredirect' || r.status === 0) throw new Error('Session expired');
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+          })
+          .then(data => {
+            if (data.error && retries > 0) {
+              // Rate limited — retry after 1.5s
+              setTimeout(() => translateWithRetry(retries - 1), 1500);
+              return;
+            }
+            const translated = (data.translated || clean).trim();
+            setTranscript('\ud83c\udf10 Translated \u2192 ' + activeLang, 'cmd');
+            _speakViaGTTS(translated, activeLang);
+          })
+          .catch(err => {
+            if (retries > 0) {
+              setTimeout(() => translateWithRetry(retries - 1), 1500);
+            } else {
+              // Translation failed after retries — speak English as last resort
+              setTranscript('\u26a0 Translation unavailable \u2014 speaking in English', 'cmd');
+              _speakViaGTTS(clean, 'en-US');
+            }
+          });
       };
 
       translateWithRetry(2); // try up to 3 times total
@@ -986,7 +986,7 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
 
     _speakViaGTTS(clean, activeLang);
   }
-    function speakBrowser(clean, lang) {
+  function speakBrowser(clean, lang) {
     if (!STATE.synth) return;
 
     // Stop gTTS audio if somehow still playing
@@ -996,21 +996,21 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
     // lang is already the correct BCP-47 code (ta-IN, hi-IN etc.)
     // passed by speak() via LANG_TO_BROWSER — never 'ta-en' here
     const utter = new SpeechSynthesisUtterance(clean);
-    utter.rate   = STATE.rate;
-    utter.pitch  = STATE.pitch;
+    utter.rate = STATE.rate;
+    utter.pitch = STATE.pitch;
     utter.volume = STATE.volume;
 
     // Try to find a matching FEMALE voice — always prefer female
     const voice = getBestVoice(lang, true); // true = prefer female
     if (voice) {
       utter.voice = voice;
-      utter.lang  = voice.lang;
+      utter.lang = voice.lang;
     } else {
       utter.lang = lang;
     }
 
     utter.onstart = () => { STATE.isSpeaking = true; setStatus('SPEAKING', 'speaking'); animateWaveformSpeak(true); };
-    utter.onend   = () => { STATE.isSpeaking = false; setStatus('IDLE', 'idle'); animateWaveformSpeak(false); };
+    utter.onend = () => { STATE.isSpeaking = false; setStatus('IDLE', 'idle'); animateWaveformSpeak(false); };
     utter.onerror = (e) => {
       STATE.isSpeaking = false;
       setStatus('IDLE', 'idle');
@@ -1049,28 +1049,28 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
     // Detect female voices — used to prefer them when preferFemale=true
     const isFemale = v => {
       const n = v.name.toLowerCase();
-      const femaleWords = ['female','woman','girl','fiona','samantha','karen','victoria','moira',
-        'veena','tessa','alice','amelie','anna','aurelie','claire','joana','lekha','heera',
-        'kalpana','meijia','sin-ji','tingting','yuna','milena','luciana','paulina','monica',
-        'chitra','zira','susan','hazel','linda','eva','julia','natasha','kate','aria','jenny',
-        'aditi','raveena','priya','asha','pallavi'];
-      const maleWords = ['male','man','david','daniel','alex','jorge','thomas','markus',
-        'stefan','otoya','maged','yuri','ravi','hemant','reed','fred','bruce','tarik','felix'];
+      const femaleWords = ['female', 'woman', 'girl', 'fiona', 'samantha', 'karen', 'victoria', 'moira',
+        'veena', 'tessa', 'alice', 'amelie', 'anna', 'aurelie', 'claire', 'joana', 'lekha', 'heera',
+        'kalpana', 'meijia', 'sin-ji', 'tingting', 'yuna', 'milena', 'luciana', 'paulina', 'monica',
+        'chitra', 'zira', 'susan', 'hazel', 'linda', 'eva', 'julia', 'natasha', 'kate', 'aria', 'jenny',
+        'aditi', 'raveena', 'priya', 'asha', 'pallavi'];
+      const maleWords = ['male', 'man', 'david', 'daniel', 'alex', 'jorge', 'thomas', 'markus',
+        'stefan', 'otoya', 'maged', 'yuri', 'ravi', 'hemant', 'reed', 'fred', 'bruce', 'tarik', 'felix'];
       if (femaleWords.some(w => n.includes(w))) return true;
       if (maleWords.some(w => n.includes(w))) return false;
       return null; // unknown gender — acceptable
     };
 
     const VOICE_NAMES = {
-      'ta': ['lekha','tamil'], 'hi': ['kalpana','heera','hindi'],
-      'te': ['chitra','telugu'], 'kn': ['kannada'], 'ml': ['malayalam'],
+      'ta': ['lekha', 'tamil'], 'hi': ['kalpana', 'heera', 'hindi'],
+      'te': ['chitra', 'telugu'], 'kn': ['kannada'], 'ml': ['malayalam'],
       'bn': ['bengali'], 'mr': ['marathi'], 'pa': ['punjabi'], 'gu': ['gujarati'],
-      'fr': ['amelie','aurelie','french'], 'de': ['anna','german'],
-      'es': ['monica','paulina','spanish'], 'ja': ['kyoko','japanese'],
-      'zh': ['tingting','meijia','chinese'], 'ko': ['yuna','korean'],
-      'ar': ['arabic'], 'ru': ['milena','russian'],
-      'pt': ['joana','luciana','portuguese'],
-      'en': ['samantha','karen','zira','moira','tessa','aria','jenny','victoria'],
+      'fr': ['amelie', 'aurelie', 'french'], 'de': ['anna', 'german'],
+      'es': ['monica', 'paulina', 'spanish'], 'ja': ['kyoko', 'japanese'],
+      'zh': ['tingting', 'meijia', 'chinese'], 'ko': ['yuna', 'korean'],
+      'ar': ['arabic'], 'ru': ['milena', 'russian'],
+      'pt': ['joana', 'luciana', 'portuguese'],
+      'en': ['samantha', 'karen', 'zira', 'moira', 'tessa', 'aria', 'jenny', 'victoria'],
     };
     const keywords = VOICE_NAMES[base] || [];
 
@@ -1279,8 +1279,8 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
       .then(d => {
         const s = d.summary || {};
         const dom = d.dominant_mood || 'neutral';
-        const emojis = {frustrated:'😤', confused:'🤔', confident:'💪', neutral:'😐'};
-        const msg = `${emojis[dom]||'😐'} Dominant mood: ${dom}. Frustrated ${s.frustrated||0} times, confident ${s.confident||0} times, confused ${s.confused||0} times.`;
+        const emojis = { frustrated: '😤', confused: '🤔', confident: '💪', neutral: '😐' };
+        const msg = `${emojis[dom] || '😐'} Dominant mood: ${dom}. Frustrated ${s.frustrated || 0} times, confident ${s.confident || 0} times, confused ${s.confused || 0} times.`;
         speak(msg);
         setTranscript('Mood: ' + dom.toUpperCase(), 'final');
       })
@@ -1329,7 +1329,7 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
       HUB.open('changelog');
       setTimeout(() => { if (typeof HUB.clGenerate === 'function') HUB.clGenerate(); }, 400);
     } else {
-      fetch('/changelog/generate', { method: 'POST', headers: {'Content-Type':'application/json'}, body: '{}' })
+      fetch('/changelog/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
         .then(r => r.json())
         .then(d => { if (d.entry) speak('Changelog generated. Open the Features Hub to read it.'); else speak(d.message || 'No sessions found for today.'); })
         .catch(() => speak('Changelog generation failed.'));
@@ -1443,8 +1443,8 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
     // If voice-clone STT is still running when PLAY is clicked, it blocks
     // audio playback for up to 20 seconds until the STT session times out.
     stopSTT() {
-      if (STATE.recognition) { try { STATE.recognition.stop(); } catch(e){} }
-      if (window._vcSttRec) { try { window._vcSttRec.stop(); } catch(e){} window._vcSttRec = null; }
+      if (STATE.recognition) { try { STATE.recognition.stop(); } catch (e) { } }
+      if (window._vcSttRec) { try { window._vcSttRec.stop(); } catch (e) { } window._vcSttRec = null; }
     },
     // Register callbacks for when audio actually starts/ends.
     // More reliable than polling getCurrentAudio() in a setInterval.
@@ -1453,9 +1453,9 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
       STATE.onSpeakEnd = onEnd || null;
     },
     stop() {
-      if (_pendingController) { try { _pendingController.abort(); } catch(e){} _pendingController = null; }
-      if (_currentAudio) { try { _currentAudio.pause(); _currentAudio.src = ''; } catch(e){} _currentAudio = null; }
-      try { STATE.synth?.cancel(); } catch(e) {}
+      if (_pendingController) { try { _pendingController.abort(); } catch (e) { } _pendingController = null; }
+      if (_currentAudio) { try { _currentAudio.pause(); _currentAudio.src = ''; } catch (e) { } _currentAudio = null; }
+      try { STATE.synth?.cancel(); } catch (e) { }
       STATE.isSpeaking = false;
       STATE.isPaused = false;
       animateWaveformSpeak(false);
@@ -1470,7 +1470,7 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
     },
     pause() {
       // Abort any in-flight TTS fetch (user paused before audio loaded)
-      if (_pendingController) { try { _pendingController.abort(); } catch(e){} _pendingController = null; }
+      if (_pendingController) { try { _pendingController.abort(); } catch (e) { } _pendingController = null; }
       // Pause the gTTS <audio> element (primary audio source)
       if (_currentAudio && !_currentAudio.paused) _currentAudio.pause();
       // Also pause Web Speech API fallback
@@ -1608,7 +1608,7 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
     // CHANGE 9: Share streak as SVG card
     shareStreak() {
       const username = document.querySelector('[data-username]')?.dataset?.username
-                    || document.title.replace('CodeBuddy - ', '') || 'coder';
+        || document.title.replace('CodeBuddy - ', '') || 'coder';
       const url = `/streak_card/${username}.svg`;
       window.open(url, '_blank');
       speak(`Opening your streak card for ${username}. Share it on social media!`);
@@ -1666,7 +1666,7 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
       .then(data => {
         STATE._leaderboard = data.leaderboard || [];
       })
-      .catch(() => {});
+      .catch(() => { });
 
     setTimeout(() => {
       setTranscript('⚡ CodeBuddy Neural Voice Engine v4.0 ready — Click 🎤 or say "Hey Buddy"', 'cmd');
@@ -1682,17 +1682,17 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
       const sel = document.getElementById('cbLangSel');
       if (sel && data.detected_lang) {
         const opt = [...sel.options].find(o => o.value === data.detected_lang);
-        if (opt) { sel.value = data.detected_lang; if (typeof onLangChange==='function') onLangChange(sel); }
+        if (opt) { sel.value = data.detected_lang; if (typeof onLangChange === 'function') onLangChange(sel); }
       }
       const eng = data.tts_engine === 'xtts_v2' ? '🎤 XTTS-v2' : '🔊 gTTS';
-      setTranscript(eng + ' — ' + (data.detected_lang_name||'English') + ' voice ready. Press PLAY.', 'cmd');
+      setTranscript(eng + ' — ' + (data.detected_lang_name || 'English') + ' voice ready. Press PLAY.', 'cmd');
     }
     fetch('/voice_clone/status', { redirect: 'manual' })
       .then(r => (r.type === 'opaqueredirect' || !r.ok) ? Promise.reject() : r.json())
       .then(data => _applyProfile(data))
       .catch(() => fetch('/coqui/status', { redirect: 'manual' })
         .then(r => r.ok ? r.json() : Promise.reject())
-        .then(_applyProfile).catch(()=>{}));
+        .then(_applyProfile).catch(() => { }));
   }
 
   if (document.readyState === 'loading') {
