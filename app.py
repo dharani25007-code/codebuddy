@@ -47,6 +47,11 @@ except ImportError:
 
 load_dotenv()
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+GROQ_API_KEY       = os.getenv("GROQ_API_KEY")
+
+# ── API base URLs ─────────────────────────────────────────────────────────────
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+GROQ_URL       = "https://api.groq.com/openai/v1/chat/completions"
 
 app = Flask(__name__)
 
@@ -600,40 +605,41 @@ def is_programming_related(text):
     if len(text.split()) < 6 and any(c in text for c in code_chars):
         return True
 
-    # Layer 3: AI classifier — explicitly multilingual prompt
+    # Layer 3: AI classifier — Groq first (fast), OpenRouter fallback
     try:
-        headers = {
-            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-            "Content-Type": "application/json"
-        }
-        payload = {
-            "model": MODELS["classifier"],
-            "max_tokens": 5,
-            "temperature": 0,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a multilingual classifier. The user's message may be in "
-                        "English, Tamil, Hindi, Telugu, Kannada, Malayalam, Bengali, Marathi, "
-                        "Gujarati, or Tanglish (Tamil+English mix). "
-                        "Decide if the message is related to: programming, software development, "
-                        "computer science, coding, algorithms, data structures, web development, "
-                        "databases, DevOps, machine learning, AI, or any technical computing topic.\n"
-                        "IMPORTANT: Questions asked in any Indian language about these topics "
-                        "are still programming-related. Reply ONLY: YES or NO"
-                    )
-                },
-                {"role": "user", "content": text[:300]}
-            ]
-        }
-        resp = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers=headers, json=payload, timeout=(5, 8)
-        )
-        if resp.status_code == 200:
-            answer = resp.json()["choices"][0]["message"]["content"].strip().upper()
-            return answer.startswith("YES")
+        clf_messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are a multilingual classifier. The user's message may be in "
+                    "English, Tamil, Hindi, Telugu, Kannada, Malayalam, Bengali, Marathi, "
+                    "Gujarati, or Tanglish (Tamil+English mix). "
+                    "Decide if the message is related to: programming, software development, "
+                    "computer science, coding, algorithms, data structures, web development, "
+                    "databases, DevOps, machine learning, AI, or any technical computing topic.\n"
+                    "IMPORTANT: Questions asked in any Indian language about these topics "
+                    "are still programming-related. Reply ONLY: YES or NO"
+                )
+            },
+            {"role": "user", "content": text[:300]}
+        ]
+        # Try Groq first — it's much faster for simple classification
+        answer = _groq_call(clf_messages, model=GROQ_MODELS["fast"],
+                            max_tokens=5, temperature=0)
+        if answer is None:
+            # Groq unavailable/rate-limited — fall back to OpenRouter
+            or_headers = _or_headers()
+            resp = requests.post(
+                OPENROUTER_URL,
+                headers=or_headers,
+                json={"model": MODELS["classifier"], "max_tokens": 5,
+                      "temperature": 0, "messages": clf_messages},
+                timeout=(5, 8)
+            )
+            if resp.status_code == 200:
+                answer = resp.json()["choices"][0]["message"]["content"].strip().upper()
+        if answer:
+            return answer.strip().upper().startswith("YES")
     except Exception:
         pass
     return True
@@ -651,73 +657,149 @@ def get_conversation_history(conversation_id, limit=20):
     return [{"role": m["role"], "content": m["content"]} for m in reversed(messages)]
 
 def generate_chat_title(user_message):
+    """Generate a short chat title — tries Groq first (fastest), then OpenRouter."""
+    title_messages = [
+        {"role": "system", "content": "Generate a concise 3-5 word title for this programming question. Only output the title, nothing else. No quotes."},
+        {"role": "user", "content": user_message[:200]}
+    ]
     try:
-        headers = {
-            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-            "Content-Type": "application/json"
-        }
-        payload = {
-            "model": MODELS["title"],
-            "max_tokens": 20,
-            "messages": [
-                {"role": "system", "content": "Generate a concise 3-5 word title for this programming question. Only output the title, nothing else. No quotes."},
-                {"role": "user", "content": user_message[:200]}
-            ]
-        }
+        # Groq first — nearly instant for short title generation
+        result = _groq_call(title_messages, model=GROQ_MODELS["fast"],
+                            max_tokens=20, temperature=0.3)
+        if result:
+            return result[:60]
+        # OpenRouter fallback
+        or_headers = _or_headers()
         resp = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers=headers, json=payload, timeout=5
+            OPENROUTER_URL,
+            headers=or_headers,
+            json={"model": MODELS["title"], "max_tokens": 20, "messages": title_messages},
+            timeout=5
         )
         title = resp.json()["choices"][0]["message"]["content"].strip()
         return title[:60] if title else "New Chat"
     except Exception:
         return user_message[:40] + "..." if len(user_message) > 40 else user_message
 
-# ================= CHANGE 1: MODEL SELECTION =================
+# ================= CHANGE 1: MODEL SELECTION (OpenRouter + Groq dual provider) =================
 
-# Free models on OpenRouter, ranked by coding quality
+# ── OpenRouter free models (best quality for each task) ───────────────────────
 MODELS = {
-    # ── PRIMARY MODELS (all :free — zero cost on OpenRouter) ─────────────────
-    # Best coding model — DeepSeek V3 free, very reliable
-    "code":       "deepseek/deepseek-chat-v3-0324:free",
-    # Best fast/multilingual — Llama 4 Scout, confirmed free March 2026
-    "fast":       "meta-llama/llama-4-scout:free",
-    # Lightweight classifier — Gemma 3 4B, fast and free
-    "classifier": "google/gemma-3-4b-it:free",
-    # Title generation — tiny, near-instant, free
-    "title":      "google/gemma-3-4b-it:free",
+    "code":       "deepseek/deepseek-chat-v3-0324:free",   # best free coding model
+    "fast":       "meta-llama/llama-3.3-70b-instruct:free", # fast general tasks
+    "classifier": "google/gemma-3-4b-it:free",              # lightweight yes/no
+    "title":      "google/gemma-3-4b-it:free",              # short title generation
+    "indic":      "meta-llama/llama-3.3-70b-instruct:free", # best free multilingual
 }
 
-# ── ORDERED FALLBACK CHAIN (all :free, different providers) ─────────────────
-# When ANY model returns 429/404/503, these are tried in order.
-# Expanded and reordered for maximum reliability in March 2026.
+# ── Groq models (ultra-fast, free tier, no credit card needed) ────────────────
+GROQ_MODELS = {
+    "fast":       "llama-3.1-8b-instant",   # fastest — classifier, title, mood, quick checks
+    "smart":      "llama-3.3-70b-versatile", # smarter — main chat fallback, code review
+    "code":       "llama-3.3-70b-versatile", # code tasks on Groq
+}
+
+# ── OpenRouter fallback chain (used when primary model rate-limits) ───────────
 FREE_FALLBACKS = [
-    "deepseek/deepseek-chat-v3-0324:free",      # DeepSeek V3 — very stable
-    "meta-llama/llama-4-scout:free",             # Llama 4 Scout — fast
-    "meta-llama/llama-4-maverick:free",          # Llama 4 Maverick — capable
-    "meta-llama/llama-3.3-70b-instruct:free",    # Llama 3.3 70B — reliable
-    "deepseek/deepseek-r1:free",                 # DeepSeek R1 — reasoning
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "meta-llama/llama-4-scout:free",
+    "meta-llama/llama-4-maverick:free",
+    "deepseek/deepseek-chat-v3-0324:free",
     "deepseek/deepseek-r1-distill-llama-70b:free",
     "deepseek/deepseek-r1-distill-qwen-32b:free",
     "google/gemma-3-27b-it:free",
     "google/gemma-3-12b-it:free",
     "mistralai/mistral-small-3.1-24b-instruct:free",
     "qwen/qwen3-coder:free",
-    "nvidia/llama-3.1-nemotron-70b-instruct:free",
     "microsoft/phi-4:free",
-    "openrouter/auto",
+    "nvidia/llama-3.1-nemotron-70b-instruct:free",
+    "openrouter/free",
 ]
 
 import time as _time
 
-def _ai_call(messages, model=None, max_tokens=1000, temperature=0.3, timeout=30):
-    """Central AI helper: tries model then FREE_FALLBACKS with 0.8s delay between attempts."""
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://codebuddy.ai",
-        "X-Title": "CodeBuddy AI",
-    }
+# ── Groq helper — fast non-streaming call ─────────────────────────────────────
+def _groq_call(messages, model=None, max_tokens=500, temperature=0.3, timeout=15):
+    """Call Groq API directly. Ultra-fast (500-1000 TPS). Used for classifier,
+    title generation, mood detection, complexity, focus zone tip, dead code, naming.
+    Falls back to None (no exception) so callers can try OpenRouter next.
+    """
+    if not GROQ_API_KEY:
+        return None
+    m = model or GROQ_MODELS["fast"]
+    try:
+        resp = requests.post(
+            GROQ_URL,
+            headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
+            json={"model": m, "max_tokens": max_tokens, "temperature": temperature, "messages": messages},
+            timeout=timeout,
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get("choices"):
+                return data["choices"][0]["message"]["content"].strip()
+        app.logger.warning(f"_groq_call: HTTP {resp.status_code} from {m}")
+        return None
+    except requests.RequestException as exc:
+        app.logger.warning(f"_groq_call exception: {exc}")
+        return None
+
+# ── Groq streaming helper — used as fallback in /chat streaming ───────────────
+def _groq_stream(messages, model=None, max_tokens=1200, temperature=0.3, timeout=60):
+    """Generator: streams tokens from Groq. Yields text chunks.
+    Used as fallback when OpenRouter models are rate-limited.
+    """
+    if not GROQ_API_KEY:
+        return
+    m = model or GROQ_MODELS["smart"]
+    try:
+        resp = requests.post(
+            GROQ_URL,
+            headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
+            json={"model": m, "max_tokens": max_tokens, "temperature": temperature,
+                  "messages": messages, "stream": True},
+            stream=True,
+            timeout=(10, timeout),
+        )
+        if resp.status_code != 200:
+            app.logger.warning(f"_groq_stream: HTTP {resp.status_code}")
+            return
+        for line in resp.iter_lines():
+            if line:
+                decoded = line.decode("utf-8")
+                if decoded.startswith("data: "):
+                    chunk = decoded[6:]
+                    if chunk == "[DONE]":
+                        break
+                    try:
+                        token = json.loads(chunk)["choices"][0]["delta"].get("content", "")
+                        if token:
+                            yield token
+                    except (json.JSONDecodeError, KeyError, IndexError):
+                        pass
+    except requests.RequestException as exc:
+        app.logger.warning(f"_groq_stream exception: {exc}")
+
+# ── Central AI call: tries Groq first (fast), then OpenRouter + fallbacks ─────
+def _ai_call(messages, model=None, max_tokens=1000, temperature=0.3, timeout=30,
+             prefer_groq=False, groq_model=None):
+    """Smart dual-provider AI call.
+
+    Strategy:
+    - prefer_groq=True  → try Groq first (fast tasks: classifier, title, mood etc.)
+    - prefer_groq=False → try OpenRouter first (main chat, code review, deep tasks)
+    - Always falls back to the other provider if primary fails/rate-limits.
+    """
+    # ── Groq-first path (fast utility calls) ──────────────────────────────────
+    if prefer_groq and GROQ_API_KEY:
+        result = _groq_call(messages, model=groq_model or GROQ_MODELS["fast"],
+                            max_tokens=max_tokens, temperature=temperature, timeout=15)
+        if result:
+            return result
+        app.logger.info("_ai_call: Groq failed, falling back to OpenRouter")
+
+    # ── OpenRouter path ────────────────────────────────────────────────────────
+    or_headers = _or_headers()
     chain = []
     if model and model not in chain:
         chain.append(model)
@@ -728,11 +810,11 @@ def _ai_call(messages, model=None, max_tokens=1000, temperature=0.3, timeout=30)
     last_err = "All models unavailable"
     for i, m in enumerate(chain):
         if i > 0:
-            _time.sleep(1.5)  # increased from 0.8s — gives rate-limited models time to recover
+            _time.sleep(1.0)
         try:
             resp = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers=headers,
+                OPENROUTER_URL,
+                headers=or_headers,
                 json={"model": m, "max_tokens": max_tokens,
                       "temperature": temperature, "messages": messages},
                 timeout=timeout,
@@ -742,15 +824,32 @@ def _ai_call(messages, model=None, max_tokens=1000, temperature=0.3, timeout=30)
                 if "choices" in data and data["choices"]:
                     return data["choices"][0]["message"]["content"].strip()
             last_err = f"HTTP {resp.status_code} from {m}"
-            app.logger.warning(f"_ai_call: {last_err}")
-            if resp.status_code not in (429, 503, 502, 500, 404):
+            app.logger.warning(f"_ai_call OpenRouter: {last_err}")
+            if resp.status_code not in (400, 402, 404, 429, 500, 502, 503):
                 break
         except requests.RequestException as exc:
             last_err = str(exc)
-            app.logger.warning(f"_ai_call: {m} exception: {exc}")
+            app.logger.warning(f"_ai_call OpenRouter {m} exception: {exc}")
             continue
 
+    # ── Final fallback: Groq smart model (if not already tried) ───────────────
+    if not prefer_groq and GROQ_API_KEY:
+        app.logger.info("_ai_call: All OpenRouter fallbacks failed, trying Groq smart model")
+        result = _groq_call(messages, model=GROQ_MODELS["smart"],
+                            max_tokens=max_tokens, temperature=temperature, timeout=20)
+        if result:
+            return result
+
     raise RuntimeError(f"AI unavailable — {last_err}. Please try again in a moment.")
+
+def _or_headers():
+    """Return standard OpenRouter auth headers."""
+    return {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://codebuddy.ai",
+        "X-Title": "CodeBuddy AI",
+    }
 
 def get_model_for_mode(mode, lang_code="en-US"):
     """Pick the best free model based on task type and language.
@@ -1679,25 +1778,24 @@ def analyze_complexity():
     if not code.strip():
         return jsonify({"error": "No code provided"}), 400
 
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "model": MODELS["classifier"],
-        "max_tokens": 200,
-        "messages": [
-            {
-                "role": "system",
-                "content": "Analyze code complexity. Return ONLY a JSON object with keys: time_complexity (Big-O string), space_complexity (Big-O string), explanation (one sentence). No markdown, no extra text."
-            },
-            {"role": "user", "content": f"Analyze:\n{code[:1000]}"}
-        ]
-    }
+    complexity_messages = [
+        {
+            "role": "system",
+            "content": "Analyze code complexity. Return ONLY a JSON object with keys: time_complexity (Big-O string), space_complexity (Big-O string), explanation (one sentence). No markdown, no extra text."
+        },
+        {"role": "user", "content": f"Analyze:\n{code[:1000]}"}
+    ]
     try:
-        resp = requests.post("https://openrouter.ai/api/v1/chat/completions",
-                             headers=headers, json=payload, timeout=10)
-        content = resp.json()["choices"][0]["message"]["content"].strip()
+        # Groq first — fast for short structured output
+        content = _groq_call(complexity_messages, model=GROQ_MODELS["fast"],
+                             max_tokens=200, temperature=0)
+        if content is None:
+            # OpenRouter fallback
+            or_headers = _or_headers()
+            resp = requests.post(OPENROUTER_URL, headers=or_headers,
+                                 json={"model": MODELS["classifier"], "max_tokens": 200,
+                                       "messages": complexity_messages}, timeout=10)
+            content = resp.json()["choices"][0]["message"]["content"].strip()
         content = re.sub(r"```json|```", "", content).strip()
         data = json.loads(content)
         return jsonify(data)
@@ -2067,12 +2165,7 @@ def chat():
     if lang_code in INDIC_SEED:
         api_messages.append({"role":"assistant","content":INDIC_SEED[lang_code]})
 
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://codebuddy.ai",
-        "X-Title": "CodeBuddy AI"
-    }
+    headers = _or_headers()
 
     # Model with fallback chain: if primary gives 404/429, try backup models
     selected_model = get_model_for_mode(mode, lang_code)
@@ -2084,7 +2177,7 @@ def chat():
     payload = {
         "model": selected_model,
         "stream": True,
-        "max_tokens": 2000,
+        "max_tokens": 1200,
         "temperature": (0.1 if lang_code not in ("en-US", "", None) else 0.7),
         "messages": api_messages
     }
@@ -2092,9 +2185,10 @@ def chat():
     def generate():
         full = ""
         stream_buf = ""
+        used_groq = False
         try:
             response = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
+                OPENROUTER_URL,
                 headers=headers,
                 json=payload,
                 stream=True,
@@ -2102,10 +2196,10 @@ def chat():
             )
 
             if response.status_code == 401:
-                yield "⚠ API key invalid. Please check your OpenRouter API key."
+                yield "⚠ OpenRouter API key invalid. Please check your .env file."
                 return
-            if response.status_code in (404, 429, 503):
-                # Try all free fallback models in order across different providers
+            if response.status_code in (400, 402, 404, 429, 503):
+                # Try all free fallback models on OpenRouter first
                 tried = {payload["model"]}
                 for fb_model in FREE_FALLBACKS:
                     if fb_model in tried:
@@ -2114,16 +2208,45 @@ def chat():
                     app.logger.warning(f"Model {payload['model']} returned {response.status_code}, trying {fb_model}")
                     payload["model"] = fb_model
                     response = requests.post(
-                        "https://openrouter.ai/api/v1/chat/completions",
+                        OPENROUTER_URL,
                         headers=headers, json=payload, stream=True, timeout=(10, 90)
                     )
                     if response.status_code == 200:
-                        app.logger.info(f"Fallback succeeded with {fb_model}")
+                        app.logger.info(f"OpenRouter fallback succeeded with {fb_model}")
                         break
+
+                # If ALL OpenRouter models failed → use Groq streaming as final fallback
+                if response.status_code != 200 and GROQ_API_KEY:
+                    app.logger.info("All OpenRouter models rate-limited — switching to Groq streaming")
+                    used_groq = True
+                    groq_model = GROQ_MODELS["smart"]
+                    for token in _groq_stream(api_messages, model=groq_model,
+                                              max_tokens=1200,
+                                              temperature=payload["temperature"]):
+                        token = _filter_response(token)
+                        stream_buf += token
+                        full += token
+                        if any(c in stream_buf for c in '.!?,\n') or len(stream_buf) > 80:
+                            yield _filter_response(stream_buf)
+                            stream_buf = ""
+                    if stream_buf:
+                        yield _filter_response(stream_buf)
+                    # mood nudge after Groq response
+                    if _mood_data.get("nudge"):
+                        yield _mood_data["nudge"]
+                    if full:
+                        full = _filter_response(full)
+                        save_conn = sqlite3.connect("codebuddy.db")
+                        save_conn.execute(
+                            "INSERT INTO messages(conversation_id,role,content,timestamp) VALUES (?,?,?,?)",
+                            (conversation_id, "assistant", full, datetime.now().isoformat()))
+                        save_conn.commit(); save_conn.close()
+                    return
+
                 if response.status_code != 200:
                     code = response.status_code
                     if code == 429:
-                        msg = "⏳ RATE_LIMIT_429"  # special token frontend detects
+                        msg = "⏳ RATE_LIMIT_429"
                     else:
                         msg = f"API Error {code}. Please try again."
                     yield f"⚠ {msg}"
@@ -2192,14 +2315,14 @@ def chat():
                         "ar-SA":"Arabic","ru-RU":"Russian","pt-BR":"Portuguese"}
                     _tl=_tn.get(lang_code,lang_code)
                     try:
-                        _th={"Authorization":f"Bearer {OPENROUTER_API_KEY}","Content-Type":"application/json"}
-                        _tp={"model":MODELS.get("indic",MODELS["fast"]),"max_tokens":3000,"temperature":0.1,
+                        _th=_or_headers()
+                        _tp={"model":MODELS.get("indic",MODELS["fast"]),"max_tokens":1200,"temperature":0.1,
                             "messages":[{"role":"system","content":(
                                 f"Translate into {_tl}. Keep code blocks unchanged. Translate prose only. Output only translation."
                             )},{"role":"user","content":full[:3000]}]}
                         for _m in [MODELS.get("indic",MODELS["fast"]),MODELS["fast"]]+FREE_FALLBACKS[:2]:
                             _tp["model"]=_m
-                            _tr=requests.post("https://openrouter.ai/api/v1/chat/completions",
+                            _tr=requests.post(OPENROUTER_URL,
                                 headers=_th,json=_tp,timeout=(5,30))
                             if _tr.status_code==200:
                                 _t=_tr.json()["choices"][0]["message"]["content"].strip()
@@ -2234,22 +2357,21 @@ def quick_explain():
         "expert": "Give a concise technical analysis: design patterns used, potential issues, and performance implications."
     }
 
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "model": MODELS["fast"],
-        "max_tokens": 600,
-        "messages": [
-            {"role": "system", "content": level_prompts.get(level, level_prompts["intermediate"])},
-            {"role": "user", "content": f"```\n{code[:2000]}\n```"}
-        ]
-    }
-
+    qe_messages = [
+        {"role": "system", "content": level_prompts.get(level, level_prompts["intermediate"])},
+        {"role": "user", "content": f"```\n{code[:2000]}\n```"}
+    ]
     try:
-        resp = requests.post("https://openrouter.ai/api/v1/chat/completions",
-                             headers=headers, json=payload, timeout=20)
+        # Groq first — fast for explanations
+        result = _groq_call(qe_messages, model=GROQ_MODELS["smart"],
+                            max_tokens=600, temperature=0.3)
+        if result:
+            return jsonify({"explanation": result})
+        # OpenRouter fallback
+        or_headers = _or_headers()
+        resp = requests.post(OPENROUTER_URL, headers=or_headers,
+                             json={"model": MODELS["fast"], "max_tokens": 600, "messages": qe_messages},
+                             timeout=20)
         explanation = resp.json()["choices"][0]["message"]["content"]
         return jsonify({"explanation": explanation})
     except Exception as e:
@@ -2267,23 +2389,21 @@ def generate_roadmap():
     if not topic.strip():
         return jsonify({"error": "No topic provided"}), 400
 
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json"
-    }
+    rm_messages = [
+        {"role": "system", "content": SYSTEM_PROMPTS["roadmap"]},
+        {"role": "user", "content": f"Create a complete learning roadmap for: {topic}\nStarting level: {level}"}
+    ]
+    or_headers = _or_headers()
     payload = {
         "model": MODELS["fast"],
-        "max_tokens": 1500,
-        "messages": [
-            {"role": "system", "content": SYSTEM_PROMPTS["roadmap"]},
-            {"role": "user", "content": f"Create a complete learning roadmap for: {topic}\nStarting level: {level}"}
-        ]
+        "max_tokens": 1200,
+        "messages": rm_messages
     }
 
     def stream_roadmap():
         response = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers=headers, json=payload, stream=True, timeout=60
+            OPENROUTER_URL,
+            headers=or_headers, json={**payload, "stream": True}, timeout=60
         )
         for line in response.iter_lines():
             if line:
@@ -2343,10 +2463,7 @@ def translate_response():
         f"Output ONLY the translated text — no preamble, no 'Here is the translation:', nothing extra."
     )
 
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-    }
+    headers = _or_headers()
 
     # Try multiple models — translation is rate-limited frequently
     models_to_try = [MODELS["fast"]] + [m for m in FREE_FALLBACKS if m != MODELS["fast"]][:3]
@@ -2356,7 +2473,7 @@ def translate_response():
         try:
             payload = {
                 "model": model,
-                "max_tokens": 1800,
+                "max_tokens": 1200,
                 "temperature": 0.15,
                 "messages": [
                     {"role": "system", "content": system_msg},
@@ -2364,14 +2481,14 @@ def translate_response():
                 ]
             }
             resp = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
+                OPENROUTER_URL,
                 headers=headers, json=payload, timeout=(5, 25)
             )
             if resp.status_code == 200:
                 translated = resp.json()["choices"][0]["message"]["content"].strip()
                 if translated:
                     return jsonify({"translated": translated})
-            elif resp.status_code in (429, 503):
+            elif resp.status_code in (400, 402, 404, 429, 503):
                 last_err = f"Model {model} rate limited"
                 continue
             else:
@@ -2795,26 +2912,21 @@ Rules:
 - Keep the full response under 120 words for natural speech rhythm
 - Be warm and encouraging"""
 
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-    }
-    payload = {
-        "model": get_model_for_mode("general", lang_code),
-        "max_tokens": 300,
-        "temperature": 0.6,
-        "messages": [
-            {"role": "system", "content": system},
-            {"role": "user", "content": text[:500]},
-        ],
-    }
+    voice_messages = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": text[:500]},
+    ]
 
     try:
-        resp = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers=headers, json=payload, timeout=20
-        )
-        fix_text = resp.json()["choices"][0]["message"]["content"].strip()
+        # Try Groq first for low-latency voice responses
+        fix_text = _groq_call(voice_messages, model=GROQ_MODELS["smart"],
+                              max_tokens=300, temperature=0.6)
+        if fix_text is None:
+            resp = requests.post(OPENROUTER_URL, headers=_or_headers(),
+                                 json={"model": get_model_for_mode("general", lang_code),
+                                       "max_tokens": 300, "temperature": 0.6,
+                                       "messages": voice_messages}, timeout=20)
+            fix_text = resp.json()["choices"][0]["message"]["content"].strip()
         # Extract code block if present (for display — not spoken)
         code_match = re.search(r"```[\w]*\n?([\s\S]+?)```", fix_text)
         code_snippet = code_match.group(1).strip() if code_match else ""
@@ -2981,10 +3093,7 @@ Evaluate both solutions and return ONLY a JSON object (no markdown) with:
 }
 Score criteria: correctness (40%), efficiency (30%), readability (20%), edge cases (10%)."""
 
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-    }
+    headers = _or_headers()
     payload = {
         "model": MODELS["fast"],
         "max_tokens": 600,
@@ -3001,7 +3110,7 @@ Score criteria: correctness (40%), efficiency (30%), readability (20%), edge cas
 
     try:
         resp = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
+            OPENROUTER_URL,
             headers=headers, json=payload, timeout=25
         )
         raw = resp.json()["choices"][0]["message"]["content"].strip()
@@ -3333,10 +3442,7 @@ def learning_insight():
         return jsonify({"insight": "Keep learning — every question brings you closer to mastery."})
 
     joined = "\n".join(f"- {q}" for q in questions)
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-    }
+    headers = _or_headers()
     payload = {
         "model": MODELS["fast"],
         "max_tokens": 200,
@@ -3617,10 +3723,7 @@ def _trigger_ai_report(submission_id):
             f"Reviewer rated {r['stars']}/5: {r['comment']}" for r in reviews
         )
 
-        headers = {
-            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-            "Content-Type": "application/json",
-        }
+        headers = _or_headers()
         payload = {
             "model": MODELS["fast"],
             "max_tokens": 600,
@@ -3651,7 +3754,7 @@ def _trigger_ai_report(submission_id):
         }
 
         resp = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
+            OPENROUTER_URL,
             headers=headers, json=payload, timeout=25
         )
         raw = resp.json()["choices"][0]["message"]["content"].strip()
@@ -3729,13 +3832,10 @@ def edit_file():
         f"```{ext}\n{original}\n```"
     )
 
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-    }
+    headers = _or_headers()
     payload = {
         "model": get_model_for_mode("general", lang_code),
-        "max_tokens": 4096,
+        "max_tokens": 1200,
         "temperature": 0.2,
         "stream": True,
         "messages": [
@@ -3747,7 +3847,7 @@ def edit_file():
     def generate():
         try:
             with requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
+                OPENROUTER_URL,
                 headers=headers, json=payload, stream=True, timeout=60
             ) as resp:
                 for line in resp.iter_lines():
@@ -3802,10 +3902,7 @@ def autocomplete():
         f"<after_cursor>\n{after}\n</after_cursor>"
     )
 
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-    }
+    headers = _or_headers()
     payload = {
         "model": MODELS["fast"],   # Llama 3.3 70B — fast & multilingual
         "max_tokens": 300,
@@ -3818,7 +3915,7 @@ def autocomplete():
 
     try:
         resp = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
+            OPENROUTER_URL,
             headers=headers, json=payload, timeout=15
         )
         raw = resp.json()["choices"][0]["message"]["content"].strip()
@@ -3840,15 +3937,15 @@ def autocomplete():
 # streams back a detailed analysis of the programming content shown.
 
 # Vision-capable free models on OpenRouter (updated March 2026)
-_VIDEO_MODEL = "google/gemini-2.0-flash-exp:free"          # Best free vision model
-_VIDEO_MODEL_FALLBACK = "google/gemini-flash-1.5-8b"        # Lighter Gemini vision
+_VIDEO_MODEL = "google/gemini-2.0-flash-exp:free"
+_VIDEO_MODEL_FALLBACK = "qwen/qwen2.5-vl-7b-instruct:free"
 _VIDEO_VISION_CHAIN = [
     "google/gemini-2.0-flash-exp:free",
-    "google/gemini-flash-1.5-8b",
-    "google/gemini-2.5-pro-exp-03-25:free",
+    "google/gemini-2.0-flash-thinking-exp:free",
+    "qwen/qwen2.5-vl-72b-instruct:free",
+    "qwen/qwen2.5-vl-7b-instruct:free",
     "meta-llama/llama-3.2-11b-vision-instruct:free",
-    "qwen/qwen2-vl-7b-instruct:free",
-    "openrouter/auto",
+    "moonshotai/kimi-vl-a3b-thinking:free",
 ]
 
 def _extract_video_frames(video_path, max_frames=6):
@@ -3961,12 +4058,7 @@ def analyze_video():
         frames = _extract_video_frames(tmp_path, max_frames=6)
         has_frames = len(frames) > 0
 
-        headers = {
-            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://codebuddy.ai",
-            "X-Title": "CodeBuddy Video Analyzer",
-        }
+        headers = _or_headers()
 
         if has_frames:
             # Build vision message with extracted frames
@@ -4018,7 +4110,7 @@ def analyze_video():
         payload = {
             "model": model_to_use,
             "stream": True,
-            "max_tokens": 2000,
+            "max_tokens": 1200,
             "temperature": 0.4,
             "messages": messages,
         }
@@ -4033,12 +4125,12 @@ def analyze_video():
 
             try:
                 resp = requests.post(
-                    "https://openrouter.ai/api/v1/chat/completions",
+                    OPENROUTER_URL,
                     headers=headers, json=payload, stream=True, timeout=(15, 120)
                 )
 
                 # Fallback chain for vision models — try all known working vision models
-                if resp.status_code in (404, 429, 503, 400):
+                if resp.status_code in (400, 402, 404, 429, 503):
                     fallback_chain = _VIDEO_VISION_CHAIN if has_frames else FREE_FALLBACKS
                     for fb in fallback_chain:
                         if fb in tried_models:
@@ -4046,7 +4138,7 @@ def analyze_video():
                         tried_models.append(fb)
                         payload["model"] = fb
                         resp = requests.post(
-                            "https://openrouter.ai/api/v1/chat/completions",
+                            OPENROUTER_URL,
                             headers=headers, json=payload, stream=True, timeout=(15, 120)
                         )
                         if resp.status_code == 200:
@@ -4063,7 +4155,7 @@ def analyze_video():
                     except Exception:
                         pass
                     if resp.status_code == 404:
-                        yield "⚠ **Vision model unavailable** — the video analysis model is currently offline on OpenRouter. Please try again in a few minutes, or contact support."
+                        yield "⚠ **Vision model unavailable** — all free vision models are temporarily offline on OpenRouter. **Try again in 2–3 minutes.** If this persists, your OpenRouter free quota may be exhausted for today."
                     else:
                         yield f"⚠ API Error {resp.status_code}. {err_detail or 'Try again in a moment.'}"
                     return
@@ -4114,6 +4206,201 @@ def analyze_video():
                 os.unlink(tmp_path)
             except Exception:
                 pass
+
+
+# ═══════════════════════════════════════════════════════════════
+# /analyze_link  — URL-based Video / Page Analyzer
+# Accepts a URL (YouTube, GitHub, article, etc.), fetches page
+# metadata, determines if it is programming-related, and streams
+# back a detailed analysis if it is.
+# ═══════════════════════════════════════════════════════════════
+
+@app.route("/analyze_link", methods=["POST"])
+@login_required
+@rate_limit(max_calls=15, window=60)
+def analyze_link():
+    """Analyze a URL to determine if it is programming-related and explain its content.
+
+    Accepts JSON:
+      url             : the URL to analyze (required)
+      question        : optional user question about the content
+      conversation_id : optional — save result as a chat message
+
+    Returns JSON:
+      is_programming  : bool
+      detected_type   : str  (e.g. "YouTube tutorial", "GitHub repo", "Documentation")
+      analysis        : str  (markdown)
+    """
+    import urllib.parse
+
+    data = request.get_json(silent=True) or {}
+    url = (data.get("url") or "").strip()
+    question = (data.get("question") or "").strip()
+    conversation_id = (data.get("conversation_id") or "").strip()
+
+    if not url:
+        return jsonify({"error": "No URL provided"}), 400
+
+    # Basic URL validation
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        return jsonify({"error": "URL must start with http:// or https://"}), 400
+
+    # ── Detect URL type from domain / path for richer context ─────────────────
+    domain = parsed.netloc.lower().replace("www.", "")
+    path   = parsed.path.lower()
+
+    def _guess_url_type(domain, path, url_lower):
+        if "youtube.com" in domain or "youtu.be" in domain:
+            return "YouTube video"
+        if "github.com" in domain:
+            if "/blob/" in path or path.endswith((".py",".js",".ts",".java",".cpp",".c",".go",".rs")):
+                return "GitHub source file"
+            if "/issues/" in path or "/pull/" in path:
+                return "GitHub issue/PR"
+            return "GitHub repository"
+        if "stackoverflow.com" in domain or "stackexchange.com" in domain:
+            return "Stack Overflow Q&A"
+        if "replit.com" in domain:
+            return "Replit project"
+        if "codepen.io" in domain:
+            return "CodePen demo"
+        if "codesandbox.io" in domain:
+            return "CodeSandbox project"
+        if "medium.com" in domain or "dev.to" in domain or "hashnode" in domain:
+            return "Developer article"
+        if "docs." in domain or "/docs/" in path or "/documentation/" in path:
+            return "Documentation page"
+        if "leetcode.com" in domain or "hackerrank.com" in domain or "codeforces.com" in domain:
+            return "Coding challenge platform"
+        if "npmjs.com" in domain or "pypi.org" in domain or "crates.io" in domain:
+            return "Package registry"
+        if "mdn" in domain or "developer.mozilla" in domain:
+            return "MDN documentation"
+        if "w3schools.com" in domain:
+            return "W3Schools tutorial"
+        if "geeksforgeeks.org" in domain or "javatpoint.com" in domain or "tutorialspoint.com" in domain:
+            return "Coding tutorial site"
+        return "Web page"
+
+    url_lower = url.lower()
+    detected_type = _guess_url_type(domain, path, url_lower)
+
+    # ── Try to fetch page title / description for richer context ──────────────
+    page_snippet = ""
+    try:
+        import urllib.request as _ureq
+        req = _ureq.Request(url, headers={"User-Agent": "Mozilla/5.0 CodeBuddy/1.0"})
+        with _ureq.urlopen(req, timeout=6) as resp:
+            raw_html = resp.read(32768).decode("utf-8", errors="ignore")
+        # Extract <title>
+        import re as _re
+        title_m = _re.search(r"<title[^>]*>([^<]{1,200})</title>", raw_html, _re.I)
+        title_txt = title_m.group(1).strip() if title_m else ""
+        # Extract <meta description>
+        desc_m = _re.search(r'<meta[^>]+name=["\']description["\'][^>]+content=["\'](.*?)["\']', raw_html, _re.I | _re.S)
+        desc_txt = desc_m.group(1).strip()[:300] if desc_m else ""
+        if title_txt or desc_txt:
+            page_snippet = f"Page title: {title_txt}\nDescription: {desc_txt}"
+    except Exception:
+        page_snippet = ""  # silently ignore — AI can still analyse from URL alone
+
+    # ── Build AI prompt ────────────────────────────────────────────────────────
+    default_q = (
+        "1. Is this URL related to programming or software development?\n"
+        "2. What programming language(s), framework(s), or topic(s) does it cover?\n"
+        "3. What does the content teach or demonstrate? Summarise the key points.\n"
+        "4. What would a developer learn from this resource?\n"
+        "5. Suggest a follow-up exercise or question based on this content."
+    )
+    user_prompt = question if question else default_q
+
+    system_msg = (
+        "You are CodeBuddy Link Analyzer — an expert programming tutor.\n"
+        "A user has shared a URL. Your job:\n"
+        "1. Determine if the URL is related to programming/coding/software development.\n"
+        "2. If YES: analyse the content in detail using markdown. Start your response with "
+        "   exactly: '✅ PROGRAMMING CONTENT DETECTED'\n"
+        "   Then state the detected_type, languages/frameworks, key concepts, and answer the user's question.\n"
+        "3. If NO: respond with exactly: '❌ NOT PROGRAMMING CONTENT'\n"
+        "   Then politely explain what the link appears to be about and why you can't analyse it.\n"
+        "Always use markdown formatting with headers and code blocks where appropriate."
+    )
+
+    context_block = f"URL: {url}\nDetected type: {detected_type}"
+    if page_snippet:
+        context_block += f"\n\n{page_snippet}"
+    context_block += f"\n\nUser question:\n{user_prompt}"
+
+    messages = [
+        {"role": "system", "content": system_msg},
+        {"role": "user",   "content": context_block},
+    ]
+
+    headers_ai = _or_headers()
+
+    payload = {
+        "model":       MODELS["fast"],
+        "stream":      False,
+        "max_tokens":  1200,
+        "temperature": 0.35,
+        "messages":    messages,
+    }
+
+    try:
+        ai_resp = requests.post(
+            OPENROUTER_URL,
+            headers=headers_ai, json=payload, timeout=(10, 45)
+        )
+        # Fallback chain if primary model fails
+        if ai_resp.status_code not in (200,):
+            for fb in FREE_FALLBACKS:
+                if fb == MODELS["fast"]:
+                    continue
+                payload["model"] = fb
+                ai_resp = requests.post(
+                    OPENROUTER_URL,
+                    headers=headers_ai, json=payload, timeout=(10, 45)
+                )
+                if ai_resp.status_code == 200:
+                    break
+
+        if ai_resp.status_code != 200:
+            err = ai_resp.json().get("error", {})
+            msg = err.get("message", "AI unavailable") if isinstance(err, dict) else str(err)
+            return jsonify({"error": msg}), 502
+
+        analysis_text = ai_resp.json()["choices"][0]["message"]["content"]
+        is_programming = "✅ PROGRAMMING CONTENT DETECTED" in analysis_text
+
+        # Save to chat history if conversation_id provided
+        if analysis_text and conversation_id:
+            try:
+                save_conn = sqlite3.connect("codebuddy.db")
+                save_conn.execute(
+                    "INSERT INTO messages(conversation_id,role,content,timestamp) VALUES (?,?,?,?)",
+                    (conversation_id, "assistant",
+                     f"**🔗 Link Analysis: {url}**\n\n" + analysis_text,
+                     datetime.now().isoformat())
+                )
+                save_conn.commit()
+                save_conn.close()
+            except Exception:
+                pass
+
+        return jsonify({
+            "is_programming": is_programming,
+            "detected_type":  detected_type,
+            "analysis":       analysis_text,
+        })
+
+    except requests.exceptions.Timeout:
+        return jsonify({"error": "AI timed out. Please try again."}), 504
+    except requests.exceptions.ConnectionError:
+        return jsonify({"error": "Connection error. Check your internet."}), 503
+    except Exception as exc:
+        app.logger.error(f"analyze_link error: {exc}")
+        return jsonify({"error": f"Server error: {str(exc)}"}), 500
 
 
 # ================= RUN APP =================
@@ -4389,7 +4676,7 @@ def voice_clone_delete():
         if _vc_os.path.exists(path):
             try: _vc_os.remove(path); deleted.append(_vc_os.path.basename(path))
             except Exception as e: app.logger.warning(f"Delete failed {path}: {e}")
-    return jsonify({"deleted": True, "files": deleted})
+    return jsonify({"deleted": True, "files": deleted, "message": "Voice profile deleted successfully."})
 
 
 @app.route("/voice_clone/tts", methods=["POST"])
@@ -4583,16 +4870,11 @@ def collab_chat():
     api_messages   = [{"role": "system", "content": system_prompt}] + history
     selected_model = get_model_for_mode(mode, lang_code)
 
-    hdrs = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://codebuddy.ai",
-        "X-Title": "CodeBuddy Collab",
-    }
+    hdrs = _or_headers()
     payload = {
         "model": selected_model,
         "stream": True,
-        "max_tokens": 2000,
+        "max_tokens": 1200,
         "temperature": 0.7,
         "messages": api_messages,
     }
@@ -4601,7 +4883,7 @@ def collab_chat():
         full = ""
         try:
             resp = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
+                OPENROUTER_URL,
                 headers=hdrs, json=payload, stream=True, timeout=(10, 90)
             )
             if resp.status_code != 200:
@@ -4612,12 +4894,28 @@ def collab_chat():
                     tried.add(fb)
                     payload["model"] = fb
                     resp = requests.post(
-                        "https://openrouter.ai/api/v1/chat/completions",
+                        OPENROUTER_URL,
                         headers=hdrs, json=payload, stream=True, timeout=(10, 90)
                     )
                     if resp.status_code == 200:
                         break
                 else:
+                    # All OpenRouter models failed — try Groq streaming
+                    if GROQ_API_KEY:
+                        for token in _groq_stream(api_messages, model=GROQ_MODELS["smart"],
+                                                  max_tokens=1200, temperature=0.7):
+                            token = _filter_response(token)
+                            full += token
+                            yield token
+                        if full:
+                            full = _filter_response(full)
+                            sc = sqlite3.connect("codebuddy.db")
+                            sc.execute(
+                                "INSERT INTO messages(conversation_id,role,content,timestamp) VALUES (?,?,?,?)",
+                                (conversation_id, "assistant", full, datetime.now().isoformat())
+                            )
+                            sc.commit(); sc.close()
+                        return
                     yield f"⚠ API Error {resp.status_code}. All models unavailable — try again."
                     return
 
@@ -5018,7 +5316,7 @@ If no dead code found, return empty dead_blocks array with a positive summary.""
                 {"role": "system", "content": system_prompt},
                 {"role": "user",   "content": f"Language: {language}\n\nCode:\n```{language}\n{code}\n```"},
             ],
-            model=MODELS["code"], max_tokens=2000, temperature=0.1, timeout=40,
+            model=MODELS["code"], max_tokens=1200, temperature=0.1, timeout=40,
         )
         raw = re.sub(r"```json|```", "", raw).strip()
         result = json.loads(raw)
@@ -5097,10 +5395,7 @@ extract their personal coding DNA. Return ONLY a raw JSON object (no markdown):
 
 Be specific and honest. If a pattern is unclear, omit that key rather than guessing."""
 
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-    }
+    headers = _or_headers()
     payload = {
         "model": MODELS["fast"],
         "max_tokens": 500,
@@ -5113,7 +5408,7 @@ Be specific and honest. If a pattern is unclear, omit that key rather than guess
 
     try:
         resp = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
+            OPENROUTER_URL,
             headers=headers, json=payload, timeout=25
         )
         raw = resp.json()["choices"][0]["message"]["content"].strip()
@@ -5346,7 +5641,7 @@ Return ONLY a raw JSON object (no markdown):
 
 Be specific and honest. If a pattern only appears once, omit it. Focus on RECURRING patterns."""
 
-    headers = {"Authorization": f"Bearer {OPENROUTER_API_KEY}", "Content-Type": "application/json"}
+    headers = _or_headers()
     payload = {
         "model": MODELS["fast"],
         "max_tokens": 800,
@@ -5361,7 +5656,7 @@ Be specific and honest. If a pattern only appears once, omit it. Focus on RECURR
         try:
             payload["model"] = model
             resp = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
+                OPENROUTER_URL,
                 headers=headers, json=payload, timeout=25
             )
             if resp.status_code != 200:
@@ -5465,7 +5760,7 @@ Return ONLY a raw JSON object (no markdown):
 
 Only flag lines that genuinely match the fingerprint patterns. If nothing matches, return empty predictions and score 0."""
 
-    headers = {"Authorization": f"Bearer {OPENROUTER_API_KEY}", "Content-Type": "application/json"}
+    headers = _or_headers()
     payload = {
         "model": MODELS["code"],
         "max_tokens": 1200,
@@ -5480,7 +5775,7 @@ Only flag lines that genuinely match the fingerprint patterns. If nothing matche
         try:
             payload["model"] = model
             resp = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
+                OPENROUTER_URL,
                 headers=headers, json=payload, timeout=30
             )
             if resp.status_code != 200:
@@ -5597,10 +5892,10 @@ Rules:
 - Make "thought" authentic — real developer frustrations and aha moments
 - Be specific about variable names, function signatures, and logic at each stage"""
 
-    headers = {"Authorization": f"Bearer {OPENROUTER_API_KEY}", "Content-Type": "application/json"}
+    headers = _or_headers()
     payload = {
         "model": MODELS["code"],
-        "max_tokens": 3000,
+        "max_tokens": 1200,
         "temperature": 0.5,   # slightly creative — we're reconstructing plausible history
         "messages": [
             {"role": "system", "content": system_prompt},
@@ -5612,7 +5907,7 @@ Rules:
         try:
             payload["model"] = model
             resp = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
+                OPENROUTER_URL,
                 headers=headers, json=payload, timeout=40
             )
             if resp.status_code != 200:
@@ -5722,10 +6017,10 @@ Return ONLY a raw JSON object (no markdown):
 
 Be specific — name actual variables, lines, and patterns. Do not give generic advice."""
 
-    headers = {"Authorization": f"Bearer {OPENROUTER_API_KEY}", "Content-Type": "application/json"}
+    headers = _or_headers()
     payload = {
         "model": MODELS["code"],
-        "max_tokens": 1800,
+        "max_tokens": 1200,
         "temperature": 0.15,
         "messages": [
             {"role": "system", "content": system_prompt},
@@ -5737,7 +6032,7 @@ Be specific — name actual variables, lines, and patterns. Do not give generic 
         try:
             payload["model"] = model
             resp = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
+                OPENROUTER_URL,
                 headers=headers, json=payload, timeout=30
             )
             if resp.status_code != 200:
@@ -5862,16 +6157,27 @@ def duck_stop():
     return jsonify({"status": "duck_mode_off", "message": "🦆 Duck Mode OFF — I can give answers again."})
 
 
+@app.route("/duck/status", defaults={"conversation_id": 0})
 @app.route("/duck/status/<int:conversation_id>")
 @login_required
 def duck_status(conversation_id):
-    """Check if duck mode is active for a conversation."""
+    """Check if duck mode is active for a conversation.
+    If conversation_id is 0 (no-arg call), checks the most recently active duck session."""
     conn = sqlite3.connect("codebuddy.db")
     conn.row_factory = sqlite3.Row
-    row = conn.execute(
-        "SELECT active, problem_statement, turn_count FROM duck_sessions WHERE user_id=? AND conversation_id=?",
-        (current_user.id, conversation_id)
-    ).fetchone()
+    if conversation_id == 0:
+        # Return most recently active session for this user
+        row = conn.execute(
+            "SELECT active, problem_statement, turn_count, started_at FROM duck_sessions "
+            "WHERE user_id=? AND active=1 ORDER BY id DESC LIMIT 1",
+            (current_user.id,)
+        ).fetchone()
+    else:
+        row = conn.execute(
+            "SELECT active, problem_statement, turn_count, started_at FROM duck_sessions "
+            "WHERE user_id=? AND conversation_id=?",
+            (current_user.id, conversation_id)
+        ).fetchone()
     conn.close()
     if not row or not row["active"]:
         return jsonify({"active": False})
@@ -5879,6 +6185,7 @@ def duck_status(conversation_id):
         "active": True,
         "problem": row["problem_statement"],
         "turns": row["turn_count"],
+        "started_at": row["started_at"] if "started_at" in row.keys() else "",
     })
 
 
@@ -6005,7 +6312,7 @@ ENTRY:
 TOPICS:
 [json array]"""
 
-    headers = {"Authorization": f"Bearer {OPENROUTER_API_KEY}", "Content-Type": "application/json"}
+    headers = _or_headers()
     payload = {
         "model": MODELS["fast"],
         "max_tokens": 800,
@@ -6018,6 +6325,7 @@ TOPICS:
 
     try:
         raw = _ai_call(
+            prefer_groq=True, groq_model=GROQ_MODELS["smart"],
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"Date: {target_date}\n\nSessions:\n{session_summary}"}
@@ -6159,7 +6467,7 @@ Rules:
 - Avoid obvious giveaways in wording
 - Test practical application, not just definitions"""
 
-    headers = {"Authorization": f"Bearer {OPENROUTER_API_KEY}", "Content-Type": "application/json"}
+    headers = _or_headers()
     payload = {
         "model": MODELS["fast"],
         "max_tokens": 1200,
@@ -6172,6 +6480,7 @@ Rules:
 
     try:
         raw = _ai_call(
+            prefer_groq=True, groq_model=GROQ_MODELS["smart"],
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"Generate 5 {difficulty} questions about: {topic}"}
@@ -6454,7 +6763,7 @@ Rules:
     if language:
         user_content += f"\n\nLanguage: {language}"
 
-    headers = {"Authorization": f"Bearer {OPENROUTER_API_KEY}", "Content-Type": "application/json"}
+    headers = _or_headers()
     payload = {
         "model": MODELS["fast"],
         "max_tokens": 1200,
@@ -6628,7 +6937,7 @@ Return ONLY raw JSON (no markdown):
                         f"Current name: `{current_name}`\n\n"
                         f"Code body:\n```{language}\n{code}\n```")
 
-    headers = {"Authorization": f"Bearer {OPENROUTER_API_KEY}", "Content-Type": "application/json"}
+    headers = _or_headers()
     payload = {
         "model": MODELS["fast"],
         "max_tokens": 800,
@@ -6874,6 +7183,6 @@ if __name__ == "__main__":
     # secret_key when files change, which invalidates all session cookies.
     _kw = dict(host="127.0.0.1", port=5000, debug=True, use_reloader=False)
     if _SOCKETIO_OK and socketio:
-        socketio.run(app, **_kw)
+        socketio.run(app, allow_unsafe_werkzeug=True, **_kw)
     else:
         app.run(**_kw)
