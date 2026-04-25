@@ -7178,6 +7178,126 @@ def focus_zone():
     })
 
 
+# ═══════════════════════════════════════════════════════════════════
+# CODEBUDDY MINI — Lightweight non-streaming JSON chat endpoint
+# Called by the floating Mini widget embedded in index.html
+# Does NOT require an active conversation_id — works standalone.
+# Supports optional base64 image (screenshot analysis).
+# ═══════════════════════════════════════════════════════════════════
+@app.route("/mini_chat", methods=["POST"])
+@login_required
+@rate_limit(max_calls=30, window=60)
+def mini_chat():
+    """CodeBuddy Mini — floating widget chat. Returns plain JSON (non-streaming)."""
+    try:
+        data = request.get_json(force=True) or {}
+    except Exception:
+        return jsonify({"error": "Invalid JSON"}), 400
+
+    message    = (data.get("message") or "").strip()
+    image_b64  = data.get("image_data")   # base64 PNG string (optional)
+    history    = data.get("history", [])  # [{role, content}, ...] last ~10 turns
+
+    if not message and not image_b64:
+        return jsonify({"error": "No message or image provided"}), 400
+
+    # ── Build messages array ──────────────────────────────────────
+    system_prompt = (
+        "You are CodeBuddy Mini, a compact floating AI assistant built into CodeBuddy. "
+        "You help users understand code, debug errors, and learn programming concepts quickly. "
+        "When analyzing screenshots: describe clearly what's visible, explain any code step by step, "
+        "and highlight key concepts simply. Keep responses concise (under 200 words unless asked for more). "
+        "Use markdown code blocks for code. Be friendly and encouraging."
+    )
+
+    messages = []
+
+    # Add recent history for context (keep it short)
+    for turn in history[-10:]:
+        role    = turn.get("role", "user")
+        content = turn.get("content", "")
+        if role in ("user", "assistant") and content:
+            messages.append({"role": role, "content": content})
+
+    # Build current user turn — text + optional image
+    if image_b64:
+        user_content = [
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/png;base64,{image_b64}"
+                }
+            },
+            {
+                "type": "text",
+                "text": message or (
+                    "Please analyze this screenshot carefully. "
+                    "Describe what you see, explain any code or concepts shown, "
+                    "and highlight the most important things to understand."
+                )
+            }
+        ]
+    else:
+        user_content = message
+
+    messages.append({"role": "user", "content": user_content})
+
+    # ── Choose model — vision-capable if image present ────────────
+    if image_b64:
+        # Use a vision-capable model via OpenRouter
+        model = "anthropic/claude-3-haiku"
+    else:
+        model = get_model_for_mode("general")
+
+    # ── Call AI ───────────────────────────────────────────────────
+    try:
+        full_messages = [{"role": "system", "content": system_prompt}] + messages
+
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://codebuddy.app",
+            "X-Title": "CodeBuddy Mini"
+        }
+
+        payload = {
+            "model": model,
+            "messages": full_messages,
+            "max_tokens": 600,
+            "temperature": 0.4,
+            "stream": False
+        }
+
+        resp = requests.post(OPENROUTER_URL, headers=headers, json=payload, timeout=30)
+
+        if resp.status_code != 200:
+            # Fallback: try Groq for text-only
+            if not image_b64:
+                try:
+                    groq_reply = _groq_call(full_messages, max_tokens=600, temperature=0.4)
+                    if groq_reply:
+                        return jsonify({"response": groq_reply})
+                except Exception:
+                    pass
+            return jsonify({"error": f"AI service unavailable (HTTP {resp.status_code})"}), 503
+
+        result  = resp.json()
+        reply   = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+
+        if not reply:
+            return jsonify({"error": "Empty response from AI"}), 500
+
+        # Track usage
+        bump_stat(current_user.id, "total_messages")
+
+        return jsonify({"response": reply})
+
+    except requests.exceptions.Timeout:
+        return jsonify({"error": "Request timed out — please try again"}), 504
+    except Exception as e:
+        return jsonify({"error": f"Server error: {str(e)}"}), 500
+
+
 if __name__ == "__main__":
     # CRITICAL: use_reloader=False stops Flask restarting with a new random
     # secret_key when files change, which invalidates all session cookies.
