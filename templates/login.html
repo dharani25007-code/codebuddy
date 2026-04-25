@@ -327,6 +327,117 @@ body::after {
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
 </style>
+<style>
+/* ═══════════════════════════════════════════
+   CODEBUDDY 5-THEME SYSTEM — shared across all pages
+   Gaming (default) | Dark Pro | Professional | Warm | Minimal
+═══════════════════════════════════════════ */
+body.theme-darkpro {
+  --void:#0a0f0a;--deep:#111a11;--plasma:#4ade80;
+  --plasma-dim:rgba(74,222,128,0.1);--plasma-glow:rgba(74,222,128,0.18);
+  --nova:#818cf8;--nova-dim:rgba(129,140,248,0.1);--fire:#22d3ee;
+  --text:#f0fdf4;--text-2:rgba(240,253,244,0.5);--text-3:rgba(240,253,244,0.2);
+  --border:rgba(74,222,128,0.09);--border-hi:rgba(74,222,128,0.32);
+  --surface:rgba(74,222,128,0.03);--surface2:rgba(74,222,128,0.07);
+}
+body.theme-professional {
+  --void:#f8fafc;--deep:#f1f5f9;--plasma:#2563eb;
+  --plasma-dim:rgba(37,99,235,0.08);--plasma-glow:rgba(37,99,235,0.15);
+  --nova:#7c3aed;--nova-dim:rgba(124,58,237,0.08);--fire:#0891b2;
+  --text:#0f172a;--text-2:rgba(15,23,42,0.6);--text-3:rgba(15,23,42,0.3);
+  --border:rgba(37,99,235,0.1);--border-hi:rgba(37,99,235,0.3);
+  --surface:rgba(37,99,235,0.04);--surface2:rgba(37,99,235,0.08);
+}
+body.theme-warm {
+  --void:#fdf8f0;--deep:#f5ede0;--plasma:#c2410c;
+  --plasma-dim:rgba(194,65,12,0.08);--plasma-glow:rgba(194,65,12,0.15);
+  --nova:#7c3aed;--nova-dim:rgba(124,58,237,0.07);--fire:#b45309;
+  --text:#292524;--text-2:rgba(41,37,36,0.62);--text-3:rgba(41,37,36,0.3);
+  --border:rgba(194,65,12,0.1);--border-hi:rgba(194,65,12,0.28);
+  --surface:rgba(194,65,12,0.04);--surface2:rgba(194,65,12,0.08);
+}
+body.theme-minimal {
+  --void:#ffffff;--deep:#f9fafb;--plasma:#111827;
+  --plasma-dim:rgba(17,24,39,0.06);--plasma-glow:rgba(17,24,39,0.1);
+  --nova:#1d4ed8;--nova-dim:rgba(29,78,216,0.07);--fire:#374151;
+  --text:#111827;--text-2:rgba(17,24,39,0.72);--text-3:rgba(17,24,39,0.42);
+  --border:rgba(17,24,39,0.1);--border-hi:rgba(17,24,39,0.35);
+  --surface:rgba(17,24,39,0.03);--surface2:rgba(17,24,39,0.06);
+}
+/* light-theme shared overrides */
+body.theme-professional,body.theme-warm,body.theme-minimal {
+  background:var(--void);color:var(--text);
+}
+body.theme-professional #neuralCanvas,body.theme-warm #neuralCanvas { opacity:0.1; }
+body.theme-minimal #neuralCanvas { display:none; }
+body.theme-professional .forge-card,body.theme-warm .forge-card,body.theme-minimal .forge-card,
+body.theme-professional .profile-card,body.theme-warm .profile-card,body.theme-minimal .profile-card {
+  background:rgba(255,255,255,0.97) !important;
+  border-color:var(--border-hi) !important;
+  box-shadow:0 12px 48px rgba(0,0,0,0.12),0 0 0 1px var(--border) !important;
+}
+body.theme-professional .topbar,body.theme-warm .topbar,body.theme-minimal .topbar {
+  background:rgba(255,255,255,0.95) !important;
+  border-bottom-color:var(--border) !important;
+}
+body.theme-professional .field-input,body.theme-warm .field-input,body.theme-minimal .field-input,
+body.theme-professional .logo-title,body.theme-warm .logo-title,body.theme-minimal .logo-title {
+  color:var(--text) !important;
+}
+body.theme-professional .field-input::placeholder,body.theme-warm .field-input::placeholder,body.theme-minimal .field-input::placeholder {
+  color:var(--text-3) !important;
+}
+body.theme-professional .field-wrap,body.theme-warm .field-wrap,body.theme-minimal .field-wrap {
+  background:var(--surface) !important;
+  border-color:var(--border) !important;
+}
+body.theme-professional .field-wrap:focus-within,body.theme-warm .field-wrap:focus-within,body.theme-minimal .field-wrap:focus-within {
+  border-color:var(--border-hi) !important;
+}
+body.theme-professional .forge-btn,body.theme-warm .forge-btn,body.theme-minimal .forge-btn {
+  background:var(--plasma-dim) !important;
+  border-color:var(--border-hi) !important;
+  color:var(--plasma) !important;
+}
+body.theme-professional .register-row,body.theme-warm .register-row,body.theme-minimal .register-row,
+body.theme-professional .login-row,body.theme-warm .login-row,body.theme-minimal .login-row,
+body.theme-professional .status-line,body.theme-warm .status-line,body.theme-minimal .status-line {
+  color:var(--text-3) !important;
+}
+body.theme-professional .field-label,body.theme-warm .field-label,body.theme-minimal .field-label,
+body.theme-professional .logo-sub,body.theme-warm .logo-sub,body.theme-minimal .logo-sub {
+  color:var(--text-3) !important;
+}
+body.theme-minimal .card-scanline,body.theme-minimal body::after { display:none !important; }
+/* theme switcher button — present on all pages */
+#cbPageThemeBtn {
+  position:fixed;bottom:20px;right:20px;z-index:9999;
+  display:flex;align-items:center;gap:6px;
+  padding:7px 14px;border-radius:20px;
+  border:1px solid var(--border-hi);background:rgba(6,13,26,0.92);
+  color:var(--plasma);font-family:'Orbitron',monospace;font-size:8px;
+  font-weight:700;letter-spacing:1.5px;cursor:pointer;
+  backdrop-filter:blur(16px);transition:all 0.2s;
+  box-shadow:0 4px 20px rgba(0,0,0,0.4);
+}
+#cbPageThemeBtn:hover { box-shadow:0 0 20px var(--plasma-glow); }
+#cbPageThemeDropdown {
+  display:none;position:fixed;bottom:54px;right:20px;z-index:9999;
+  background:rgba(6,13,26,0.97);border:1px solid var(--border-hi);
+  border-radius:10px;padding:8px;min-width:200px;
+  box-shadow:0 16px 48px rgba(0,0,0,0.6);backdrop-filter:blur(24px);
+}
+#cbPageThemeDropdown.open { display:block;animation:cbTDrop 0.15s ease; }
+@keyframes cbTDrop { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+.cbt-item {
+  display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:6px;
+  cursor:pointer;font-family:'Orbitron',monospace;font-size:8px;font-weight:700;
+  letter-spacing:1px;color:var(--text-2);transition:all 0.15s;border:1px solid transparent;
+}
+.cbt-item:hover,.cbt-item.active { background:var(--plasma-dim);border-color:var(--border-hi);color:var(--plasma); }
+.cbt-swatch { width:22px;height:14px;border-radius:3px;border:1px solid rgba(255,255,255,0.1);flex-shrink:0; }
+
+</style>
 </head>
 <body>
 
@@ -472,6 +583,52 @@ function togglePwd(){
   }
   draw();
 })();
+</script>
+<script>
+/* ── THEME SYSTEM — shared across all CodeBuddy pages ── */
+(function(){
+  const THEMES=['gaming','darkpro','professional','warm','minimal'];
+  const LABELS={gaming:'🎮 GAMING',darkpro:'💻 DARK PRO',professional:'📋 PROFESSIONAL',warm:'☕ WARM',minimal:'📄 MINIMAL'};
+  const SWATCHES={gaming:'background:linear-gradient(135deg,#020408,#00ffe0)',darkpro:'background:linear-gradient(135deg,#0a0f0a,#4ade80)',professional:'background:linear-gradient(135deg,#f8fafc,#2563eb)',warm:'background:linear-gradient(135deg,#fdf8f0,#c2410c)',minimal:'background:linear-gradient(135deg,#fff,#111827);border:1px solid #ddd'};
+  let cur = localStorage.getItem('cb-theme')||'gaming';
+
+  function apply(t){
+    THEMES.forEach(x=>document.body.classList.remove('theme-'+x));
+    if(t!=='gaming') document.body.classList.add('theme-'+t);
+    document.querySelectorAll('.cbt-item').forEach(el=>{
+      el.classList.toggle('active',el.dataset.theme===t);
+    });
+    const btn=document.getElementById('cbPageThemeBtn');
+    if(btn) btn.innerHTML='🎨 '+LABELS[t];
+  }
+
+  function build(){
+    if(document.getElementById('cbPageThemeBtn')) return;
+    const btn=document.createElement('button');
+    btn.id='cbPageThemeBtn';
+    btn.innerHTML='🎨 '+LABELS[cur];
+    btn.onclick=function(e){e.stopPropagation();toggle();};
+    const dd=document.createElement('div');
+    dd.id='cbPageThemeDropdown';
+    dd.innerHTML=THEMES.map(t=>`<div class="cbt-item${t===cur?' active':''}" data-theme="${t}" onclick="(function(){document.querySelectorAll('.cbt-item').forEach(x=>x.classList.remove('active'));this.classList.add('active');var t=this.dataset.theme;THEMES_APPLY(t);document.getElementById('cbPageThemeDropdown').classList.remove('open');})()" style="cursor:pointer"><div class="cbt-swatch" style="${SWATCHES[t]}"></div>${LABELS[t]}</div>`).join('');
+    document.body.appendChild(btn);
+    document.body.appendChild(dd);
+    document.addEventListener('click',function(e){
+      if(!btn.contains(e.target)&&!dd.contains(e.target)) dd.classList.remove('open');
+    });
+    apply(cur);
+  }
+  function toggle(){
+    const dd=document.getElementById('cbPageThemeDropdown');
+    if(dd) dd.classList.toggle('open');
+  }
+  window.THEMES_APPLY=function(t){
+    cur=t;localStorage.setItem('cb-theme',t);apply(t);
+  };
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',build);
+  else build();
+})();
+
 </script>
 </body>
 </html>
