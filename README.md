@@ -9,7 +9,6 @@
 ![SQLite](https://img.shields.io/badge/SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
 ![OpenRouter](https://img.shields.io/badge/OpenRouter-7C3AED?style=for-the-badge)
 ![SocketIO](https://img.shields.io/badge/Socket.IO-010101?style=for-the-badge&logo=socket.io&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-4ecdc4?style=for-the-badge)
 
 > ⚡ **28 World-First Features · 20+ Languages · 14 Free AI Models · 100% Free Forever**
 > Built with ⚡ in Coimbatore, India · v9.0 · March 2026
