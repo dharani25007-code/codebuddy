@@ -140,8 +140,3 @@ If any model returns 429/404/503 → next model tried automatically with 1.5s de
 ---
 
 
-<div align="center">
-<img src="https://capsule-render.vercel.app/api?type=waving&color=0:4ecdc4,100:0f1117&height=120&section=footer"/>
-
-**Built by [Dharanidharan M](https://github.com/dharani25007-code) 
-</div>
