@@ -10,7 +10,7 @@
 ![OpenRouter](https://img.shields.io/badge/OpenRouter-7C3AED?style=for-the-badge)
 ![SocketIO](https://img.shields.io/badge/Socket.IO-010101?style=for-the-badge&logo=socket.io&logoColor=white)
 
-> ⚡ **28 World-First Features · 20+ Languages · 14 Free AI Models · 100% Free Forever**
+> ⚡ **28 New Features · 20+ Languages · 14 Free AI Models · 100% Free Forever**
 > Built with ⚡ in Coimbatore, India · v9.0 · March 2026
 
 </div>
@@ -29,7 +29,7 @@ CodeBuddy is a full-stack AI-powered programming assistant with **28 features un
 |---|---|
 | 🧠 **8 AI Modes** | General, Debug, Optimize, Explain, Interview, ML, DSA, Roadmap |
 | 🌍 **20+ Languages** | 9 Indian languages + French, German, Spanish, Japanese, Chinese & more |
-| 🗣️ **Tanglish AI** | World's first Tamil+English mixed language coding assistant |
+| 🗣️ **Tanglish AI** |  Tamil+English mixed language coding assistant |
 | 🔁 **Streaming** | Token-by-token with 14-model fallback chain |
 | ▶️ **Code Execution** | Run 50+ languages via sandboxed Piston API |
 | 🧬 **Code DNA** | Builds your personal coding style — AI silently matches it |
