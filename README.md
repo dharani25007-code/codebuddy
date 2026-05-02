@@ -10,8 +10,7 @@
 ![OpenRouter](https://img.shields.io/badge/OpenRouter-7C3AED?style=for-the-badge)
 ![SocketIO](https://img.shields.io/badge/Socket.IO-010101?style=for-the-badge&logo=socket.io&logoColor=white)
 
-> ⚡ **28 New Features · 20+ Languages · 14 Free AI Models · 100% Free Forever**
-> Built with ⚡ in Coimbatore, India · v9.0 · March 2026
+> ⚡ **28 New Features · 20+ Languages · 14 Free AI Models · 
 
 </div>
 
