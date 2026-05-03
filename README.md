@@ -18,7 +18,7 @@
 
 ## 📌 Overview
 
-CodeBuddy is a full-stack AI-powered programming assistant with **28 features unavailable in any other tool** — including Tanglish (Tamil + English) voice coding, Code DNA fingerprinting, Rubber Duck+ Mode, and a 14-model AI fallback chain. Everything runs 100% free using OpenRouter's free-tier models.
+CodeBuddy is a full-stack AI-powered programming assistant with **28 New features** — including Tanglish (Tamil + English) voice coding, Code DNA fingerprinting, Rubber Duck+ Mode, and a 14-model AI fallback chain. Everything runs 100% free using OpenRouter's free-tier models.
 
 ---
 
@@ -141,21 +141,7 @@ If any model returns 429/404/503 → next model tried automatically with 1.5s de
 <div align="center">
 <img src="https://capsule-render.vercel.app/api?type=waving&color=0:4ecdc4,100:0f1117&height=120&section=footer"/>
 
-**Built by [Dharanidharan M](https://github.com/dharani25007-code)**
-
----
-
-## 🛠️ Git Workflow
-
-To push your changes to the repository, use the following commands:
-
-```bash
-git add .
-git commit -m "Your descriptive commit message"
-git pull origin main --rebase
-git push origin main
-```
+**Built by [Dharanidharan M](https://github.com/dharani25007-code) 
 </div>
-
 
 
