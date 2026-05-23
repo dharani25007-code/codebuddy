@@ -54,6 +54,8 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 GROQ_URL       = "https://api.groq.com/openai/v1/chat/completions"
 
 app = Flask(__name__)
+# Allow reasonably large request bodies for file uploads / AI edits (32MB)
+app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024
 
 # ── STABLE SECRET KEY ─────────────────────────────────────────────────────────
 # FIX: secrets.token_hex(32) generates a NEW key every restart, invalidating

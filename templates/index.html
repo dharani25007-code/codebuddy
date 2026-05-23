@@ -5475,6 +5475,8 @@
       opacity: 0.7;
     }
   </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/cursor.css') }}">
+  <script src="{{ url_for('static', filename='js/cursor.js') }}" defer></script>
 </head>
 
 <body>
@@ -5739,6 +5741,11 @@
 
         <button id="fp-topbtn" onclick="FP.togglePanel()" title="Upload & edit code files">
           📁 <span id="fp-topbtn-lbl">FILE FORGE</span>
+        </button>
+        <!-- Statically render VIDEO button so it appears even if JS-insert fails -->
+        <button id="videoAnalyzerBtn" title="Analyze programming videos"
+          onclick="typeof VideoAnalyzer!=='undefined' && VideoAnalyzer.open()">
+          🎬 VIDEO
         </button>
 
         <div id="cbThemeWrap" style="position:relative">
@@ -8016,6 +8023,22 @@ Hints used: ${IV.hintCount} | Skipped: ${IV.skipCount} | Best streak: ${IV.maxSt
 
     <script src="/static/js/codebuddy_voice.js"></script>
     <script>
+      // Lightweight toast helper so components (File Forge, etc.) can call toast(...)
+      function toast(msg, type) {
+        try {
+          let t = document.getElementById('toast');
+          if (!t) {
+            t = document.createElement('div');
+            t.id = 'toast';
+            t.className = 'toast';
+            document.body.appendChild(t);
+          }
+          t.textContent = msg;
+          t.classList.add('show');
+          setTimeout(() => t.classList.remove('show'), 2800);
+        } catch (e) { console.warn('toast failed', e); }
+      }
+
       /* ════════════════════════════════════════════════════════════
          FILE FORGE — upload, edit, run, AI edit, autocomplete
       ════════════════════════════════════════════════════════════ */
@@ -8057,8 +8080,9 @@ Hints used: ${IV.hintCount} | Skipped: ${IV.skipCount} | Best streak: ${IV.maxSt
 
         /* ── load file ── */
         function loadFile(file) {
-          const MAX = 200 * 1024;
-          if (file.size > MAX) { toast('File too large (max 200KB)', 'err'); return; }
+          // Allow larger file uploads in the File Forge editor (2 MB)
+          const MAX = 2 * 1024 * 1024; // 2 MB
+          if (file.size > MAX) { toast('File too large (max 2MB)', 'err'); return; }
           const ok = ['py', 'js', 'ts', 'jsx', 'tsx', 'html', 'css', 'java', 'cpp', 'c', 'cs', 'go',
             'rs', 'rb', 'php', 'swift', 'kt', 'sql', 'sh', 'r', 'json', 'yaml', 'yml',
             'xml', 'md', 'txt', 'toml'];
@@ -8395,7 +8419,9 @@ Hints used: ${IV.hintCount} | Skipped: ${IV.skipCount} | Best streak: ${IV.maxSt
 
       /* ── expose globally ── */
       window.FP = FP;
+      console.debug && console.debug('FP: initialized');
       window.VA = VA;
+      console.debug && console.debug('VA: initialized');
 
       /* ── autocomplete from main chat (ta-en users typing in textarea) ── */
       (function () {
@@ -9082,21 +9108,7 @@ Hints used: ${IV.hintCount} | Skipped: ${IV.skipCount} | Best streak: ${IV.maxSt
       }
     </style>
 
-    <!-- Topbar button — inject via JS since we can't easily edit the static HTML here -->
-    <script>
-      document.addEventListener('DOMContentLoaded', () => {
-        // Add VIDEO button to topbar
-        const fpBtn = document.getElementById('fp-topbtn');
-        if (fpBtn && fpBtn.parentElement) {
-          const btn = document.createElement('button');
-          btn.id = 'videoAnalyzerBtn';
-          btn.title = 'Analyze programming videos';
-          btn.innerHTML = '🎬 VIDEO';
-          btn.onclick = () => VideoAnalyzer.open();
-          fpBtn.insertAdjacentElement('afterend', btn);
-        }
-      });
-    </script>
+    <!-- Topbar buttons are rendered statically to avoid runtime injection failures -->
 
     <!-- VIDEO ANALYZER PANEL HTML -->
     <div id="videoAnalyzerPanel">
@@ -9555,6 +9567,7 @@ Then give your full analysis.`;
         return { open, close, handleDrop, handleFile, clearFile, analyze, sendToChat, switchTab, analyzeLink };
       })();
       window.VideoAnalyzer = VideoAnalyzer;
+      console.debug && console.debug('VideoAnalyzer: initialized');
     </script>
 
     <!-- ═══════════════════════════════════════════════════════════
