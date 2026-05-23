@@ -13,6 +13,9 @@ venv/
 
 # Database
 codebuddy.db
+codebuddy.db-wal
+codebuddy.db-shm
+codebuddy.db-journal
 
 # VS Code
 .vscode/

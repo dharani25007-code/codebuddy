@@ -53,11 +53,27 @@ GROQ_API_KEY       = os.getenv("GROQ_API_KEY")
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 GROQ_URL       = "https://api.groq.com/openai/v1/chat/completions"
 
+# Database path is configurable from .env so the filename is not hardcoded.
+DEFAULT_DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "codebuddy.db")
+DB_PATH = os.getenv("CODEBUDDY_DB_PATH", DEFAULT_DB_PATH)
+
 # Shared request size limit for upload-heavy features like File Forge and video analysis.
 MAX_UPLOAD_BYTES = 32 * 1024 * 1024  # 32 MB
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = MAX_UPLOAD_BYTES
+
+# Keep existing sqlite3.connect(...) calls working while allowing the DB path to come from .env.
+_sqlite_connect = sqlite3.connect
+
+
+def _connect_db(database=None, *args, **kwargs):
+    if database in (None, "", "codebuddy.db"):
+        database = DB_PATH
+    return _sqlite_connect(database, *args, **kwargs)
+
+
+sqlite3.connect = _connect_db
 
 # ── STABLE SECRET KEY ─────────────────────────────────────────────────────────
 # FIX: secrets.token_hex(32) generates a NEW key every restart, invalidating

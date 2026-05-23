@@ -95,6 +95,7 @@ pip install -r requirements.txt
 # Create .env file
 OPENROUTER_API_KEY=sk-or-v1-your-key-here
 SECRET_KEY=any-long-random-string
+CODEBUDDY_DB_PATH=codebuddy.db
 ```
 
 ### Run
@@ -106,6 +107,7 @@ Open: `http://127.0.0.1:5000` → Register → New Chat → Pick a mode 🚀
 ### Upload Notes
 - File Forge accepts larger files than before; the browser-side limit is 2 MB and the Flask server accepts up to 32 MB.
 - If you see a "File too large" message, try a smaller file or increase the limit in `templates/index.html` and `app.py` together.
+- The SQLite database path is configurable through `CODEBUDDY_DB_PATH` in `.env`.
 
 ---
 
