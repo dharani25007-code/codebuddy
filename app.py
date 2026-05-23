@@ -53,9 +53,11 @@ GROQ_API_KEY       = os.getenv("GROQ_API_KEY")
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 GROQ_URL       = "https://api.groq.com/openai/v1/chat/completions"
 
+# Shared request size limit for upload-heavy features like File Forge and video analysis.
+MAX_UPLOAD_BYTES = 32 * 1024 * 1024  # 32 MB
+
 app = Flask(__name__)
-# Allow reasonably large request bodies for file uploads / AI edits (32MB)
-app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024
+app.config['MAX_CONTENT_LENGTH'] = MAX_UPLOAD_BYTES
 
 # ── STABLE SECRET KEY ─────────────────────────────────────────────────────────
 # FIX: secrets.token_hex(32) generates a NEW key every restart, invalidating
@@ -161,6 +163,15 @@ def add_security_headers(resp):
     resp.headers["X-Frame-Options"] = "SAMEORIGIN"
     resp.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     return resp
+
+
+@app.errorhandler(413)
+def request_too_large(error):
+    """Return a clear response when uploads exceed MAX_CONTENT_LENGTH."""
+    message = f"File too large. Limit is {MAX_UPLOAD_BYTES // (1024 * 1024)}MB."
+    if request.accept_mimetypes.best == "application/json" or request.path.startswith(("/edit_file", "/autocomplete", "/analyze_video", "/run_code")):
+        return jsonify({"error": message}), 413
+    return message, 413
 
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
