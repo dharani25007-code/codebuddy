@@ -10,7 +10,7 @@
 ![OpenRouter](https://img.shields.io/badge/OpenRouter-7C3AED?style=for-the-badge)
 ![SocketIO](https://img.shields.io/badge/Socket.IO-010101?style=for-the-badge&logo=socket.io&logoColor=white)
 
-> ⚡ **28 New Features · 20+ Languages · 14 Free AI Models · 
+> ⚡ **28 New Features · 5 Themes · 20+ Languages · 14 Free AI Models**
 
 </div>
 
@@ -18,7 +18,7 @@
 
 ## 📌 Overview
 
-CodeBuddy is a full-stack AI-powered programming assistant with **28 New features** — including Tanglish (Tamil + English) voice coding, Code DNA fingerprinting, Rubber Duck+ Mode, and a 14-model AI fallback chain. Everything runs 100% free using OpenRouter's free-tier models.
+CodeBuddy is a full-stack AI-powered programming assistant with **28 New features** — including Tanglish (Tamil + English) voice coding, File Forge upload/edit/run, Video Analyzer, Code DNA fingerprinting, Rubber Duck+ Mode, and a 14-model AI fallback chain. The app now uses a 5-theme system across the UI and supports larger file uploads for File Forge and media analysis.
 
 ---
 
@@ -32,6 +32,8 @@ CodeBuddy is a full-stack AI-powered programming assistant with **28 New feature
 | 🔁 **Streaming** | Token-by-token with 14-model fallback chain |
 | ▶️ **Code Execution** | Run 50+ languages via sandboxed Piston API |
 | 🧬 **Code DNA** | Builds your personal coding style — AI silently matches it |
+| 📁 **File Forge** | Upload, edit, run, and AI-refactor code files in the browser |
+| 🎬 **Video Analyzer** | Upload videos or analyze coding/tutorial links from the UI |
 | 🦆 **Rubber Duck+** | AI refuses to give answers, only asks Socratic questions |
 | 🎭 **Mood Engine** | Detects frustration and adapts AI tone in real-time |
 | 🔮 **Bug Prophecy** | Predicts which lines will break based on your past bug history |
@@ -52,6 +54,15 @@ codebuddy/
 ├── .env                            # API keys (create this)
 ├── codebuddy.db                    # SQLite database (auto-created)
 ├── requirements.txt
+├── static/
+│   ├── css/
+│   │   ├── theme-system.css        # Shared theme variables for non-index pages
+│   │   ├── auth-theme-switcher.css # Auth-page theme selector styling
+│   │   └── cursor.css              # Shared custom cursor styling
+│   └── js/
+│       ├── theme-system.js         # Shared 5-theme initializer
+│       ├── auth-theme-switcher.js  # Login/register theme picker
+│       └── cursor.js               # Shared custom cursor controller
 ├── templates/
 │   ├── index.html                  # Main dashboard + chat interface
 │   ├── login.html / register.html
@@ -91,6 +102,10 @@ SECRET_KEY=any-long-random-string
 python app.py
 ```
 Open: `http://127.0.0.1:5000` → Register → New Chat → Pick a mode 🚀
+
+### Upload Notes
+- File Forge accepts larger files than before; the browser-side limit is 2 MB and the Flask server accepts up to 32 MB.
+- If you see a "File too large" message, try a smaller file or increase the limit in `templates/index.html` and `app.py` together.
 
 ---
 
