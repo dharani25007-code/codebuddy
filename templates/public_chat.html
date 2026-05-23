@@ -10,9 +10,11 @@
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/cursor.css') }}">
+  <script src="{{ url_for('static', filename='js/cursor.js') }}" defer></script>
   <style>
-    <link rel="stylesheet" href="/static/css/theme-system.css">:root {
-      <body><script src="/static/js/theme-system.js"></script>--deep: #060d1a;
+    :root {
+      --deep: #060d1a;
       --plasma: #00ffe0;
       --plasma-dim: rgba(0, 255, 224, 0.1);
       --plasma-glow: rgba(0, 255, 224, 0.2);
@@ -670,9 +672,11 @@
       animation: blink 1.8s ease infinite;
     }
   </style>
+  <link rel="stylesheet" href="/static/css/theme-system.css">
 </head>
 
 <body>
+  <script src="/static/js/theme-system.js"></script>
 
   <div id="cursor"></div>
   <div id="cursor-ring"></div>
