@@ -4,11 +4,14 @@
 
 <div align="center">
 
-![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![Flask](https://img.shields.io/badge/Flask-000000?style=for-the-badge&logo=flask&logoColor=white)
-![SQLite](https://img.shields.io/badge/SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
-![OpenRouter](https://img.shields.io/badge/OpenRouter-7C3AED?style=for-the-badge)
-![SocketIO](https://img.shields.io/badge/Socket.IO-010101?style=for-the-badge&logo=socket.io&logoColor=white)
+![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![Flask](https://img.shields.io/badge/Flask-2.0%2B-000000?style=for-the-badge&logo=flask&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-3%2B-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
+![OpenRouter](https://img.shields.io/badge/OpenRouter-API-7C3AED?style=for-the-badge)
+![Socket.IO](https://img.shields.io/badge/Socket.IO-4.0%2B-010101?style=for-the-badge&logo=socket.io&logoColor=white)
+![Piston](https://img.shields.io/badge/Piston-API-4ecdc4?style=for-the-badge)
+![gTTS](https://img.shields.io/badge/gTTS-TTS-4ecdc4?style=for-the-badge)
+![Eventlet](https://img.shields.io/badge/Eventlet--Gevent-8A2BE2?style=for-the-badge)
 
 > ⚡ **28 New Features · 5 Themes · 20+ Languages · 14 Free AI Models**
 
@@ -80,8 +83,11 @@ codebuddy/
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Python **3.10+**
-- Free API key from [openrouter.ai/keys](https://openrouter.ai/keys)
+- Python 3.10 or newer
+- Pip (bundled with modern Python) and a virtual environment (recommended)
+- A free OpenRouter API key: https://openrouter.ai/keys (set in `.env`)
+- Optional: Piston API access for code execution (if using self Piston instance)
+- Recommended system packages: `sqlite3` (usually bundled), `ffmpeg` (for voice/video features)
 
 ### Install
 ```bash
@@ -137,12 +143,17 @@ If any model returns 429/404/503 → next model tried automatically with 1.5s de
 | Library | Role |
 |---|---|
 | Flask | Web framework |
-| Flask-Login + Bcrypt | Auth & password hashing |
-| Flask-SocketIO | Real-time WebSocket collab |
-| SQLite (WAL) | Primary data store |
-| OpenRouter API | 14 free AI models with fallback |
-| gTTS / XTTS-v2 | Text-to-speech (20+ languages / voice cloning) |
-| Piston API | Sandboxed code execution — 50+ languages |
+| Flask-Login | Authentication management |
+| Flask-Bcrypt | Password hashing |
+| Flask-SocketIO | Real-time WebSocket collaboration |
+| Eventlet / Gevent | Async workers for SocketIO in production |
+| SQLite (WAL) | Local relational database (configurable path) |
+| OpenRouter API | Multi-model AI fallback chain |
+| Piston API | Sandboxed code execution (50+ languages) |
+| gTTS / XTTS-v2 | Text-to-speech and voice cloning |
+| python-dotenv | Load `.env` configuration |
+| requests | HTTP requests to external APIs |
+| ffmpeg | Media processing for voice/video features (external binary) |
 
 ---
 
