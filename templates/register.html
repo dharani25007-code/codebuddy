@@ -8,25 +8,26 @@
     href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@300;400;500&family=Exo+2:wght@300;400;600&display=swap"
     rel="stylesheet">
   <style>
-    :root {
-      --void: #020408;
-      --deep: #060d1a;
-      --plasma: #00ffe0;
-      --plasma-dim: rgba(0, 255, 224, 0.1);
-      --plasma-glow: rgba(0, 255, 224, 0.2);
-      --nova: #a855f7;
-      --nova-dim: rgba(168, 85, 247, 0.1);
-      --fire: #ff6b2b;
-      --gold: #fbbf24;
-      --text: #e2f4ff;
-      --text-2: rgba(226, 244, 255, 0.45);
-      --text-3: rgba(226, 244, 255, 0.18);
-      --border: rgba(0, 255, 224, 0.08);
-      --border-hi: rgba(0, 255, 224, 0.3);
-      --surface: rgba(0, 255, 224, 0.03);
-      --mono: 'IBM Plex Mono', monospace;
-      --display: 'Orbitron', monospace;
-      --body: 'Exo 2', sans-serif;
+    --deep: #060d1a;
+    --plasma: #00ffe0;
+    --plasma-dim: rgba(0, 255, 224, 0.1);
+    --plasma-glow: rgba(0, 255, 224, 0.2);
+    --nova: #a855f7;
+    --nova-dim: rgba(168, 85, 247, 0.1);
+    --fire: #ff6b2b;
+    --gold: #fbbf24;
+    --text: #e2f4ff;
+    --text-2: rgba(226, 244, 255, 0.45);
+    --text-3: rgba(226, 244, 255, 0.18);
+    --border: rgba(0, 255, 224, 0.08);
+    --border-hi: rgba(0, 255, 224, 0.3);
+    --surface: rgba(0, 255, 224, 0.03);
+    --mono: 'IBM Plex Mono',
+    monospace;
+    --display: 'Orbitron',
+    monospace;
+    --body: 'Exo 2',
+    sans-serif;
     }
 
     *,
@@ -616,10 +617,14 @@
     }
   </style>
   <link rel="stylesheet" href="/static/css/theme-system.css">
+  <link rel="stylesheet" href="/static/css/auth-theme-switcher.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/cursor.css') }}">
+  <script src="{{ url_for('static', filename='js/cursor.js') }}" defer></script>
 </head>
 
 <body>
   <script src="/static/js/theme-system.js"></script>
+  <script src="/static/js/auth-theme-switcher.js"></script>
 
   <div id="cursor"></div>
   <div id="cursor-ring"></div>
@@ -627,6 +632,63 @@
 
   <div class="forge-card">
     <div class="card-scanline"></div>
+
+    <div class="auth-theme-wrap" id="authThemeWrap">
+      <button type="button" class="auth-theme-toggle" id="authThemeToggle" aria-haspopup="true" aria-expanded="false"
+        title="Change theme">
+        <span class="auth-theme-toggle-left">
+          <span class="auth-theme-emoji" id="authThemeEmoji">🕹️</span>
+          <span class="auth-theme-label" id="authThemeLabel">GAMING</span>
+        </span>
+        <span class="auth-theme-caret">▾</span>
+      </button>
+      <div class="auth-theme-menu" id="authThemeMenu" role="menu" aria-label="Theme selector">
+        <button type="button" class="auth-theme-item" data-auth-theme="gaming" role="menuitemradio"
+          aria-pressed="false">
+          <span class="auth-theme-chip">🕹️</span>
+          <span class="auth-theme-meta">
+            <span class="auth-theme-name">GAMING</span>
+            <span class="auth-theme-desc">Jet black · electric cyan</span>
+          </span>
+          <span class="auth-theme-check">✔</span>
+        </button>
+        <button type="button" class="auth-theme-item" data-auth-theme="darkpro" role="menuitemradio"
+          aria-pressed="false">
+          <span class="auth-theme-chip">💻</span>
+          <span class="auth-theme-meta">
+            <span class="auth-theme-name">DARK PRO</span>
+            <span class="auth-theme-desc">Navy dark · amber gold</span>
+          </span>
+          <span class="auth-theme-check">✔</span>
+        </button>
+        <button type="button" class="auth-theme-item" data-auth-theme="professional" role="menuitemradio"
+          aria-pressed="false">
+          <span class="auth-theme-chip">💼</span>
+          <span class="auth-theme-meta">
+            <span class="auth-theme-name">PROFESSIONAL</span>
+            <span class="auth-theme-desc">Clean white · deep indigo</span>
+          </span>
+          <span class="auth-theme-check">✔</span>
+        </button>
+        <button type="button" class="auth-theme-item" data-auth-theme="warm" role="menuitemradio" aria-pressed="false">
+          <span class="auth-theme-chip">🌅</span>
+          <span class="auth-theme-meta">
+            <span class="auth-theme-name">WARM</span>
+            <span class="auth-theme-desc">Cream · terracotta brown</span>
+          </span>
+          <span class="auth-theme-check">✔</span>
+        </button>
+        <button type="button" class="auth-theme-item" data-auth-theme="minimal" role="menuitemradio"
+          aria-pressed="false">
+          <span class="auth-theme-chip">➖</span>
+          <span class="auth-theme-meta">
+            <span class="auth-theme-name">MINIMAL</span>
+            <span class="auth-theme-desc">Pure white · forest green</span>
+          </span>
+          <span class="auth-theme-check">✔</span>
+        </button>
+      </div>
+    </div>
 
     <!-- LOGO -->
     <div class="logo-area">
