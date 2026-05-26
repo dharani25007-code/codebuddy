@@ -7,6 +7,7 @@ flask-bcrypt>=1.0.1
 python-dotenv>=1.0.0
 requests>=2.31.0
 gtts>=2.5.0
+gunicorn>=21.2.0
 
 # click>=8.2.1 fixes conflict between gTTS and typer
 click>=8.2.1
@@ -16,6 +17,9 @@ flask-socketio>=5.3.6
 
 # Redis for rate limiting (optional — falls back to in-memory if unavailable)
 redis>=5.0.0
+
+# Optional if you later migrate from SQLite to PostgreSQL
+# psycopg[binary]>=3.1.18
 
 # Video Analyzer frame extraction (optional — text-only mode without it)
 # pip install opencv-python

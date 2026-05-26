@@ -57,6 +57,7 @@ codebuddy/
 ├── .env                            # API keys (create this)
 ├── codebuddy.db                    # SQLite database (auto-created)
 ├── requirements.txt
+├── gunicorn.conf.py                # Production Gunicorn defaults
 ├── static/
 │   ├── css/
 │   │   ├── theme-system.css        # Shared theme variables for non-index pages
@@ -73,6 +74,8 @@ codebuddy/
 │   ├── leaderboard.html
 │   ├── collab.html
 │   └── codebuddy_world_first.html  # 28 Features Hub
+├── scripts/
+│   └── load_benchmark.py           # Concurrent endpoint benchmark harness
 ├── static/js/
 │   └── codebuddy_voice.js
 └── coqui_profiles/                 # Voice clone samples (auto-created)
@@ -109,6 +112,60 @@ CODEBUDDY_DB_PATH=codebuddy.db
 python app.py
 ```
 Open: `http://127.0.0.1:5000` → Register → New Chat → Pick a mode 🚀
+
+### Production Deployment
+For a production stack, run the app behind Gunicorn and Nginx, and enable Redis for rate limiting plus Socket.IO fan-out across multiple workers:
+
+```bash
+pip install -r requirements.txt
+set SECRET_KEY=your-long-random-secret
+set REDIS_URL=redis://127.0.0.1:6379/0
+set USE_SOCKETIO_REDIS=true
+gunicorn -c gunicorn.conf.py app:app
+```
+
+Minimal Nginx reverse proxy example:
+
+```nginx
+server {
+	listen 80;
+	server_name codebuddy.example.com;
+
+	location / {
+		proxy_pass http://127.0.0.1:8000;
+		proxy_http_version 1.1;
+		proxy_set_header Host $host;
+		proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+		proxy_set_header X-Forwarded-Proto $scheme;
+		proxy_set_header Upgrade $http_upgrade;
+		proxy_set_header Connection "upgrade";
+	}
+}
+```
+
+The current data layer still uses SQLite. If you want PostgreSQL in production, migrate the `sqlite3` access layer first, then point the app at the new database backend.
+
+### Load Benchmark
+Run the built-in concurrent benchmark against the chat and code-run endpoints:
+
+```bash
+python scripts/load_benchmark.py --concurrency 6 --chat-requests 6 --code-requests 6
+```
+
+To hit a live server instead of the in-process test client:
+
+```bash
+python scripts/load_benchmark.py --mode live --base-url http://127.0.0.1:5000 --concurrency 8 --chat-requests 12 --code-requests 12 --no-stub-upstreams
+```
+
+The benchmark prints p50/p95 latency, max latency, and status counts per endpoint.
+
+### Automated Tests
+Run the smoke tests locally with the standard library test runner:
+
+```bash
+python -m unittest discover -s tests -p "test_*.py"
+```
 
 ### Upload Notes
 - File Forge accepts larger files than before; the browser-side limit is 2 MB and the Flask server accepts up to 32 MB.
