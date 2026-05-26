@@ -19,6 +19,7 @@
    ║      peak window analytics from session timestamps)    ║
    ╚════════════════════════════════════════════════════════╝
 """
+import ast
 import json
 import os
 import re
@@ -62,15 +63,34 @@ MAX_UPLOAD_BYTES = 32 * 1024 * 1024  # 32 MB
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = MAX_UPLOAD_BYTES
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 3600
+
+# Redis can back rate limiting and, when enabled, Socket.IO fan-out across workers.
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+USE_SOCKETIO_REDIS = os.getenv("USE_SOCKETIO_REDIS", "false").lower() == "true"
+SOCKETIO_MESSAGE_QUEUE = REDIS_URL if USE_SOCKETIO_REDIS else None
 
 # Keep existing sqlite3.connect(...) calls working while allowing the DB path to come from .env.
 _sqlite_connect = sqlite3.connect
 
 
+def _configure_sqlite_connection(conn):
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        conn.execute("PRAGMA cache_size=-32000")
+        conn.execute("PRAGMA busy_timeout=5000")
+        conn.execute("PRAGMA foreign_keys=ON")
+    except sqlite3.Error:
+        pass
+    return conn
+
+
 def _connect_db(database=None, *args, **kwargs):
     if database in (None, "", "codebuddy.db"):
         database = DB_PATH
-    return _sqlite_connect(database, *args, **kwargs)
+    kwargs.setdefault("timeout", 30)
+    return _configure_sqlite_connection(_sqlite_connect(database, *args, **kwargs))
 
 
 sqlite3.connect = _connect_db
@@ -106,6 +126,7 @@ if _SOCKETIO_OK:
     socketio = SocketIO(
         app, cors_allowed_origins="*",
         async_mode="threading",
+        message_queue=SOCKETIO_MESSAGE_QUEUE,
         logger=False, engineio_logger=False,
     )
 else:
@@ -178,6 +199,26 @@ def add_security_headers(resp):
     resp.headers["X-Content-Type-Options"] = "nosniff"
     resp.headers["X-Frame-Options"] = "SAMEORIGIN"
     resp.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    if request.method == "GET" and "Cache-Control" not in resp.headers:
+        path = request.path
+        if path.startswith("/static/"):
+            resp.headers["Cache-Control"] = "public, max-age=3600"
+        elif path == "/manifest.json":
+            resp.headers["Cache-Control"] = "public, max-age=600"
+        elif path == "/sw.js":
+            resp.headers["Cache-Control"] = "no-cache"
+        elif path.startswith("/streak_card/"):
+            resp.headers["Cache-Control"] = "public, max-age=300"
+        elif path in {"/leaderboard", "/api/leaderboard"}:
+            resp.headers["Cache-Control"] = "public, max-age=60"
+        elif path.startswith("/public_chat/"):
+            resp.headers["Cache-Control"] = "public, max-age=30"
+        elif path in {"/", "/profile", "/get_memory", "/features"} and current_user.is_authenticated:
+            resp.headers["Cache-Control"] = "no-store"
+        else:
+            resp.headers["Cache-Control"] = "no-store"
+    elif request.method != "GET":
+        resp.headers["Cache-Control"] = "no-store"
     return resp
 
 
@@ -193,12 +234,326 @@ bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
 
+
+_JSON_AUTH_PREFIXES = (
+    "/api/", "/chat", "/run_code", "/new_chat", "/load_messages/", "/get_chat_title/",
+    "/rename_chat", "/delete_chat", "/pin_chat", "/share_chat", "/bookmark_message",
+    "/get_bookmarks", "/supported_languages", "/analyze_complexity", "/get_stats",
+    "/search_chats", "/quick_explain", "/generate_roadmap", "/translate", "/tts",
+    "/thought_replay", "/voice_fix", "/collab_chat", "/collab/", "/mood/",
+    "/dead_code", "/dna/", "/prophecy/", "/time_machine", "/cognitive_load",
+    "/duck/", "/changelog/", "/calibrate/", "/error_autopsy", "/naming/",
+    "/focus_zone", "/voice_clone/", "/coqui/"
+)
+
+
+@login_manager.unauthorized_handler
+def unauthorized_handler():
+    """Return JSON for API/fetch routes and redirects for normal page views."""
+    if request.path.startswith(_JSON_AUTH_PREFIXES):
+        return jsonify({"error": "Please log in to use this feature."}), 401
+    return redirect(url_for("login", next=request.url))
+
+
+_NAMING_GENERIC_WORDS = {
+    "temp", "tmp", "foo", "bar", "baz", "qux", "x", "y", "z",
+    "data", "value", "item", "thing", "stuff", "obj", "var", "result",
+    "message", "text", "content", "input", "output", "response", "name",
+}
+
+
+_NAMING_DESCRIPTOR_MAP = {
+    "hello": ["greeting", "welcome", "hello"],
+    "hi": ["greeting", "welcome", "hello"],
+    "welcome": ["welcome", "greeting"],
+    "message": ["message", "text", "content"],
+    "text": ["text", "content", "message"],
+    "data": ["data", "payload", "record"],
+    "result": ["result", "output", "response"],
+    "response": ["response", "reply", "output"],
+    "output": ["output", "display", "result"],
+    "print": ["output", "display", "shown"],
+    "error": ["error", "issue", "failure"],
+    "fail": ["error", "failure", "issue"],
+    "count": ["count", "total", "quantity"],
+    "total": ["total", "count", "summary"],
+    "file": ["file", "path", "resource"],
+    "path": ["path", "file", "location"],
+    "user": ["user", "account", "profile"],
+    "value": ["value", "data", "result"],
+}
+
+
+def _split_naming_words(text):
+    text = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", text.replace("-", "_"))
+    return [part.lower() for part in re.findall(r"[A-Za-z0-9]+", text) if part]
+
+
+def _dedupe_preserve_order(items):
+    seen = set()
+    result = []
+    for item in items:
+        if item and item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+
+def _collect_naming_signals(code, language):
+    signals = {
+        "assigned_names": [],
+        "string_literals": [],
+        "has_def": bool(re.search(r"^\s*def\s+\w+", code, re.M)),
+        "has_class": bool(re.search(r"^\s*class\s+\w+", code, re.M)),
+        "has_print": bool(re.search(r"\bprint\s*\(", code)),
+        "has_return": bool(re.search(r"\breturn\b", code)),
+    }
+
+    if language.lower().startswith("py"):
+        try:
+            tree = ast.parse(code)
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Assign):
+                    for target in node.targets:
+                        if isinstance(target, ast.Name):
+                            signals["assigned_names"].append(target.id)
+                elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+                    signals["assigned_names"].append(node.target.id)
+                elif isinstance(node, ast.FunctionDef):
+                    signals["has_def"] = True
+                elif isinstance(node, ast.ClassDef):
+                    signals["has_class"] = True
+                elif isinstance(node, ast.Call):
+                    if isinstance(node.func, ast.Name) and node.func.id == "print":
+                        signals["has_print"] = True
+                elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+                    signals["string_literals"].append(node.value)
+        except Exception:
+            pass
+
+    if not signals["assigned_names"]:
+        signals["assigned_names"] = re.findall(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*=", code)
+    if not signals["string_literals"]:
+        signals["string_literals"] = re.findall(r'["\']([^"\']{1,120})["\']', code)
+
+    return signals
+
+
+def _naming_descriptor_words(signals):
+    words = []
+    for text in signals["string_literals"]:
+        for token in _split_naming_words(text):
+            if token in _NAMING_DESCRIPTOR_MAP:
+                words.extend(_NAMING_DESCRIPTOR_MAP[token])
+
+    if signals["has_print"]:
+        words.extend(["output", "display"])
+    if signals["has_return"]:
+        words.append("result")
+    if signals["has_class"]:
+        words.append("object")
+
+    return _dedupe_preserve_order(words) or ["result"]
+
+
+def _naming_subject_words(signals, current_name=""):
+    words = []
+    for name in signals["assigned_names"]:
+        words.extend(_split_naming_words(name))
+    if not words and current_name:
+        words.extend(_split_naming_words(current_name))
+    if not words:
+        if signals["has_def"]:
+            words.append("function")
+        elif signals["has_class"]:
+            words.append("object")
+        else:
+            words.extend(["message", "value"])
+    if signals["has_print"] and "message" not in words:
+        words.insert(0, "message")
+    if signals["has_return"] and "result" not in words:
+        words.append("result")
+    return _dedupe_preserve_order([w for w in words if w not in _NAMING_GENERIC_WORDS or w in {"message", "value", "result"}]) or ["value"]
+
+
+def _score_naming_candidate(candidate, descriptors, subjects, current_name, effective_kind):
+    parts = _split_naming_words(candidate)
+    descriptor_hit = any(part in descriptors for part in parts)
+    subject_hit = any(part in subjects for part in parts)
+
+    score = 40
+    if descriptor_hit:
+        score += 25
+    if subject_hit:
+        score += 20
+    if effective_kind == "class" and candidate[:1].isupper():
+        score += 8
+    if effective_kind == "variable" and "_" in candidate:
+        score += 5
+    if effective_kind == "function" and parts and parts[0] in {
+        "get", "set", "load", "save", "parse", "build", "calculate", "format",
+        "render", "create", "update", "validate", "compute", "make", "generate",
+    }:
+        score += 8
+    if len(parts) == 2:
+        score += 4
+    if len(parts) > 3:
+        score -= 4 * (len(parts) - 3)
+    if candidate.lower() in _NAMING_GENERIC_WORDS:
+        score -= 15
+    if current_name and candidate.lower() == current_name.lower():
+        score -= 20
+    if len(candidate) < 4:
+        score -= 8
+    if len(candidate) > 30:
+        score -= 4
+
+    score = max(0, min(100, score))
+    clarity = max(0, min(10, 3 + (4 if descriptor_hit else 0) + (2 if subject_hit else 0)))
+    convention = max(0, min(10, 5 + (2 if effective_kind != "class" or candidate[:1].isupper() else 0) + (1 if "_" in candidate else 0)))
+    searchability = max(0, min(10, 4 + (3 if len(parts) >= 2 else 0) + (2 if descriptor_hit else 0) + (1 if subject_hit else 0)))
+    intent_match = max(0, min(10, 3 + (4 if descriptor_hit else 0) + (3 if subject_hit else 0)))
+    return score, clarity, convention, searchability, intent_match
+
+
+def _make_naming_fallback(code, kind, language, current_name=""):
+    signals = _collect_naming_signals(code, language)
+    descriptors = _naming_descriptor_words(signals)
+    subjects = _naming_subject_words(signals, current_name=current_name)
+
+    effective_kind = (kind or "function").lower()
+    if signals["has_class"] or effective_kind == "class":
+        effective_kind = "class"
+    elif signals["has_def"] and effective_kind != "variable":
+        effective_kind = "function"
+    else:
+        effective_kind = "variable"
+
+    candidates = []
+    if effective_kind == "class":
+        for descriptor in descriptors:
+            for subject in subjects:
+                candidates.append("".join(part.capitalize() for part in (descriptor, subject)))
+            candidates.append("".join(part.capitalize() for part in _split_naming_words(descriptor)))
+        candidates.extend("".join(part.capitalize() for part in _split_naming_words(subject)) for subject in subjects)
+    else:
+        for descriptor in descriptors:
+            for subject in subjects:
+                candidates.append(f"{descriptor}_{subject}")
+                candidates.append(f"{subject}_{descriptor}")
+            candidates.append(descriptor)
+        candidates.extend(subjects)
+
+    scored = []
+    for candidate in _dedupe_preserve_order(candidates):
+        if not candidate:
+            continue
+        score, clarity, convention, searchability, intent_match = _score_naming_candidate(
+            candidate, descriptors, subjects, current_name, effective_kind
+        )
+        scored.append({
+            "name": candidate,
+            "score": score,
+            "clarity": clarity,
+            "convention": convention,
+            "searchability": searchability,
+            "intent_match": intent_match,
+            "reasoning": f"Uses {', '.join(descriptors[:2])} cues and fits the code's role as a {effective_kind}.",
+        })
+
+    scored.sort(key=lambda item: item["score"], reverse=True)
+    suggestions = scored[:5] or [{
+        "name": "value",
+        "score": 50,
+        "clarity": 5,
+        "convention": 5,
+        "searchability": 5,
+        "intent_match": 5,
+        "reasoning": "Fallback suggestion generated from generic code cues.",
+    }]
+
+    winner = suggestions[0]["name"]
+    principle = f"Use concrete names that reflect the code's {effective_kind} role and the literal text or identifiers it works with."
+
+    if current_name:
+        current_parts = set(_split_naming_words(current_name))
+        generic_current = bool(current_parts & _NAMING_GENERIC_WORDS) or current_name.lower() in _NAMING_GENERIC_WORDS
+        verdict = "undersells" if generic_current and any(d in descriptors for d in {"greeting", "welcome", "hello", "output", "result"}) else ("misleading" if generic_current else "accurate")
+        issues = []
+        if generic_current:
+            issues.append("Current name is too generic for what the code is doing.")
+        if signals["has_print"]:
+            issues.append("The code emits output, so the name should reflect the displayed content.")
+        if descriptors:
+            issues.append(f"The code carries {descriptors[0]} cues from its literals.")
+        return {
+            "mode": "reverse",
+            "current_name": current_name,
+            "verdict": verdict,
+            "score": suggestions[0]["score"],
+            "issues": issues[:3],
+            "explanation": "Fallback analysis generated locally because the AI response was not valid JSON.",
+            "better_names": suggestions,
+            "winner": winner,
+            "naming_principle": principle,
+        }
+
+    return {
+        "mode": "suggest",
+        "winner": winner,
+        "suggestions": suggestions,
+        "better_names": suggestions,
+        "naming_principle": principle,
+        "explanation": "Fallback analysis generated locally because the AI response was not valid JSON.",
+    }
+
+
+def _normalize_naming_items(items, current_name="", mode="suggest"):
+    normalized = []
+    for item in items or []:
+        if isinstance(item, dict):
+            entry = dict(item)
+            name = (entry.get("name") or entry.get("new_name") or entry.get("suggested") or entry.get("title") or "").strip()
+            if name:
+                entry.setdefault("name", name)
+                entry.setdefault("new_name", name)
+                entry.setdefault("suggested", name)
+            if current_name and mode == "reverse":
+                entry.setdefault("old_name", current_name)
+                entry.setdefault("original", current_name)
+            normalized.append(entry)
+        elif item:
+            name = str(item).strip()
+            entry = {"name": name, "new_name": name, "suggested": name}
+            if current_name and mode == "reverse":
+                entry["old_name"] = current_name
+                entry["original"] = current_name
+            normalized.append(entry)
+    return normalized
+
+
+def _normalize_naming_result(result, current_name="", mode="suggest"):
+    if not isinstance(result, dict):
+        return result
+    for key in ("suggestions", "better_names"):
+        if key in result:
+            result[key] = _normalize_naming_items(result.get(key), current_name=current_name, mode=mode)
+    if not result.get("suggestions") and result.get("better_names"):
+        result["suggestions"] = list(result["better_names"])
+    if not result.get("better_names") and result.get("suggestions"):
+        result["better_names"] = list(result["suggestions"])
+    if result.get("suggestions") and not result.get("winner"):
+        result["winner"] = result["suggestions"][0].get("name", "")
+    if result.get("better_names") and not result.get("winner"):
+        result["winner"] = result["better_names"][0].get("name", "")
+    return result
+
 # ================= CHANGE 10: RATE LIMITING (Redis → memory fallback) =================
 
 try:
     import redis as _redis
     _redis_client = _redis.from_url(
-        os.getenv("REDIS_URL", "redis://localhost:6379/0"),
+        REDIS_URL,
         decode_responses=True, socket_connect_timeout=1
     )
     _redis_client.ping()
@@ -742,7 +1097,6 @@ FREE_FALLBACKS = [
     "qwen/qwen3-coder:free",
     "microsoft/phi-4:free",
     "nvidia/llama-3.1-nemotron-70b-instruct:free",
-    "openrouter/free",
 ]
 
 import time as _time
@@ -764,9 +1118,15 @@ def _groq_call(messages, model=None, max_tokens=500, temperature=0.3, timeout=15
             timeout=timeout,
         )
         if resp.status_code == 200:
-            data = resp.json()
-            if data.get("choices"):
-                return data["choices"][0]["message"]["content"].strip()
+            try:
+                data = resp.json()
+            except ValueError as exc:
+                app.logger.warning(f"_groq_call: invalid JSON from {m}: {exc}")
+                return None
+            content = _extract_ai_content(data)
+            if content:
+                return content
+            app.logger.warning(f"_groq_call: empty content from {m}")
         app.logger.warning(f"_groq_call: HTTP {resp.status_code} from {m}")
         return None
     except requests.RequestException as exc:
@@ -809,6 +1169,26 @@ def _groq_stream(messages, model=None, max_tokens=1200, temperature=0.3, timeout
     except requests.RequestException as exc:
         app.logger.warning(f"_groq_stream exception: {exc}")
 
+
+def _extract_ai_content(data):
+    if not isinstance(data, dict):
+        return None
+    choices = data.get("choices") or []
+    if not choices:
+        return None
+    first_choice = choices[0] if isinstance(choices[0], dict) else {}
+    message = first_choice.get("message") if isinstance(first_choice, dict) else None
+    if not isinstance(message, dict):
+        return None
+    content = message.get("content")
+    if content is None:
+        return None
+    if isinstance(content, str):
+        content = content.strip()
+        return content or None
+    content = str(content).strip()
+    return content or None
+
 # ── Central AI call: tries Groq first (fast), then OpenRouter + fallbacks ─────
 def _ai_call(messages, model=None, max_tokens=1000, temperature=0.3, timeout=30,
              prefer_groq=False, groq_model=None):
@@ -849,9 +1229,18 @@ def _ai_call(messages, model=None, max_tokens=1000, temperature=0.3, timeout=30,
                 timeout=timeout,
             )
             if resp.status_code == 200:
-                data = resp.json()
-                if "choices" in data and data["choices"]:
-                    return data["choices"][0]["message"]["content"].strip()
+                try:
+                    data = resp.json()
+                except ValueError as exc:
+                    last_err = f"invalid JSON from {m}: {exc}"
+                    app.logger.warning(f"_ai_call OpenRouter {m} exception: {exc}")
+                    continue
+                content = _extract_ai_content(data)
+                if content:
+                    return content
+                last_err = f"HTTP 200 from {m} but response had no content"
+                app.logger.warning(f"_ai_call OpenRouter: empty content from {m}")
+                continue
             last_err = f"HTTP {resp.status_code} from {m}"
             app.logger.warning(f"_ai_call OpenRouter: {last_err}")
             if resp.status_code not in (400, 402, 404, 429, 500, 502, 503):
@@ -1560,6 +1949,7 @@ def delete_chat():
 def pin_chat():
     data = request.json
     conn = sqlite3.connect("codebuddy.db")
+    conn.row_factory = sqlite3.Row
     current = conn.execute(
         "SELECT pinned FROM conversations WHERE id=? AND user_id=?",
         (data["chat_id"], current_user.id)
@@ -5530,7 +5920,11 @@ def dna_build():
     """
     profile = _build_dna_profile(current_user.id)
     if not profile:
-        return jsonify({"error": "Not enough code samples yet. Paste some code in chat first!"}), 400
+        return jsonify({
+            "profile": None,
+            "status": "needs_samples",
+            "message": "Not enough code samples yet. Paste some code in chat first!"
+        })
     return jsonify({"profile": profile, "status": "built"})
 
 
@@ -6979,14 +7373,37 @@ Return ONLY raw JSON (no markdown):
 
     try:
         raw = _ai_call(
+            prefer_groq=True, groq_model=GROQ_MODELS["smart"],
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user",   "content": user_content},
             ],
             model=MODELS["fast"], max_tokens=800, temperature=0.4, timeout=25,
         )
-        raw = re.sub(r"```json|```", "", raw).strip()
-        result = json.loads(raw)
+        raw = re.sub(r"```json|```", "", raw or "").strip()
+        result = None
+        parse_candidates = [raw]
+        if "{" in raw and "}" in raw:
+            fragment = raw[raw.find("{"):raw.rfind("}") + 1]
+            if fragment and fragment not in parse_candidates:
+                parse_candidates.append(fragment)
+        for candidate in parse_candidates:
+            try:
+                result = json.loads(candidate)
+                break
+            except json.JSONDecodeError:
+                continue
+        if result is None:
+            raise json.JSONDecodeError("Could not parse naming response", raw, 0)
+
+        result.setdefault("mode", mode)
+        if result.get("mode") == "suggest":
+            result.setdefault("suggestions", result.get("better_names", []))
+            result.setdefault("winner", (result.get("suggestions") or [{}])[0].get("name", ""))
+        else:
+            result.setdefault("better_names", result.get("suggestions", []))
+            result.setdefault("winner", (result.get("better_names") or [{}])[0].get("name", ""))
+        result = _normalize_naming_result(result, current_name=current_name, mode=mode)
 
         try:
             conn = sqlite3.connect("codebuddy.db")
@@ -7004,9 +7421,41 @@ Return ONLY raw JSON (no markdown):
 
         return jsonify(result)
     except (json.JSONDecodeError, KeyError, ValueError) as exc:
-        return jsonify({"error": f"Could not parse response: {exc}"}), 503
+        app.logger.warning(f"Naming AI parse failed for user {current_user.id}: {exc}")
+        result = _make_naming_fallback(code, kind, language, current_name)
+        result = _normalize_naming_result(result, current_name=current_name, mode=result.get("mode", mode))
+        try:
+            conn = sqlite3.connect("codebuddy.db")
+            conn.execute(
+                "INSERT INTO naming_history(user_id,original_name,suggestions,code_snippet,mode) "
+                "VALUES (?,?,?,?,?)",
+                (current_user.id, current_name or "",
+                 json.dumps(result.get("suggestions") or result.get("better_names", [])),
+                 code[:300], result.get("mode", mode))
+            )
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
+        return jsonify(result)
     except RuntimeError as exc:
-        return jsonify({"error": str(exc)}), 503
+        app.logger.warning(f"Naming AI unavailable for user {current_user.id}: {exc}")
+        result = _make_naming_fallback(code, kind, language, current_name)
+        result = _normalize_naming_result(result, current_name=current_name, mode=result.get("mode", mode))
+        try:
+            conn = sqlite3.connect("codebuddy.db")
+            conn.execute(
+                "INSERT INTO naming_history(user_id,original_name,suggestions,code_snippet,mode) "
+                "VALUES (?,?,?,?,?)",
+                (current_user.id, current_name or "",
+                 json.dumps(result.get("suggestions") or result.get("better_names", [])),
+                 code[:300], result.get("mode", mode))
+            )
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
+        return jsonify(result)
 
 
 @app.route("/naming/history")
