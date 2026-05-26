@@ -3367,9 +3367,18 @@ def calculate_average(numbers):
       _wfSetBtn('dna-build-btn', true, 'ANALYSING…');
       document.getElementById('dna-status').textContent = 'Scanning your code history…';
       try {
-        var r = await fetch('/dna/build', { method: 'POST' }); if (!r.ok) throw new Error('HTTP ' + r.status);
-        var d = await r.json();
-        if (d.error) { document.getElementById('dna-status').textContent = d.error; return; }
+        var r = await fetch('/dna/build', { method: 'POST' });
+        var d = await r.json().catch(function () { return {}; });
+        if (d.status === 'needs_samples' || !d.profile) {
+          document.getElementById('dna-status').textContent = d.message || d.error || 'No DNA profile yet — paste code in chat first.';
+          _wfSetBtn('dna-build-btn', false, '🧬 BUILD MY DNA');
+          return;
+        }
+        if (!r.ok || d.error) {
+          document.getElementById('dna-status').textContent = d.error || 'Failed: HTTP ' + r.status;
+          _wfSetBtn('dna-build-btn', false, '🧬 BUILD MY DNA');
+          return;
+        }
         document.getElementById('dna-status').textContent = '✅ DNA built! Showing your profile…';
         _wfRenderDna(d.profile);
       } catch (e) { document.getElementById('dna-status').textContent = 'Failed: ' + e.message; }
@@ -3495,17 +3504,26 @@ def calculate_average(numbers):
       var res = document.getElementById('naming-result'); res.innerHTML = '';
       try {
         var r = await fetch('/naming/suggest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: code, language: lang }) });
-        var d = await r.json(); if (d.error) { showToast(d.error, true); return; }
-        var renames = d.renames || d.suggestions || [], renamed_code = d.renamed_code || d.refactored_code || '';
-        res.innerHTML = (renames.length ? '<div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--plasma);margin-bottom:10px">NAME CHANGES (' + renames.length + ')</div>'
-          + '<div style="margin-bottom:14px">' + renames.map(function (item) {
-            return '<div style="display:flex;align-items:center;gap:10px;padding:7px 10px;border:1px solid rgba(0,255,224,0.07);border-radius:5px;margin-bottom:6px">'
-              + '<span style="font-family:var(--mono);font-size:11px;color:var(--fire);text-decoration:line-through">' + ((item.old_name || item.original || '').replace(/</g, '&lt;')) + '</span>'
-              + '<span style="color:var(--text-3)">→</span>'
-              + '<span style="font-family:var(--mono);font-size:11px;color:var(--plasma);font-weight:700">' + ((item.new_name || item.suggested || '').replace(/</g, '&lt;')) + '</span>'
-              + (item.reason ? '<span style="font-family:var(--mono);font-size:9.5px;color:var(--text-3);margin-left:auto">' + item.reason.replace(/</g, '&lt;') + '</span>' : '')
+        var d = await r.json().catch(function () { return {}; });
+        if (!r.ok || d.error) { showToast(d.error || ('HTTP ' + r.status), true); return; }
+        var renames = d.renames || d.suggestions || d.better_names || [], renamed_code = d.renamed_code || d.refactored_code || '';
+        var winner = d.winner || (renames[0] && (renames[0].name || renames[0].new_name || renames[0].suggested)) || '';
+        res.innerHTML = (renames.length ? '<div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--plasma);margin-bottom:10px">NAME OPTIONS (' + renames.length + ')</div>'
+          + (winner ? '<div style="padding:10px 12px;border:1px solid rgba(0,255,224,0.14);border-radius:5px;background:rgba(0,255,224,0.03);margin-bottom:12px;font-family:var(--mono);font-size:11px;color:var(--text-2)"><span style="font-family:var(--display);font-size:8px;letter-spacing:1.5px;color:var(--plasma);margin-right:8px">TOP PICK</span>' + winner.replace(/</g, '&lt;') + '</div>' : '')
+          + '<div style="margin-bottom:14px">' + renames.map(function (item, index) {
+            var name = (item.name || item.new_name || item.suggested || item.winner || item.title || '').toString();
+            var score = item.score != null ? item.score : '';
+            var reason = (item.reasoning || item.reason || item.explanation || '').toString();
+            return '<div style="padding:10px 12px;border:1px solid rgba(0,255,224,0.07);border-radius:5px;margin-bottom:6px;background:rgba(0,255,224,0.01)">'
+              + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">'
+              + '<span style="font-family:var(--display);font-size:8px;letter-spacing:1.5px;color:var(--text-3);flex-shrink:0">#' + (index + 1) + '</span>'
+              + '<span style="font-family:var(--mono);font-size:11px;color:var(--plasma);font-weight:700;flex:1">' + name.replace(/</g, '&lt;') + '</span>'
+              + (score !== '' ? '<span style="font-family:var(--display);font-size:8px;color:var(--plasma);flex-shrink:0">' + score + '/100</span>' : '')
+              + '</div>'
+              + (reason ? '<div style="font-family:var(--mono);font-size:9.5px;color:var(--text-3);line-height:1.6">' + reason.replace(/</g, '&lt;') + '</div>' : '')
               + '</div>';
           }).join('') + '</div>' : '')
+          + (d.naming_principle ? '<div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-bottom:12px;line-height:1.7"><span style="font-family:var(--display);font-size:8px;letter-spacing:1.5px;color:var(--text-3);margin-right:8px">NAMING PRINCIPLE</span>' + d.naming_principle.replace(/</g, '&lt;') + '</div>' : '')
           + (renamed_code ? '<div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--text-3);margin-bottom:8px">RENAMED CODE</div>'
             + '<pre style="background:rgba(0,0,0,0.4);border:1px solid rgba(0,255,224,0.1);border-radius:5px;padding:14px;font-family:var(--mono);font-size:11px;color:var(--text-2);line-height:1.6;overflow-x:auto;white-space:pre-wrap;word-break:break-word;max-height:280px;overflow-y:auto">' + renamed_code.replace(/</g, '&lt;') + '</pre>' : '')
           + (d.explanation ? '<div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-top:12px;line-height:1.7;font-style:italic">' + d.explanation.replace(/</g, '&lt;') + '</div>' : '');
@@ -3772,8 +3790,17 @@ def calculate_average(numbers):
       document.getElementById('dna-status').textContent = 'Scanning your code history…';
       try {
         var r = await fetch('/dna/build', { method: 'POST' });
-        var d = await r.json();
-        if (d.error) { document.getElementById('dna-status').textContent = d.error; return; }
+        var d = await r.json().catch(function () { return {}; });
+        if (d.status === 'needs_samples' || !d.profile) {
+          document.getElementById('dna-status').textContent = d.message || d.error || 'No DNA profile yet — paste code in chat first.';
+          btn.disabled = false; btn.textContent = '🧬 BUILD MY DNA';
+          return;
+        }
+        if (!r.ok || d.error) {
+          document.getElementById('dna-status').textContent = d.error || 'Failed: HTTP ' + r.status;
+          btn.disabled = false; btn.textContent = '🧬 BUILD MY DNA';
+          return;
+        }
         document.getElementById('dna-status').textContent = '✅ DNA built!';
         renderDnaProfile(d.profile);
       } catch (e) { document.getElementById('dna-status').textContent = 'Failed: ' + e.message; }
@@ -3916,18 +3943,27 @@ def calculate_average(numbers):
       res.innerHTML = '';
       try {
         var r = await fetch('/naming/suggest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: code, language: lang }) });
-        var d = await r.json();
-        if (d.error) { showToast(d.error, true); return; }
-        var renames = d.renames || d.suggestions || [];
+        var d = await r.json().catch(function () { return {}; });
+        if (!r.ok || d.error) { showToast(d.error || ('HTTP ' + r.status), true); return; }
+        var renames = d.renames || d.suggestions || d.better_names || [];
         var renamed_code = d.renamed_code || d.refactored_code || '';
-        res.innerHTML = (renames.length ? '<div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--plasma);margin-bottom:10px">NAME CHANGES (' + renames.length + ')</div>'
-          + '<div style="margin-bottom:14px">' + renames.map(function (item) {
-            return '<div style="display:flex;align-items:center;gap:10px;padding:7px 10px;border:1px solid rgba(0,255,224,0.07);border-radius:3px;margin-bottom:6px;background:rgba(0,255,224,0.01)">'
-              + '<span style="font-family:var(--mono);font-size:11px;color:var(--fire);text-decoration:line-through">' + (item.old_name || item.original || '').replace(/</g, '&lt;') + '</span>'
-              + '<span style="color:var(--text-3)">→</span>'
-              + '<span style="font-family:var(--mono);font-size:11px;color:var(--plasma);font-weight:700">' + (item.new_name || item.suggested || '').replace(/</g, '&lt;') + '</span>'
-              + (item.reason ? '<span style="font-family:var(--mono);font-size:9.5px;color:var(--text-3);margin-left:auto">' + item.reason.replace(/</g, '&lt;') + '</span>' : '') + '</div>';
+        var winner = d.winner || (renames[0] && (renames[0].name || renames[0].new_name || renames[0].suggested)) || '';
+        res.innerHTML = (renames.length ? '<div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--plasma);margin-bottom:10px">NAME OPTIONS (' + renames.length + ')</div>'
+          + (winner ? '<div style="padding:10px 12px;border:1px solid rgba(0,255,224,0.14);border-radius:5px;background:rgba(0,255,224,0.03);margin-bottom:12px;font-family:var(--mono);font-size:11px;color:var(--text-2)"><span style="font-family:var(--display);font-size:8px;letter-spacing:1.5px;color:var(--plasma);margin-right:8px">TOP PICK</span>' + winner.replace(/</g, '&lt;') + '</div>' : '')
+          + '<div style="margin-bottom:14px">' + renames.map(function (item, index) {
+            var name = (item.name || item.new_name || item.suggested || item.winner || item.title || '').toString();
+            var score = item.score != null ? item.score : '';
+            var reason = (item.reasoning || item.reason || item.explanation || '').toString();
+            return '<div style="padding:7px 10px;border:1px solid rgba(0,255,224,0.07);border-radius:3px;margin-bottom:6px;background:rgba(0,255,224,0.01)">'
+              + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">'
+              + '<span style="font-family:var(--display);font-size:8px;letter-spacing:1.5px;color:var(--text-3);flex-shrink:0">#' + (index + 1) + '</span>'
+              + '<span style="font-family:var(--mono);font-size:11px;color:var(--plasma);font-weight:700;flex:1">' + name.replace(/</g, '&lt;') + '</span>'
+              + (score !== '' ? '<span style="font-family:var(--display);font-size:8px;color:var(--plasma);flex-shrink:0">' + score + '/100</span>' : '')
+              + '</div>'
+              + (reason ? '<div style="font-family:var(--mono);font-size:9.5px;color:var(--text-3);line-height:1.6">' + reason.replace(/</g, '&lt;') + '</div>' : '')
+              + '</div>';
           }).join('') + '</div>' : '')
+          + (d.naming_principle ? '<div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-bottom:12px;line-height:1.7"><span style="font-family:var(--display);font-size:8px;letter-spacing:1.5px;color:var(--text-3);margin-right:8px">NAMING PRINCIPLE</span>' + d.naming_principle.replace(/</g, '&lt;') + '</div>' : '')
           + (renamed_code ? '<div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--text-3);margin-bottom:8px">RENAMED CODE</div>'
             + '<div style="position:relative"><pre style="background:rgba(0,0,0,0.4);border:1px solid rgba(0,255,224,0.1);border-radius:4px;padding:14px;font-family:var(--mono);font-size:11px;color:var(--text-2);line-height:1.6;overflow-x:auto;white-space:pre-wrap;word-break:break-word;max-height:300px;overflow-y:auto">' + renamed_code.replace(/</g, '&lt;') + '</pre></div>' : '')
           + (d.explanation ? '<div style="font-family:var(--mono);font-size:11px;color:var(--text-3);margin-top:12px;line-height:1.7;font-style:italic">' + d.explanation.replace(/</g, '&lt;') + '</div>' : '');
