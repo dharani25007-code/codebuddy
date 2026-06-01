@@ -47,8 +47,25 @@ except ImportError:
 # ================= INIT =================
 
 load_dotenv()
+
+# Ensure requests/ssl use a valid CA bundle from certifi when available.
+# Some environments (moved/renamed venvs or mismatched activations) can point
+# to an invalid path for TLS CA bundles. Force the env vars to certifi's
+# bundle if it exists so external HTTPS calls succeed reliably.
+try:
+    import certifi
+    cafile = certifi.where()
+    if cafile and os.path.exists(cafile):
+        os.environ.setdefault("REQUESTS_CA_BUNDLE", cafile)
+        os.environ.setdefault("SSL_CERT_FILE", cafile)
+    else:
+        print(f"Warning: certifi CA bundle not found at: {cafile}")
+except Exception as _e:
+    print("Warning: certifi not available — TLS CA bundle not set.")
+
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 GROQ_API_KEY       = os.getenv("GROQ_API_KEY")
+FREE_ONLY_MODE     = os.getenv("FREE_ONLY_MODE", "false").lower() == "true"
 
 # ── API base URLs ─────────────────────────────────────────────────────────────
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
@@ -1042,6 +1059,8 @@ def get_conversation_history(conversation_id, limit=20):
 
 def generate_chat_title(user_message):
     """Generate a short chat title — tries Groq first (fastest), then OpenRouter."""
+    if _free_only_active():
+        return _local_chat_title(user_message)
     title_messages = [
         {"role": "system", "content": "Generate a concise 3-5 word title for this programming question. Only output the title, nothing else. No quotes."},
         {"role": "user", "content": user_message[:200]}
@@ -1107,7 +1126,7 @@ def _groq_call(messages, model=None, max_tokens=500, temperature=0.3, timeout=15
     title generation, mood detection, complexity, focus zone tip, dead code, naming.
     Falls back to None (no exception) so callers can try OpenRouter next.
     """
-    if not GROQ_API_KEY:
+    if _free_only_active() or not GROQ_API_KEY:
         return None
     m = model or GROQ_MODELS["fast"]
     try:
@@ -1138,7 +1157,7 @@ def _groq_stream(messages, model=None, max_tokens=1200, temperature=0.3, timeout
     """Generator: streams tokens from Groq. Yields text chunks.
     Used as fallback when OpenRouter models are rate-limited.
     """
-    if not GROQ_API_KEY:
+    if _free_only_active() or not GROQ_API_KEY:
         return
     m = model or GROQ_MODELS["smart"]
     try:
@@ -1189,6 +1208,258 @@ def _extract_ai_content(data):
     content = str(content).strip()
     return content or None
 
+
+def _free_only_active():
+    return FREE_ONLY_MODE or (not OPENROUTER_API_KEY and not GROQ_API_KEY)
+
+
+def _extract_first_code_block(text):
+    match = re.search(r"```(?:[\w+-]+)?\n([\s\S]+?)```", text or "")
+    return match.group(1).strip() if match else ""
+
+
+def _compact_topic(text, limit=5):
+    words = re.findall(r"[A-Za-z][A-Za-z0-9_+-]{2,}", text or "")
+    stop = {
+        "this", "that", "with", "from", "into", "your", "about", "please",
+        "code", "function", "class", "error", "issue", "debug", "help",
+        "the", "and", "for", "you", "are", "how", "what", "why", "when",
+    }
+    picked = []
+    for word in words:
+        lower = word.lower()
+        if lower not in stop and lower not in picked:
+            picked.append(lower)
+        if len(picked) >= limit:
+            break
+    return " ".join(picked) if picked else "your code"
+
+
+def _local_chat_title(user_message):
+    return _compact_topic(user_message, limit=4).title()[:60] or "New Chat"
+
+
+def _local_quick_explain(code, level="intermediate"):
+    code_lower = code.lower()
+    parts = []
+    if "class " in code_lower:
+        parts.append("This defines a class and groups related data and behavior together.")
+    elif "def " in code_lower:
+        parts.append("This defines a function that takes input, does work, and returns a result.")
+    if "for " in code_lower or "while " in code_lower:
+        parts.append("It uses a loop to repeat work.")
+    if "if " in code_lower:
+        parts.append("It has conditional checks to choose different paths.")
+    if "return" in code_lower:
+        parts.append("It returns a value to the caller.")
+    if "print(" in code_lower:
+        parts.append("It prints output for the user or for debugging.")
+    if not parts:
+        parts.append("This code looks like a small routine that processes input and produces output.")
+    if level == "beginner":
+        lead = "Simple version:"
+    elif level == "expert":
+        lead = "Technical version:"
+    else:
+        lead = "Explanation:"
+    return f"{lead} {' '.join(parts)}\n\nFree-only mode is active, so this is a local best-effort explanation."
+
+
+def _local_roadmap(topic, level="beginner"):
+    effort = {
+        "beginner": "2-4 weeks",
+        "intermediate": "4-8 weeks",
+        "advanced": "8-12 weeks",
+    }.get(level, "4-8 weeks")
+    topic_name = topic.strip().title() or "Programming"
+    return (
+        f"Learning Roadmap: {topic_name}\n"
+        f"Total time: {effort}\n\n"
+        "1. Learn the basics: syntax, data types, and common tools.\n"
+        "2. Practice small exercises: build tiny scripts and fix bugs.\n"
+        "3. Build one mini project: a to-do app, calculator, or API client.\n"
+        "4. Review and improve: refactor your code and add tests.\n\n"
+        f"Final project: build a small {topic_name.lower()} project that combines what you learned.\n"
+        "Free-only mode is active, so this roadmap is generated locally."
+    )
+
+
+def _local_error_autopsy(error, code="", language=""):
+    error_text = (error or "").lower()
+    code_text = (code or "").lower()
+    combined = f"{error_text} {code_text}"
+    causes = []
+
+    if "syntaxerror" in combined or "invalid syntax" in combined or "unexpected token" in combined:
+        causes = [
+            {"rank": 1, "cause": "syntax error", "probability": "70%", "explanation": "The error text points to invalid syntax or a malformed statement.", "clue": error[:120]},
+            {"rank": 2, "cause": "missing punctuation", "probability": "20%", "explanation": "A missing colon, bracket, or comma is a common trigger for this error.", "clue": code[:120]},
+            {"rank": 3, "cause": "copy/paste issue", "probability": "10%", "explanation": "Sometimes the code was pasted with a broken indentation or stray character.", "clue": code[:120]},
+        ]
+        verdict = "Fix the malformed syntax first, usually near the line mentioned in the traceback."
+        fix = "Check punctuation, indentation, and any unfinished string or bracket on the failing line."
+    elif "nameerror" in combined or "undefined variable" in combined:
+        causes = [
+            {"rank": 1, "cause": "undefined variable", "probability": "75%", "explanation": "The code references a name before it is created.", "clue": error[:120]},
+            {"rank": 2, "cause": "typo in variable name", "probability": "15%", "explanation": "The variable may be spelled differently in one place.", "clue": code[:120]},
+            {"rank": 3, "cause": "scope issue", "probability": "10%", "explanation": "The variable may be defined in another scope that is not visible here.", "clue": code[:120]},
+        ]
+        verdict = "Define the variable first or use the correct name in the same scope."
+        fix = "Check spelling and make sure the variable is assigned before it is used."
+    elif "typeerror" in combined:
+        causes = [
+            {"rank": 1, "cause": "type mismatch", "probability": "70%", "explanation": "One value is not the type that the function or operator expects.", "clue": error[:120]},
+            {"rank": 2, "cause": "wrong argument shape", "probability": "20%", "explanation": "A function may be receiving the wrong number or structure of arguments.", "clue": code[:120]},
+            {"rank": 3, "cause": "missing conversion", "probability": "10%", "explanation": "A string, list, or number may need to be converted first.", "clue": code[:120]},
+        ]
+        verdict = "Convert the values to the expected type before the operation runs."
+        fix = "Inspect each argument and add the needed cast, parse, or validation step."
+    elif "indexerror" in combined or "out of range" in combined:
+        causes = [
+            {"rank": 1, "cause": "index out of range", "probability": "80%", "explanation": "The code is reading past the end of a list, tuple, or string.", "clue": error[:120]},
+            {"rank": 2, "cause": "loop boundary bug", "probability": "15%", "explanation": "A loop may be running one step too far.", "clue": code[:120]},
+            {"rank": 3, "cause": "empty collection", "probability": "5%", "explanation": "The collection may be empty when the code expects data.", "clue": code[:120]},
+        ]
+        verdict = "Clamp the index or check collection length before reading it."
+        fix = "Add a length check and make sure the loop stops before the last invalid position."
+    else:
+        causes = [
+            {"rank": 1, "cause": "runtime bug", "probability": "55%", "explanation": "The error likely comes from a logic or data issue in the code path shown.", "clue": error[:120]},
+            {"rank": 2, "cause": "bad input", "probability": "25%", "explanation": "Unexpected input may be reaching this code path.", "clue": code[:120]},
+            {"rank": 3, "cause": "missing guard", "probability": "20%", "explanation": "A validation or null check may be missing.", "clue": code[:120]},
+        ]
+        verdict = "Add input checks and inspect the failing line with the traceback."
+        fix = "Trace the exact line in the error, then add guards for the bad input or missing value."
+
+    tree = [
+        {"node": "Is the error caused by a typo or missing symbol?", "children": ["Check spelling", "Check variable definition"]},
+        {"node": "Is the value the expected type/shape?", "children": ["Convert the value", "Validate the input"]},
+        {"node": "Is the index or loop boundary valid?", "children": ["Clamp the index", "Adjust the loop limit"]},
+    ]
+
+    return {
+        "language": language or "unknown",
+        "error_type": causes[0]["cause"],
+        "causes": causes,
+        "tree": tree,
+        "verdict": verdict,
+        "fix": fix,
+        "prevention": "Add a small validation check before the failing line and test the edge case once.",
+    }
+
+
+def _local_voice_fix(text, lang_code="en-US"):
+    snippet = _compact_topic(text, limit=6)
+    return (
+        f"I think the main issue is around {snippet}. "
+        "Check the input types, the exact line where it fails, and any missing guard. "
+        "If you share the traceback, I can narrow it down further."
+    )
+
+
+def _local_chat_response(user_message, mode, lang_code, personality):
+    code_block = _extract_first_code_block(user_message)
+    code_lower = code_block.lower()
+    msg_lower = user_message.lower()
+
+    if code_block and mode == "debug":
+        parts = ["The issue looks local and traceable."]
+        if "syntaxerror" in msg_lower or "invalid syntax" in msg_lower:
+            parts.append("Check the punctuation, indentation, and any unfinished brackets or strings.")
+        elif "nameerror" in msg_lower or "undefined" in msg_lower:
+            parts.append("Check that every variable is defined before use and spelled the same way everywhere.")
+        elif "typeerror" in msg_lower:
+            parts.append("Check that each value has the type the function expects.")
+        elif "indexerror" in msg_lower or "out of range" in msg_lower:
+            parts.append("Check the loop bounds and list length before reading an item.")
+        else:
+            parts.append("Inspect the failing line first, then compare input values against the expected shape.")
+        return " ".join(parts) + "\n\nFree-only mode is active, so this is a local best-effort debug reply."
+
+    if mode == "roadmap":
+        return _local_roadmap(_compact_topic(user_message, limit=4), "beginner")
+
+    if mode == "interview":
+        return (
+            "Let us start with one question: can you explain what the code is trying to do, line by line? "
+            "After you answer, I will give feedback and the next question."
+        )
+
+    if mode == "optimize":
+        return (
+            "The safest optimization path is to remove repeated work, reduce nested loops, and move expensive parsing outside hot paths. "
+            "If you paste the code, I can point to the exact lines to change."
+        )
+
+    if code_block:
+        if "def " in code_lower:
+            return (
+                "This looks like a function-focused question. Check the inputs, the return value, and any edge cases first. "
+                "If you want, paste the exact error or ask for a line-by-line explanation."
+            )
+        if "class " in code_lower:
+            return (
+                "This looks like a class-based design question. Focus on the constructor, state changes, and the public methods. "
+                "If you share the goal, I can suggest a cleaner structure."
+            )
+
+    if "how" in msg_lower or "what" in msg_lower or "why" in msg_lower:
+        return (
+            "Here is the practical answer: start with the simplest working version, validate the input, then add one improvement at a time. "
+            "If you share the code or error, I can make the answer specific."
+        )
+
+    return (
+        "I can help with the code, but in free-only mode I am using local heuristics instead of a hosted model. "
+        "Please paste the code or error so I can give a more precise answer."
+    )
+
+
+def _local_ai_response(messages, mode=None, max_tokens=1000, temperature=0.3):
+    system_text = " ".join((msg.get("content", "") or "") for msg in messages if msg.get("role") == "system")
+    user_text = "\n".join((msg.get("content", "") or "") for msg in messages if msg.get("role") == "user")
+    probe = f"{system_text}\n{user_text}".lower()
+
+    if "pair naming assistant" in probe:
+        kind = "class" if "class" in probe else ("variable" if "variable" in probe else "function")
+        current_match = re.search(r"Current name:\s*`([^`]+)`", user_text)
+        current_name = current_match.group(1) if current_match else ""
+        code_match = re.search(r"```[\w+-]*\n([\s\S]+?)```", user_text)
+        code = code_match.group(1).strip() if code_match else user_text
+        return json.dumps(_make_naming_fallback(code, kind, "python", current_name))
+
+    if "error autopsy" in probe:
+        error_match = re.search(r"Error:\s*```\n([\s\S]+?)```", user_text)
+        code_match = re.search(r"Code context:\s*```[\w+-]*\n([\s\S]+?)```", user_text)
+        language_match = re.search(r"Language:\s*([A-Za-z0-9_+-]+)", user_text)
+        return json.dumps(_local_error_autopsy(
+            error_match.group(1).strip() if error_match else user_text,
+            code_match.group(1).strip() if code_match else "",
+            language_match.group(1).strip() if language_match else "",
+        ))
+
+    if "roadmap" in probe:
+        topic_match = re.search(r"for:\s*(.+)", user_text, re.I)
+        level_match = re.search(r"Starting level:\s*(\w+)", user_text, re.I)
+        return _local_roadmap(
+            topic_match.group(1).strip() if topic_match else _compact_topic(user_text, limit=3),
+            (level_match.group(1).strip().lower() if level_match else "beginner"),
+        )
+
+    if "explain this code" in probe or "explain code" in probe:
+        return _local_quick_explain(_extract_first_code_block(user_text) or user_text, "intermediate")
+
+    if "voice assistant" in probe or "read aloud" in probe:
+        return _local_voice_fix(user_text)
+
+    if "generate a concise 3-5 word title" in probe or "short chat title" in probe:
+        return _local_chat_title(user_text)
+
+    if "translate" in probe:
+        return user_text[:1200]
+
+    return _local_quick_explain(_extract_first_code_block(user_text) or user_text, "intermediate")
+
 # ── Central AI call: tries Groq first (fast), then OpenRouter + fallbacks ─────
 def _ai_call(messages, model=None, max_tokens=1000, temperature=0.3, timeout=30,
              prefer_groq=False, groq_model=None):
@@ -1199,6 +1470,9 @@ def _ai_call(messages, model=None, max_tokens=1000, temperature=0.3, timeout=30,
     - prefer_groq=False → try OpenRouter first (main chat, code review, deep tasks)
     - Always falls back to the other provider if primary fails/rate-limits.
     """
+    if _free_only_active():
+        return _local_ai_response(messages, mode=model, max_tokens=max_tokens, temperature=temperature)
+
     # ── Groq-first path (fast utility calls) ──────────────────────────────────
     if prefer_groq and GROQ_API_KEY:
         result = _groq_call(messages, model=groq_model or GROQ_MODELS["fast"],
@@ -2463,6 +2737,33 @@ def chat():
 
     tone = "strict technical interviewer" if personality == "strict" else "supportive technical mentor"
 
+    if _free_only_active():
+        local_title = _local_chat_title(user_message)
+        if convo["title"] in ("New Chat", "", None):
+            conn = sqlite3.connect("codebuddy.db")
+            conn.execute(
+                "UPDATE conversations SET title=?, mode=?, updated_at=? WHERE id=?",
+                (local_title, mode, datetime.now().isoformat(), conversation_id)
+            )
+            conn.commit()
+            conn.close()
+
+        local_response = _local_chat_response(user_message, mode, lang_code, personality)
+
+        def local_generate():
+            for chunk in re.split(r"(?<=[.!?\n])\s+", local_response.strip()):
+                if chunk:
+                    yield chunk + (" " if not chunk.endswith("\n") else "")
+            save_conn = sqlite3.connect("codebuddy.db")
+            save_conn.execute(
+                "INSERT INTO messages(conversation_id,role,content,timestamp) VALUES (?,?,?,?)",
+                (conversation_id, "assistant", local_response, datetime.now().isoformat())
+            )
+            save_conn.commit()
+            save_conn.close()
+
+        return Response(local_generate(), mimetype="text/plain")
+
     # CHANGE 5: Inject persistent memory into system prompt
     memory_context = build_memory_context(current_user.id)
 
@@ -2781,6 +3082,8 @@ def quick_explain():
         {"role": "user", "content": f"```\n{code[:2000]}\n```"}
     ]
     try:
+        if _free_only_active():
+            return jsonify({"explanation": _local_quick_explain(code, level)})
         # Groq first — fast for explanations
         result = _groq_call(qe_messages, model=GROQ_MODELS["smart"],
                             max_tokens=600, temperature=0.3)
@@ -2807,6 +3110,9 @@ def generate_roadmap():
 
     if not topic.strip():
         return jsonify({"error": "No topic provided"}), 400
+
+    if _free_only_active():
+        return Response(_local_roadmap(topic, level), mimetype="text/plain")
 
     rm_messages = [
         {"role": "system", "content": SYSTEM_PROMPTS["roadmap"]},
@@ -2856,6 +3162,9 @@ def translate_response():
 
     if not text or lang_code == "en-US":
         return jsonify({"translated": text})
+
+    if _free_only_active():
+        return jsonify({"translated": text, "error": "Free-only mode is active; online translation is disabled."})
 
     LANG_NAMES_SHORT = {
         "ta-IN": "Tamil (தமிழ் script only — unicode characters)",
@@ -3337,6 +3646,8 @@ Rules:
     ]
 
     try:
+        if _free_only_active():
+            return jsonify({"fix_text": _local_voice_fix(text, lang_code), "code": ""})
         # Try Groq first for low-latency voice responses
         fix_text = _groq_call(voice_messages, model=GROQ_MODELS["smart"],
                               max_tokens=300, temperature=0.6)
@@ -7145,6 +7456,21 @@ def error_autopsy():
             return jsonify(json.loads(cached["diagnosis"]))
         except Exception:
             pass
+
+    if _free_only_active():
+        result = _local_error_autopsy(error, code, language)
+        try:
+            conn2 = sqlite3.connect("codebuddy.db")
+            conn2.execute(
+                "INSERT INTO error_autopsies(user_id,error_hash,error_text,language,diagnosis) VALUES (?,?,?,?,?)",
+                (current_user.id, err_hash, error[:500], result.get("language", language), json.dumps(result))
+            )
+            conn2.commit()
+            conn2.close()
+        except Exception:
+            pass
+        bump_stat(current_user.id, "debug_count")
+        return jsonify(result)
 
     system_prompt = """You are CodeBuddy's Error Autopsy engine — a senior debugging expert.
 
