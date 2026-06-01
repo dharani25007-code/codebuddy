@@ -7,13 +7,13 @@
 ![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-2.0%2B-000000?style=for-the-badge&logo=flask&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-3%2B-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
-![OpenRouter](https://img.shields.io/badge/OpenRouter-API-7C3AED?style=for-the-badge)
+![Free AI Fallbacks](https://img.shields.io/badge/Free%20AI%20Fallbacks-Open%20Source%20%2B%20Free%20Tier-7C3AED?style=for-the-badge)
 ![Socket.IO](https://img.shields.io/badge/Socket.IO-4.0%2B-010101?style=for-the-badge&logo=socket.io&logoColor=white)
 ![Piston](https://img.shields.io/badge/Piston-API-4ecdc4?style=for-the-badge)
 ![gTTS](https://img.shields.io/badge/gTTS-TTS-4ecdc4?style=for-the-badge)
 ![Eventlet](https://img.shields.io/badge/Eventlet--Gevent-8A2BE2?style=for-the-badge)
 
-> ⚡ **28 New Features · 5 Themes · 20+ Languages · 14 Free AI Models**
+> ⚡ **28 New Features · 5 Themes · 20+ Languages · Free-first AI stack**
 
 </div>
 
@@ -21,7 +21,7 @@
 
 ## 📌 Overview
 
-CodeBuddy is a full-stack AI-powered programming assistant with **28 New features** — including Tanglish (Tamil + English) voice coding, File Forge upload/edit/run, Video Analyzer, Code DNA fingerprinting, Rubber Duck+ Mode, and a 14-model AI fallback chain. The app now uses a 5-theme system across the UI and supports larger file uploads for File Forge and media analysis.
+CodeBuddy is a full-stack AI-powered programming assistant with **28 New features** — including Tanglish (Tamil + English) voice coding, File Forge upload/edit/run, Video Analyzer, Code DNA fingerprinting, Rubber Duck+ Mode, and a free-first AI fallback chain. The app now uses a 5-theme system across the UI and supports larger file uploads for File Forge and media analysis.
 
 ---
 
@@ -32,8 +32,8 @@ CodeBuddy is a full-stack AI-powered programming assistant with **28 New feature
 | 🧠 **8 AI Modes** | General, Debug, Optimize, Explain, Interview, ML, DSA, Roadmap |
 | 🌍 **20+ Languages** | 9 Indian languages + French, German, Spanish, Japanese, Chinese & more |
 | 🗣️ **Tanglish AI** |  Tamil+English mixed language coding assistant |
-| 🔁 **Streaming** | Token-by-token with 14-model fallback chain |
-| ▶️ **Code Execution** | Run 50+ languages via sandboxed Piston API |
+| 🔁 **Streaming** | Token-by-token with free-tier and local fallbacks |
+| ▶️ **Code Execution** | Run 50+ languages via sandboxed free Piston endpoints |
 | 🧬 **Code DNA** | Builds your personal coding style — AI silently matches it |
 | 📁 **File Forge** | Upload, edit, run, and AI-refactor code files in the browser |
 | 🎬 **Video Analyzer** | Upload videos or analyze coding/tutorial links from the UI |
@@ -88,8 +88,9 @@ codebuddy/
 ### Prerequisites
 - Python 3.10 or newer
 - Pip (bundled with modern Python) and a virtual environment (recommended)
-- A free OpenRouter API key: https://openrouter.ai/keys (set in `.env`)
-- Optional: Piston API access for code execution (if using self Piston instance)
+- No paid API keys are required for the default free-only mode
+- Optional free-tier API keys if you want higher-quality hosted replies later: OpenRouter and/or Groq
+- Optional: a self-hosted Piston instance for code execution if you want to avoid public endpoints entirely
 - Recommended system packages: `sqlite3` (usually bundled), `ffmpeg` (for voice/video features)
 
 ### Install
@@ -102,10 +103,12 @@ pip install -r requirements.txt
 ### Configure
 ```bash
 # Create .env file
-OPENROUTER_API_KEY=sk-or-v1-your-key-here
 SECRET_KEY=any-long-random-string
 CODEBUDDY_DB_PATH=codebuddy.db
+FREE_ONLY_MODE=true
 ```
+
+The app runs without any AI keys in free-only mode. Add optional free-tier keys only if you want better hosted responses.
 
 ### Run
 ```bash
@@ -114,13 +117,11 @@ python app.py
 Open: `http://127.0.0.1:5000` → Register → New Chat → Pick a mode 🚀
 
 ### Production Deployment
-For a production stack, run the app behind Gunicorn and Nginx, and enable Redis for rate limiting plus Socket.IO fan-out across multiple workers:
+For a production stack, run the app behind Gunicorn and Nginx. Redis is optional and only needed if you want Socket.IO fan-out across multiple workers:
 
 ```bash
 pip install -r requirements.txt
 set SECRET_KEY=your-long-random-secret
-set REDIS_URL=redis://127.0.0.1:6379/0
-set USE_SOCKETIO_REDIS=true
 gunicorn -c gunicorn.conf.py app:app
 ```
 
@@ -174,16 +175,16 @@ python -m unittest discover -s tests -p "test_*.py"
 
 ---
 
-## 🤖 AI Fallback Chain (14 Models)
+## 🤖 AI Fallback Chain (Free-First)
 
 | Role | Model |
 |---|---|
 | Code tasks | `deepseek/deepseek-chat-v3-0324:free` |
-| Fast / multilingual | `meta-llama/llama-4-scout:free` |
+| Fast / multilingual | `meta-llama/llama-3.3-70b-instruct:free` |
 | Classification | `google/gemma-3-4b-it:free` |
-| Last resort | `openrouter/auto` |
+| Last resort | local heuristics / graceful fallback |
 
-If any model returns 429/404/503 → next model tried automatically with 1.5s delay.
+If any model returns 429/404/503 → next free model is tried automatically, then the app falls back to local heuristics where possible.
 
 ---
 
@@ -205,8 +206,8 @@ If any model returns 429/404/503 → next model tried automatically with 1.5s de
 | Flask-SocketIO | Real-time WebSocket collaboration |
 | Eventlet / Gevent | Async workers for SocketIO in production |
 | SQLite (WAL) | Local relational database (configurable path) |
-| OpenRouter API | Multi-model AI fallback chain |
-| Piston API | Sandboxed code execution (50+ languages) |
+| OpenRouter / Groq | Free-tier AI fallback chain |
+| Piston API | Sandboxed code execution (50+ languages, free endpoints) |
 | gTTS / XTTS-v2 | Text-to-speech and voice cloning |
 | python-dotenv | Load `.env` configuration |
 | requests | HTTP requests to external APIs |
