@@ -222,7 +222,7 @@ If any model returns 429/404/503 → next model tried automatically with 1.5s de
 - SQL stat fields use a whitelist — zero raw input in queries
 
 ---
-> ⭐ Star this repo if you found it helpful!
+
 
 <div align="center">
 <img src="https://capsule-render.vercel.app/api?type=waving&color=0:4ecdc4,100:0f1117&height=120&section=footer"/>
