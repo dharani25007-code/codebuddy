@@ -6,7 +6,7 @@ flask-login>=0.6.3
 flask-bcrypt>=1.0.1
 python-dotenv>=1.0.0
 requests>=2.31.0
-gtts>=2.5.0
+gtts==2.3.2
 gunicorn>=21.2.0
 
 
