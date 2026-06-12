@@ -105,7 +105,7 @@ pip install -r requirements.txt
 # Create .env file
 SECRET_KEY=any-long-random-string
 CODEBUDDY_DB_PATH=codebuddy.db
-FREE_ONLY_MODE=true
+
 ```
 
 The app runs without any AI keys in free-only mode. Add optional free-tier keys only if you want better hosted responses.
@@ -144,7 +144,7 @@ server {
 }
 ```
 
-The current data layer still uses SQLite. If you want PostgreSQL in production, migrate the `sqlite3` access layer first, then point the app at the new database backend.
+The current data layer still uses SQLite. If you want PostgreSQL in production, migrate the `sqlite3` access layer first, then point the app at the new database backend
 
 ### Load Benchmark
 Run the built-in concurrent benchmark against the chat and code-run endpoints:

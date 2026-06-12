@@ -9,8 +9,7 @@ requests>=2.31.0
 gtts>=2.5.0
 gunicorn>=21.2.0
 
-# click>=8.2.1 fixes conflict between gTTS and typer
-click>=8.2.1
+
 
 # Collab real-time (threading mode — eventlet removed, was causing session bugs)
 flask-socketio>=5.3.6
