@@ -1,6 +1,3 @@
-<div align="center">
-<img src="https://capsule-render.vercel.app/api?type=waving&color=0:0f1117,50:7C3AED,100:4ecdc4&height=200&section=header&text=CodeBuddy%20AI&fontSize=52&fontColor=ffffff&fontAlignY=40&desc=World's%20First%20Tanglish%20AI%20Coding%20Assistant&descAlignY=60&descSize=18&animation=fadeIn"/>
-</div>
 
 <div align="center">
 
