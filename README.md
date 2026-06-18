@@ -1,6 +1,7 @@
 
 <div align="center">
 
+
 ![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-2.0%2B-000000?style=for-the-badge&logo=flask&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-3%2B-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
