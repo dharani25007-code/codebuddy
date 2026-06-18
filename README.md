@@ -25,6 +25,7 @@ CodeBuddy is a full-stack AI-powered programming assistant with **28 New feature
 
 ---
 
+
 ## ✨ Core Features
 
 | Feature | Description |
