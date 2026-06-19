@@ -1121,6 +1121,35 @@
     .vc-btn.vc-end:hover {
       background: rgba(255, 107, 43, 0.28)
     }
+
+    @media (max-width: 768px) {
+      .layout {
+        flex-direction: column;
+      }
+      .sidebar {
+        width: 100%;
+        height: auto;
+        max-height: 200px;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+      }
+      .main {
+        height: calc(100vh - 200px);
+      }
+    }
+
+    @media (max-width: 520px) {
+      .topbar {
+        padding: 0 10px;
+        gap: 8px;
+      }
+      .topbar-brand, .topbar-sep, .topbar-members {
+        display: none;
+      }
+      .topbar-title {
+        max-width: 150px;
+      }
+    }
   </style>
   <link rel="stylesheet" href="/static/css/theme-system.css">
 </head>
