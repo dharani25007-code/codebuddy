@@ -3,6 +3,7 @@
 
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{ title }} | CodeBuddy</title>
   <link
     href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@300;400;500&family=Exo+2:wght@300;400;600&display=swap"
@@ -670,6 +671,38 @@
       background: var(--plasma);
       box-shadow: 0 0 5px var(--plasma);
       animation: blink 1.8s ease infinite;
+    }
+
+    @media (max-width: 580px) {
+      .topbar {
+        padding: 0 12px;
+      }
+      .topbar-page, .topbar-divider {
+        display: none;
+      }
+      .hud-pill {
+        display: none;
+      }
+      .page-body {
+        padding: 20px 12px 40px;
+      }
+      .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+      }
+      .msg-count {
+        margin-left: 0;
+      }
+      .bubble-body {
+        padding: 10px 12px;
+      }
+      .status-bar {
+        padding: 0 12px;
+      }
+      .sbar-right {
+        display: none;
+      }
     }
   </style>
   <link rel="stylesheet" href="/static/css/theme-system.css">
