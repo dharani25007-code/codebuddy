@@ -3,6 +3,7 @@
 
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Profile | CodeBuddy</title>
   <link
     href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@300;400;500&family=Exo+2:wght@300;400;600&display=swap"
@@ -707,6 +708,54 @@
       border-color: rgba(255, 107, 43, 0.5);
       background: rgba(255, 107, 43, 0.08);
       box-shadow: 0 0 14px rgba(255, 107, 43, 0.15);
+    }
+
+    @media (max-width: 580px) {
+      body {
+        padding: 70px 10px 20px;
+      }
+      .card-header {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 16px;
+        padding: 24px 16px;
+      }
+      .header-info {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .user-role {
+        justify-content: center;
+      }
+      .user-badges {
+        justify-content: center;
+      }
+      .stats-section, .info-section, .activity-section {
+        padding: 20px 16px;
+      }
+      .stats-grid {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+      .info-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+      }
+      .info-key {
+        width: auto;
+      }
+      .card-footer {
+        flex-direction: column;
+        gap: 16px;
+        align-items: center;
+        padding: 16px;
+      }
+      .topbar {
+        padding: 0 12px;
+      }
     }
   </style>
   <link rel="stylesheet" href="/static/css/theme-system.css">
