@@ -5474,6 +5474,72 @@
       transition: height 0.1s;
       opacity: 0.7;
     }
+
+    /* MOBILE RESPONSIVE STYLES */
+    @media (max-width: 768px) {
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        height: 100vh;
+        z-index: 1000;
+        transition: transform 0.3s ease;
+        width: 280px !important;
+        min-width: 280px !important;
+      }
+      .sidebar.collapsed {
+        transform: translateX(-100%);
+      }
+      .sidebar.collapsed .sidebar-body {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .sidebar-collapse {
+        right: -36px;
+        width: 32px;
+        height: 32px;
+        border-radius: 0 4px 4px 0;
+        background: rgba(6, 13, 26, 0.95);
+      }
+      #cbBar, #cbVoiceBar, #cbPanel, #cbVoicePanel {
+        left: 0 !important;
+      }
+      .quick-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .topbar {
+        padding: 0 12px;
+        height: 50px;
+        gap: 6px;
+      }
+      .hud-badge {
+        padding: 4px 8px;
+        font-size: 8px;
+        letter-spacing: 1px;
+      }
+      .mode-select {
+        padding: 5px 20px 5px 8px;
+        font-size: 8px;
+        letter-spacing: 1px;
+      }
+      .theme-morph {
+        min-width: unset;
+        width: 36px;
+        height: 30px;
+        padding: 0;
+        justify-content: center;
+      }
+      #cb-theme-cur-label {
+        display: none;
+      }
+      .topbar-right {
+        gap: 4px;
+      }
+    }
   </style>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/cursor.css') }}">
   <script src="{{ url_for('static', filename='js/cursor.js') }}" defer></script>
