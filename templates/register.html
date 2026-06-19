@@ -3,6 +3,7 @@
 
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Register | CodeBuddy</title>
   <link
     href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@300;400;500&family=Exo+2:wght@300;400;600&display=swap"
@@ -135,7 +136,8 @@
     .forge-card {
       position: relative;
       z-index: 10;
-      width: 400px;
+      width: 100%;
+      max-width: 400px;
       background: rgba(6, 13, 26, 0.92);
       backdrop-filter: blur(40px) saturate(180%);
       border: 1px solid var(--border-hi);
@@ -623,6 +625,21 @@
 
       50% {
         opacity: 0.3
+      }
+    }
+
+    @media (max-width: 520px) {
+      html, body {
+        height: auto;
+        min-height: 100%;
+        overflow: auto;
+      }
+      body {
+        padding: 20px 10px;
+      }
+      .forge-card {
+        padding: 30px 20px 24px;
+        margin: 20px auto;
       }
     }
   </style>
