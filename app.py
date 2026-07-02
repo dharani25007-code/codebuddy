@@ -952,11 +952,12 @@ def bump_stat(user_id, field, amount=1):
         conn.execute("PRAGMA journal_mode=WAL")
         _tl.conn = conn
     # Safe because field is whitelisted — not user-supplied
+    # Use EXCLUDED + table-qualified name for PostgreSQL compatibility
     conn.execute(f"""
         INSERT INTO user_stats(user_id, {field}, last_active)
         VALUES (?, ?, datetime('now'))
         ON CONFLICT(user_id) DO UPDATE SET
-            {field} = {field} + ?,
+            {field} = user_stats.{field} + ?,
             last_active = datetime('now')
     """, (user_id, amount, amount))
     conn.commit()
