@@ -1174,11 +1174,11 @@ def generate_chat_title(user_message):
 
 # ── OpenRouter free models (best quality for each task) ───────────────────────
 MODELS = {
-    "code":       "deepseek/deepseek-chat-v3-0324:free",   # best free coding model
-    "fast":       "meta-llama/llama-3.3-70b-instruct:free", # fast general tasks
-    "classifier": "google/gemma-3-4b-it:free",              # lightweight yes/no
-    "title":      "google/gemma-3-4b-it:free",              # short title generation
-    "indic":      "meta-llama/llama-3.3-70b-instruct:free", # best free multilingual
+    "code":       "nvidia/llama-3.1-nemotron-70b-instruct:free",   # best free coding model (confirmed working)
+    "fast":       "nvidia/llama-3.1-nemotron-70b-instruct:free",   # fast general tasks
+    "classifier": "google/gemma-3-4b-it:free",                     # lightweight yes/no
+    "title":      "google/gemma-3-4b-it:free",                     # short title generation
+    "indic":      "nvidia/llama-3.1-nemotron-70b-instruct:free",   # best free multilingual
 }
 
 # ── Groq models (ultra-fast, free tier, no credit card needed) ────────────────
@@ -1189,19 +1189,13 @@ GROQ_MODELS = {
 }
 
 # ── OpenRouter fallback chain (used when primary model rate-limits) ───────────
+# Ordered by reliability: confirmed-working models first, then others as backup.
 FREE_FALLBACKS = [
-    "meta-llama/llama-3.3-70b-instruct:free",
-    "meta-llama/llama-4-scout:free",
-    "meta-llama/llama-4-maverick:free",
-    "deepseek/deepseek-chat-v3-0324:free",
-    "deepseek/deepseek-r1-distill-llama-70b:free",
-    "deepseek/deepseek-r1-distill-qwen-32b:free",
-    "google/gemma-3-27b-it:free",
-    "google/gemma-3-12b-it:free",
-    "mistralai/mistral-small-3.1-24b-instruct:free",
-    "qwen/qwen3-coder:free",
-    "microsoft/phi-4:free",
-    "nvidia/llama-3.1-nemotron-70b-instruct:free",
+    "nvidia/llama-3.1-nemotron-70b-instruct:free",  # confirmed working Jul 2026
+    "meta-llama/llama-3.3-70b-instruct:free",        # sometimes 429 but works
+    "qwen/qwen3-coder:free",                         # sometimes 429 but works
+    "google/gemma-3-4b-it:free",                     # lightweight fallback
+    "openrouter/free",                               # auto-router picks best available
 ]
 
 import time as _time
