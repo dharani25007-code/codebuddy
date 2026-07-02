@@ -111,6 +111,7 @@ def _connect_db(database=None, *args, **kwargs):
         class PostgresCursorWrapper:
             def __init__(self, cursor):
                 self._cursor = cursor
+                self._lastrowid = None
             def execute(self, sql, parameters=None):
                 sql = sql.replace("?", "%s")
                 sql = sql.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY")
@@ -126,12 +127,31 @@ def _connect_db(database=None, *args, **kwargs):
                     else:
                         return self
                 
+                is_insert = sql.strip().upper().startswith("INSERT INTO") and "COLLAB_ROOMS" not in sql.upper()
+                if is_insert:
+                    sql = sql.rstrip('; \t\n\r') + " RETURNING id"
+
                 if parameters:
                     self._cursor.execute(sql, parameters)
                 else:
                     self._cursor.execute(sql)
+
+                if is_insert:
+                    try:
+                        row = self._cursor.fetchone()
+                        if row:
+                            self._lastrowid = row[0]
+                    except Exception:
+                        self._lastrowid = None
+                else:
+                    self._lastrowid = None
+
                 return self
                 
+            @property
+            def lastrowid(self):
+                return self._lastrowid
+
             def executemany(self, sql, parameters):
                 sql = sql.replace("?", "%s")
                 self._cursor.executemany(sql, parameters)
