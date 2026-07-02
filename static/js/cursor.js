@@ -15,6 +15,11 @@
     }
 
     function initCursor() {
+        // Skip custom cursor on mobile and touch devices
+        if (window.matchMedia('(max-width: 768px)').matches || ('ontouchstart' in window) || navigator.maxTouchPoints > 0) {
+            return;
+        }
+
         const cur = document.getElementById('cursor');
         const ring = document.getElementById('cursor-ring');
         if (!cur || !ring) return;

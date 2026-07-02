@@ -18,7 +18,7 @@ flask-socketio>=5.3.6
 redis>=5.0.0
 
 # Optional if you later migrate from SQLite to PostgreSQL
-# psycopg[binary]>=3.1.18
+psycopg2-binary>=2.9.9
 
 # Video Analyzer frame extraction (optional — text-only mode without it)
 # pip install opencv-python

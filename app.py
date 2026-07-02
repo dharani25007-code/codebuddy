@@ -104,11 +104,71 @@ def _configure_sqlite_connection(conn):
 
 
 def _connect_db(database=None, *args, **kwargs):
+    DATABASE_URL = os.getenv("DATABASE_URL")
+    if DATABASE_URL:
+        import psycopg2
+        import psycopg2.extras
+        class PostgresCursorWrapper:
+            def __init__(self, cursor):
+                self._cursor = cursor
+            def execute(self, sql, parameters=None):
+                sql = sql.replace("?", "%s")
+                sql = sql.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY")
+                sql = sql.replace("AUTOINCREMENT", "SERIAL")
+                sql = sql.replace("datetime('now')", "CURRENT_TIMESTAMP")
+                
+                # PostgreSQL ignore PRAGMA
+                if sql.strip().upper().startswith("PRAGMA"):
+                    return self
+                
+                if parameters:
+                    self._cursor.execute(sql, parameters)
+                else:
+                    self._cursor.execute(sql)
+                return self
+                
+            def executemany(self, sql, parameters):
+                sql = sql.replace("?", "%s")
+                self._cursor.executemany(sql, parameters)
+                return self
+                
+            def fetchone(self):
+                return self._cursor.fetchone()
+                
+            def fetchall(self):
+                return self._cursor.fetchall()
+                
+            def __iter__(self):
+                return iter(self._cursor)
+                
+            def close(self):
+                self._cursor.close()
+
+        class PostgresConnectionWrapper:
+            def __init__(self, conn):
+                self._conn = conn
+                self.row_factory = None
+            def cursor(self):
+                return PostgresCursorWrapper(self._conn.cursor(cursor_factory=psycopg2.extras.DictCursor))
+            def execute(self, sql, parameters=None):
+                cur = self.cursor()
+                cur.execute(sql, parameters)
+                return cur
+            def executemany(self, sql, parameters):
+                cur = self.cursor()
+                cur.executemany(sql, parameters)
+                return cur
+            def commit(self):
+                self._conn.commit()
+            def close(self):
+                self._conn.close()
+
+        return PostgresConnectionWrapper(psycopg2.connect(DATABASE_URL))
+
     if database in (None, "", "codebuddy.db"):
         database = DB_PATH
     kwargs.setdefault("timeout", 30)
     return _configure_sqlite_connection(_sqlite_connect(database, *args, **kwargs))
-
 
 sqlite3.connect = _connect_db
 
