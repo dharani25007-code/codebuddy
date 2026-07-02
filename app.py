@@ -117,9 +117,14 @@ def _connect_db(database=None, *args, **kwargs):
                 sql = sql.replace("AUTOINCREMENT", "SERIAL")
                 sql = sql.replace("datetime('now')", "CURRENT_TIMESTAMP")
                 
-                # PostgreSQL ignore PRAGMA
+                # PostgreSQL handle PRAGMA
                 if sql.strip().upper().startswith("PRAGMA"):
-                    return self
+                    match = re.search(r"PRAGMA\s+table_info\((.*?)\)", sql, re.IGNORECASE)
+                    if match:
+                        table_name = match.group(1).strip("'\"")
+                        sql = f"SELECT 0 as cid, column_name as name, data_type as type, 0 as notnull, null as dflt_value, 0 as pk FROM information_schema.columns WHERE table_name = '{table_name}'"
+                    else:
+                        return self
                 
                 if parameters:
                     self._cursor.execute(sql, parameters)
