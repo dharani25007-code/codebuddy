@@ -1,0 +1,196 @@
+/* Shared theme system for non-index pages */
+body.light {
+    --void: #e8f4f8;
+    --deep: #d4ecf5;
+    --abyss: #eaf6fb;
+    --panel: rgba(231, 244, 249, 0.98);
+    --panel-soft: rgba(8, 145, 178, 0.05);
+    --panel-strong: rgba(8, 145, 178, 0.09);
+    --plasma: #0891b2;
+    --plasma-dim: rgba(8, 145, 178, 0.1);
+    --plasma-glow: rgba(8, 145, 178, 0.2);
+    --plasma-hard: rgba(8, 145, 178, 0.7);
+    --fire: #0e7490;
+    --fire-dim: rgba(14, 116, 144, 0.12);
+    --nova: #6d28d9;
+    --nova-dim: rgba(109, 40, 217, 0.08);
+    --gold: #d97706;
+    --ice: #0369a1;
+    --text: #0c2a3a;
+    --text-2: rgba(12, 42, 58, 0.55);
+    --text-3: rgba(12, 42, 58, 0.3);
+    --border: rgba(8, 145, 178, 0.12);
+    --border-hi: rgba(8, 145, 178, 0.4);
+    --surface: rgba(8, 145, 178, 0.05);
+    --surface2: rgba(8, 145, 178, 0.09);
+}
+
+body.theme-gaming {
+    --void: #020d12;
+    --deep: #051820;
+    --abyss: #031016;
+    --panel: rgba(6, 22, 29, 0.96);
+    --panel-soft: rgba(0, 245, 212, 0.03);
+    --panel-strong: rgba(0, 245, 212, 0.06);
+    --plasma: #00f5d4;
+    --plasma-dim: rgba(0, 245, 212, 0.07);
+    --plasma-glow: rgba(0, 245, 212, 0.22);
+    --plasma-hard: rgba(0, 245, 212, 0.75);
+    --fire: #ff3e3e;
+    --fire-dim: rgba(255, 62, 62, 0.1);
+    --nova: #ff00ff;
+    --nova-dim: rgba(255, 0, 255, 0.07);
+    --gold: #ffe600;
+    --ice: #00cfff;
+    --text: #d0fff8;
+    --text-2: rgba(208, 255, 248, 0.65);
+    --text-3: rgba(208, 255, 248, 0.22);
+    --border: rgba(0, 245, 212, 0.1);
+    --border-hi: rgba(0, 245, 212, 0.32);
+    --surface: rgba(0, 245, 212, 0.03);
+    --surface2: rgba(0, 245, 212, 0.06);
+}
+
+body.theme-darkpro {
+    --void: #0d1117;
+    --deep: #161b22;
+    --abyss: #10141b;
+    --panel: rgba(15, 18, 25, 0.96);
+    --panel-soft: rgba(240, 165, 0, 0.04);
+    --panel-strong: rgba(240, 165, 0, 0.07);
+    --plasma: #f0a500;
+    --plasma-dim: rgba(240, 165, 0, 0.08);
+    --plasma-glow: rgba(240, 165, 0, 0.22);
+    --plasma-hard: rgba(240, 165, 0, 0.75);
+    --fire: #ff6b35;
+    --fire-dim: rgba(255, 107, 53, 0.1);
+    --nova: #58a6ff;
+    --nova-dim: rgba(88, 166, 255, 0.08);
+    --gold: #f0a500;
+    --ice: #79c0ff;
+    --text: #f0f6fc;
+    --text-2: rgba(240, 246, 252, 0.68);
+    --text-3: rgba(240, 246, 252, 0.28);
+    --border: rgba(240, 165, 0, 0.1);
+    --border-hi: rgba(240, 165, 0, 0.35);
+    --surface: rgba(240, 165, 0, 0.04);
+    --surface2: rgba(240, 165, 0, 0.07);
+}
+
+body.theme-professional {
+    --void: #f5f8ff;
+    --deep: #dde6f5;
+    --abyss: #edf2fb;
+    --panel: rgba(247, 250, 255, 0.97);
+    --panel-soft: rgba(55, 48, 163, 0.05);
+    --panel-strong: rgba(55, 48, 163, 0.09);
+    --plasma: #3730a3;
+    --plasma-dim: rgba(55, 48, 163, 0.07);
+    --plasma-glow: rgba(55, 48, 163, 0.18);
+    --plasma-hard: rgba(55, 48, 163, 0.7);
+    --fire: #dc2626;
+    --fire-dim: rgba(220, 38, 38, 0.08);
+    --nova: #7c3aed;
+    --nova-dim: rgba(124, 58, 237, 0.07);
+    --gold: #b45309;
+    --ice: #1d4ed8;
+    --text: #0d1225;
+    --text-2: rgba(13, 18, 37, 0.78);
+    --text-3: rgba(13, 18, 37, 0.45);
+    --border: rgba(55, 48, 163, 0.1);
+    --border-hi: rgba(55, 48, 163, 0.38);
+    --surface: rgba(55, 48, 163, 0.05);
+    --surface2: rgba(55, 48, 163, 0.09);
+}
+
+body.theme-warm {
+    --void: #fdf6ec;
+    --deep: #f2e0c5;
+    --abyss: #f7ecda;
+    --panel: rgba(253, 248, 240, 0.97);
+    --panel-soft: rgba(194, 65, 12, 0.05);
+    --panel-strong: rgba(194, 65, 12, 0.09);
+    --plasma: #c2410c;
+    --plasma-dim: rgba(194, 65, 12, 0.08);
+    --plasma-glow: rgba(194, 65, 12, 0.2);
+    --plasma-hard: rgba(194, 65, 12, 0.72);
+    --fire: #dc2626;
+    --fire-dim: rgba(220, 38, 38, 0.09);
+    --nova: #7c2d12;
+    --nova-dim: rgba(124, 45, 18, 0.08);
+    --gold: #92400e;
+    --ice: #0369a1;
+    --text: #1c0a00;
+    --text-2: rgba(28, 10, 0, 0.75);
+    --text-3: rgba(28, 10, 0, 0.42);
+    --border: rgba(194, 65, 12, 0.1);
+    --border-hi: rgba(194, 65, 12, 0.38);
+    --surface: rgba(194, 65, 12, 0.05);
+    --surface2: rgba(194, 65, 12, 0.09);
+}
+
+body.theme-minimal {
+    --void: #ffffff;
+    --deep: #f0f4f0;
+    --abyss: #f7faf7;
+    --panel: rgba(250, 252, 250, 0.98);
+    --panel-soft: rgba(22, 101, 52, 0.05);
+    --panel-strong: rgba(22, 101, 52, 0.09);
+    --plasma: #166534;
+    --plasma-dim: rgba(22, 101, 52, 0.07);
+    --plasma-glow: rgba(22, 101, 52, 0.16);
+    --plasma-hard: rgba(22, 101, 52, 0.72);
+    --fire: #b91c1c;
+    --fire-dim: rgba(185, 28, 28, 0.08);
+    --nova: #0f766e;
+    --nova-dim: rgba(15, 118, 110, 0.07);
+    --gold: #854d0e;
+    --ice: #1e40af;
+    --text: #0a140d;
+    --text-2: rgba(10, 20, 13, 0.75);
+    --text-3: rgba(10, 20, 13, 0.42);
+    --border: rgba(22, 101, 52, 0.1);
+    --border-hi: rgba(22, 101, 52, 0.35);
+    --surface: rgba(22, 101, 52, 0.05);
+    --surface2: rgba(22, 101, 52, 0.09);
+}
+
+body[class*="theme-"] .forge-card,
+body[class*="theme-"] .profile-card,
+body[class*="theme-"] .panel-header,
+body[class*="theme-"] .tab-bar-wrap,
+body[class*="theme-"] .sidebar,
+body[class*="theme-"] .voice-panel,
+body[class*="theme-"] .topbar,
+body[class*="theme-"] .nav,
+body[class*="theme-"] .input-area,
+body[class*="theme-"] .modal,
+body[class*="theme-"] .modal-hdr,
+body[class*="theme-"] .modal-overlay,
+body[class*="theme-"] #videoCallOverlay {
+    background: linear-gradient(180deg, var(--panel) 0%, var(--deep) 100%) !important;
+    border-color: var(--border-hi) !important;
+    color: var(--text) !important;
+}
+
+body[class*="theme-"] .tabs,
+body[class*="theme-"] .stat-card,
+body[class*="theme-"] .podium-card,
+body[class*="theme-"] .toast,
+body[class*="theme-"] .video-slot,
+body[class*="theme-"] .video-slot-cam-off,
+body[class*="theme-"] .bubble-content pre {
+    background: var(--panel-soft) !important;
+    border-color: var(--border-hi) !important;
+    color: var(--text) !important;
+}
+
+body[class*="theme-"] .field-wrap,
+body[class*="theme-"] .input-box,
+body[class*="theme-"] .hub-body textarea,
+body[class*="theme-"] .hub-body input,
+body[class*="theme-"] .hub-body select {
+    background: var(--surface) !important;
+    border-color: var(--border) !important;
+    color: var(--text) !important;
+}
