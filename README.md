@@ -13,6 +13,8 @@
 ![Render](https://img.shields.io/badge/Deployed%20on-Render-46E3B7?style=for-the-badge&logo=render&logoColor=white)
 ![Piston](https://img.shields.io/badge/Piston-API-4ecdc4?style=for-the-badge)
 ![gTTS](https://img.shields.io/badge/gTTS-TTS-4ecdc4?style=for-the-badge)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+[![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-brightgreen.svg?style=for-the-badge)](https://github.com/dharani25007-code/codebuddy/pulls)
 
 > ⚡ **28 World-First Features · 5 Themes · 20+ Languages · Free-first AI stack · Live on Render**
 
@@ -21,7 +23,10 @@
 </div>
 
 <div align="center">
-<img src="https://capsule-render.vercel.app/api?type=waving&color=0:0f1117,50:7C3AED,100:4ecdc4&height=200&section=header&text=CodeBuddy%20AI&fontSize=52&fontColor=ffffff&fontAlignY=40&desc=World's%20First%20Tanglish%20AI%20Coding%20Assistant&descAlignY=60&descSize=18&animation=fadeIn"/>
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+[![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-brightgreen.svg?style=for-the-badge)](https://github.com/dharani25007-code/codebuddy/pulls)
+
 </div>
 
 ---
