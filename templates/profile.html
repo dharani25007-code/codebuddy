@@ -757,12 +757,12 @@
         padding: 0 12px;
       }
     }
-  </style>
-  <link rel="stylesheet" href="/static/css/theme-system.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/theme-system.css') }}">
 </head>
 
 <body>
-  <script src="/static/js/theme-system.js"></script>
+  <script src="{{ url_for('static', filename='js/theme-system.js') }}"></script>
+
 
   <div id="cursor"></div>
   <div id="cursor-ring"></div>
