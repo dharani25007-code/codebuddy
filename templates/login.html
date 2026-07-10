@@ -9,25 +9,23 @@
     href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@300;400;500&family=Exo+2:wght@300;400;600&display=swap"
     rel="stylesheet">
   <style>
-    --void: #020d12;
-    --deep: #060d1a;
-    --plasma: #00ffe0;
-    --plasma-dim: rgba(0, 255, 224, 0.1);
-    --plasma-glow: rgba(0, 255, 224, 0.2);
-    --nova: #a855f7;
-    --fire: #ff6b2b;
-    --text: #e2f4ff;
-    --text-2: rgba(226, 244, 255, 0.45);
-    --text-3: rgba(226, 244, 255, 0.18);
-    --border: rgba(0, 255, 224, 0.08);
-    --border-hi: rgba(0, 255, 224, 0.3);
-    --surface: rgba(0, 255, 224, 0.03);
-    --mono: 'IBM Plex Mono',
-    monospace;
-    --display: 'Orbitron',
-    monospace;
-    --body: 'Exo 2',
-    sans-serif;
+    :root {
+      --void: #020d12;
+      --deep: #060d1a;
+      --plasma: #00ffe0;
+      --plasma-dim: rgba(0, 255, 224, 0.1);
+      --plasma-glow: rgba(0, 255, 224, 0.2);
+      --nova: #a855f7;
+      --fire: #ff6b2b;
+      --text: #e2f4ff;
+      --text-2: rgba(226, 244, 255, 0.45);
+      --text-3: rgba(226, 244, 255, 0.18);
+      --border: rgba(0, 255, 224, 0.08);
+      --border-hi: rgba(0, 255, 224, 0.3);
+      --surface: rgba(0, 255, 224, 0.03);
+      --mono: 'IBM Plex Mono', monospace;
+      --display: 'Orbitron', monospace;
+      --body: 'Exo 2', sans-serif;
     }
 
     *,
@@ -374,15 +372,6 @@
       color: var(--plasma);
     }
 
-    /* ── ERROR / FLASH ── */
-      {
-      % with messages=get_flashed_messages() %
-    }
-
-      {
-      % if messages %
-    }
-
     .flash-msg {
       font-family: var(--mono);
       font-size: 11px;
@@ -398,13 +387,6 @@
       animation: fadeUp 0.3s ease;
     }
 
-      {
-      % endif %
-    }
-
-      {
-      % endwith %
-    }
 
     @keyframes fadeUp {
       from {
