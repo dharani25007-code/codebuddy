@@ -11,8 +11,10 @@ gunicorn>=21.2.0
 
 
 
-# Collab real-time (threading mode — eventlet removed, was causing session bugs)
+# Collab real-time (gevent mode — required for WebSocket support on Render)
 flask-socketio>=5.3.6
+gevent>=24.2.1
+gevent-websocket>=0.10.1
 
 # Redis for rate limiting (optional — falls back to in-memory if unavailable)
 redis>=5.0.0

@@ -1,1 +1,1 @@
-web: gunicorn app:app -c gunicorn.conf.py
+web: gunicorn app:app -c gunicorn.conf.py --worker-class geventwebsocket.handler.WebSocketHandler

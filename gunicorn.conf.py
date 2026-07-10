@@ -8,7 +8,7 @@ heavier traffic.
 import os
 
 bind = os.getenv("GUNICORN_BIND", "0.0.0.0:8000")
-worker_class = os.getenv("GUNICORN_WORKER_CLASS", "gthread")
+worker_class = os.getenv("GUNICORN_WORKER_CLASS", "geventwebsocket.handler.WebSocketHandler")
 workers = int(os.getenv("WEB_CONCURRENCY", "1"))
 threads = int(os.getenv("GUNICORN_THREADS", "4"))
 timeout = int(os.getenv("GUNICORN_TIMEOUT", "180"))
