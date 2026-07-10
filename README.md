@@ -20,6 +20,12 @@
 
 </div>
 
+<div align="center">
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+[![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-brightgreen.svg?style=for-the-badge)](https://github.com/dharani25007-code/codebuddy/pulls)
+
+</div>
 
 ---
 
