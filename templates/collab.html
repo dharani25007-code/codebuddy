@@ -1150,6 +1150,7 @@
         max-width: 150px;
       }
     }
+  </style>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/theme-system.css') }}">
 </head>
 
@@ -1191,17 +1192,15 @@
           <button id="endCallBtn" onclick="hangUp()">📵 END CALL</button>
         </div>
       </div>
+      {% if username == room.host %}
+      <button class="end-btn" onclick="endSession()">✕ END SESSION</button>
+      {% else %}
+      <button class="end-btn" onclick="leaveSession()">← LEAVE SESSION</button>
+      {% endif %}
+    </aside>
 
-  </div>
-  {% if username == room.host %}
-  <button class="end-btn" onclick="endSession()">✕ END SESSION</button>
-  {% else %}
-  <button class="end-btn" onclick="leaveSession()">← LEAVE SESSION</button>
-  {% endif %}
-  </aside>
-
-  <!-- MAIN -->
-  <div class="main">
+    <!-- MAIN -->
+    <div class="main">
     <div class="topbar">
       <div class="topbar-brand">CODEBUDDY</div>
       <div class="topbar-sep"></div>
@@ -1269,7 +1268,7 @@
       </div>
       <div class="input-hint">ENTER TO SEND · SHIFT+ENTER FOR NEW LINE · SESSION: {{ room_code|upper }}</div>
     </div>
-  </div>
+    </div>
   </div>
 
   <!-- VIDEO CALL OVERLAY -->
