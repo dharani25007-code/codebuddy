@@ -1016,7 +1016,7 @@
       border-radius: 3px
     }
 
-    ..video-slot-cam-off {
+    .video-slot-cam-off {
       display: flex;
       align-items: center;
       justify-content: center;
@@ -1318,10 +1318,10 @@
       enhanceCodeBlocks(el.closest('.bubble-forge'));
     });
 
-    const ROOM_CODE = {{ room_code| tojson }};
-    const USERNAME = {{ username| tojson }};
-    const IS_HOST = {{ (username == room.host) | tojson }};
-    const CHAT_ID = {{ chat_id| tojson }};
+    const ROOM_CODE = "{{ room_code }}";
+    const USERNAME = "{{ username }}";
+    const IS_HOST = ("{{ username }}" === "{{ room.host }}");
+    const CHAT_ID = Number("{{ chat_id }}");
 
     const socket = io({ transports: ['websocket', 'polling'] });
     socket.emit('join_collab', { room_code: ROOM_CODE, username: USERNAME });
