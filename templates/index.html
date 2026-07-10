@@ -904,10 +904,6 @@
       letter-spacing: 0.5px;
     }
 
-    #cbThemeWrap .dropdown div:hover {
-      /* overridden per-item */
-    }
-
     .dropdown div:hover {
       background: var(--plasma-dim);
       color: var(--plasma);
@@ -5773,15 +5769,15 @@
       <div class="nav-label">Active Sessions</div>
       <div id="chatList">
         {% for chat in chats %}
-        <div class="chat-item" onclick="if(!event.target.closest('.menu'))selectChat({{ chat['id'] }}, this)">
+        <div class="chat-item" onclick="if(!event.target.closest('.menu'))selectChat('{{ chat['id'] }}', this)">
           <span class="chat-title">{{ chat['title'] }}</span>
           <div class="menu">
             <button class="menu-btn" onclick="toggleMenu(event,this)">⋯</button>
             <div class="dropdown">
-              <div onclick="event.stopPropagation();renameChat({{ chat['id'] }})">✏ RENAME</div>
-              <div onclick="event.stopPropagation();deleteChat({{ chat['id'] }})">✕ DELETE</div>
-              <div onclick="event.stopPropagation();shareChat({{ chat['id'] }})">⟁ SHARE</div>
-              <div onclick="event.stopPropagation();collaborateChat({{ chat['id'] }})" style="color:#a855f7">🤝
+              <div onclick="event.stopPropagation();renameChat('{{ chat['id'] }}')">✏ RENAME</div>
+              <div onclick="event.stopPropagation();deleteChat('{{ chat['id'] }}')">✕ DELETE</div>
+              <div onclick="event.stopPropagation();shareChat('{{ chat['id'] }}')">⟁ SHARE</div>
+              <div onclick="event.stopPropagation();collaborateChat('{{ chat['id'] }}')" style="color:#a855f7">🤝
                 COLLABORATE</div>
             </div>
           </div>
