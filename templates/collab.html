@@ -13,7 +13,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <link rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css" />
-  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
   <style>
     :root {
       --void: #020408;
@@ -1393,7 +1393,11 @@
 
       let full = '';
       fetch('/collab_chat', { method: 'POST', body: fd })
-        .then(r => {
+        .then(async r => {
+          if (!r.ok) {
+            const errText = await r.text();
+            throw new Error(errText || `Server error ${r.status}`);
+          }
           const reader = r.body.getReader(), dec = new TextDecoder();
           function read() {
             reader.read().then(({ done, value }) => {
@@ -1416,12 +1420,17 @@
               }
               chatBox.scrollTop = chatBox.scrollHeight;
               read();
-            }).catch(() => { isStreaming = false; sendBtn.disabled = false; });
+            }).catch((err) => { 
+              isStreaming = false; 
+              sendBtn.disabled = false; 
+              addNotif('⚠ Streaming interrupted: ' + err.message);
+            });
           }
           read();
         })
         .catch(e => { isStreaming = false; sendBtn.disabled = false; addNotif('⚠ Send failed: ' + e.message); });
     }
+
 
     // Avatar builder — identical to index.html
     function buildAvatar(role, label, color, fill) {
