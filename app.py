@@ -19,6 +19,18 @@
    ║      peak window analytics from session timestamps)    ║
    ╚════════════════════════════════════════════════════════╝
 """
+# ── GEVENT MONKEY-PATCH ───────────────────────────────────────────────────────
+# MUST be the very first code executed before any other imports.
+# Patches Python's standard I/O so gevent greenlets work correctly on Render.
+# Skipped on Windows to avoid breaking local development.
+import sys as _pre_sys, os as _pre_os
+if _pre_sys.platform != "win32" and _pre_os.getenv("DATABASE_URL"):
+    try:
+        from gevent import monkey as _gmonkey
+        _gmonkey.patch_all()
+    except ImportError:
+        pass
+
 import ast
 import json
 import os
@@ -91,6 +103,34 @@ SOCKETIO_MESSAGE_QUEUE = REDIS_URL if USE_SOCKETIO_REDIS else None
 _sqlite_connect = sqlite3.connect
 
 
+_pg_pool = None  # PostgreSQL connection pool — initialized on first DB call
+
+
+def _start_db_keepalive():
+    """Ping Neon every 4 minutes to prevent free-tier compute auto-suspend."""
+    import threading
+    DATABASE_URL = os.getenv("DATABASE_URL")
+    if not DATABASE_URL:
+        return
+
+    def _keepalive_loop():
+        import time as _time
+        while True:
+            _time.sleep(240)  # 4 minutes
+            try:
+                import psycopg2
+                conn = psycopg2.connect(DATABASE_URL, connect_timeout=5)
+                conn.cursor().execute("SELECT 1")
+                conn.close()
+            except Exception:
+                pass  # silently ignore — server may be restarting
+
+    t = threading.Thread(target=_keepalive_loop, daemon=True, name="neon-keepalive")
+    t.start()
+
+_start_db_keepalive()
+
+
 def _configure_sqlite_connection(conn):
     try:
         conn.execute("PRAGMA journal_mode=WAL")
@@ -108,6 +148,22 @@ def _connect_db(database=None, *args, **kwargs):
     if DATABASE_URL:
         import psycopg2
         import psycopg2.extras
+        import psycopg2.pool
+
+        # ── Persistent connection pool (created once, reused per request) ──────
+        # Avoids a new TCP+TLS handshake to Neon on every sqlite3.connect() call.
+        global _pg_pool
+        if _pg_pool is None:
+            try:
+                _pg_pool = psycopg2.pool.ThreadedConnectionPool(
+                    minconn=1, maxconn=10,
+                    dsn=DATABASE_URL,
+                    connect_timeout=10,
+                )
+            except Exception as _pe:
+                print(f"[DB] Pool creation failed: {_pe} — falling back to direct connect")
+                _pg_pool = None
+
         class PostgresCursorWrapper:
             def __init__(self, cursor):
                 self._cursor = cursor
@@ -117,7 +173,7 @@ def _connect_db(database=None, *args, **kwargs):
                 sql = sql.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY")
                 sql = sql.replace("AUTOINCREMENT", "SERIAL")
                 sql = sql.replace("datetime('now')", "CURRENT_TIMESTAMP")
-                
+
                 # PostgreSQL handle PRAGMA
                 if sql.strip().upper().startswith("PRAGMA"):
                     match = re.search(r"PRAGMA\s+table_info\((.*?)\)", sql, re.IGNORECASE)
@@ -126,7 +182,7 @@ def _connect_db(database=None, *args, **kwargs):
                         sql = f"SELECT 0 as cid, column_name as name, data_type as type, 0 as notnull, null as dflt_value, 0 as pk FROM information_schema.columns WHERE table_name = '{table_name}'"
                     else:
                         return self
-                
+
                 is_insert = sql.strip().upper().startswith("INSERT INTO") and "COLLAB_ROOMS" not in sql.upper()
                 if is_insert:
                     sql = sql.rstrip('; \t\n\r') + " RETURNING id"
@@ -147,7 +203,7 @@ def _connect_db(database=None, *args, **kwargs):
                     self._lastrowid = None
 
                 return self
-                
+
             @property
             def lastrowid(self):
                 return self._lastrowid
@@ -156,22 +212,23 @@ def _connect_db(database=None, *args, **kwargs):
                 sql = sql.replace("?", "%s")
                 self._cursor.executemany(sql, parameters)
                 return self
-                
+
             def fetchone(self):
                 return self._cursor.fetchone()
-                
+
             def fetchall(self):
                 return self._cursor.fetchall()
-                
+
             def __iter__(self):
                 return iter(self._cursor)
-                
+
             def close(self):
                 self._cursor.close()
 
         class PostgresConnectionWrapper:
-            def __init__(self, conn):
+            def __init__(self, conn, pool):
                 self._conn = conn
+                self._pool = pool
                 self.row_factory = None
             def cursor(self):
                 return PostgresCursorWrapper(self._conn.cursor(cursor_factory=psycopg2.extras.DictCursor))
@@ -186,9 +243,32 @@ def _connect_db(database=None, *args, **kwargs):
             def commit(self):
                 self._conn.commit()
             def close(self):
-                self._conn.close()
+                # Return connection to pool instead of closing it
+                if self._pool and self._conn:
+                    try:
+                        self._conn.rollback()  # reset any open txn
+                        self._pool.putconn(self._conn)
+                    except Exception:
+                        try:
+                            self._pool.putconn(self._conn, close=True)
+                        except Exception:
+                            pass
+                    self._conn = None
 
-        return PostgresConnectionWrapper(psycopg2.connect(DATABASE_URL))
+        # Get a connection from pool, or fall back to direct connect
+        if _pg_pool:
+            try:
+                pg_conn = _pg_pool.getconn()
+                # Reset any stale transaction state
+                if pg_conn.closed:
+                    _pg_pool.putconn(pg_conn, close=True)
+                    pg_conn = psycopg2.connect(DATABASE_URL)
+                    return PostgresConnectionWrapper(pg_conn, None)
+                pg_conn.rollback()
+                return PostgresConnectionWrapper(pg_conn, _pg_pool)
+            except Exception:
+                pass
+        return PostgresConnectionWrapper(psycopg2.connect(DATABASE_URL), None)
 
     if database in (None, "", "codebuddy.db"):
         database = DB_PATH
@@ -223,11 +303,18 @@ app.config.update(
     REMEMBER_COOKIE_SAMESITE="Lax",
 )
 
-# ── SOCKETIO: always threading — eventlet is deprecated & breaks sessions ──────
+# ── SOCKETIO: auto-detect async mode ──────────────────────────────────────────
+# Use gevent on Render (Linux + DATABASE_URL set) for WebSocket support.
+# Fall back to threading on Windows / local dev to avoid gevent bind errors.
+import sys as _sys
+_socketio_mode = os.getenv(
+    "SOCKETIO_ASYNC_MODE",
+    "gevent" if (_sys.platform != "win32" and os.getenv("DATABASE_URL")) else "threading"
+)
 if _SOCKETIO_OK:
     socketio = SocketIO(
         app, cors_allowed_origins="*",
-        async_mode="threading",
+        async_mode=_socketio_mode,
         message_queue=SOCKETIO_MESSAGE_QUEUE,
         logger=False, engineio_logger=False,
     )
@@ -355,6 +442,12 @@ def unauthorized_handler():
     if request.path.startswith(_JSON_AUTH_PREFIXES):
         return jsonify({"error": "Please log in to use this feature."}), 401
     return redirect(url_for("login", next=request.url))
+
+
+@app.route("/ping")
+def ping():
+    """Health check endpoint — keeps Render service warm, used by uptime monitors."""
+    return jsonify({"status": "ok", "service": "codebuddy"}), 200
 
 
 _NAMING_GENERIC_WORDS = {
