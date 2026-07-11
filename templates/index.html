@@ -5480,23 +5480,43 @@
         bottom: 0;
         height: 100vh;
         z-index: 1000;
+        transform: translateX(-100%);
         transition: transform 0.3s ease;
         width: 280px !important;
         min-width: 280px !important;
       }
-      .sidebar.collapsed {
-        transform: translateX(-100%);
-      }
-      .sidebar.collapsed .sidebar-body {
-        opacity: 0;
-        pointer-events: none;
+      .sidebar.mobile-open {
+        transform: translateX(0);
       }
       .sidebar-collapse {
-        right: -36px;
-        width: 32px;
-        height: 32px;
-        border-radius: 0 4px 4px 0;
-        background: rgba(6, 13, 26, 0.95);
+        display: none !important;
+      }
+      .main {
+        width: 100vw;
+      }
+      .mobile-scrim {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 999;
+        backdrop-filter: blur(2px);
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+      .mobile-scrim.show {
+        display: block;
+        opacity: 1;
+      }
+      .mobile-nav-btn {
+        display: block !important;
+        background: none;
+        border: none;
+        color: var(--plasma);
+        font-size: 20px;
+        cursor: pointer;
+        padding: 4px 8px;
+        margin-right: 8px;
       }
       #cbBar, #cbVoiceBar, #cbPanel, #cbVoicePanel {
         left: 0 !important;
@@ -5504,6 +5524,10 @@
       .quick-grid {
         grid-template-columns: 1fr;
       }
+    }
+    
+    .mobile-nav-btn {
+      display: none;
     }
 
     @media (max-width: 520px) {
@@ -5788,9 +5812,11 @@
   </div>
 
   <!-- MAIN -->
+  <div class="mobile-scrim" id="mobileScrim" onclick="toggleSidebar()"></div>
   <div class="main">
     <div class="topbar">
       <div class="topbar-left">
+        <button class="mobile-nav-btn" onclick="toggleSidebar()">☰</button>
         <div class="hud-badge">
           <div class="pulse"></div><span id="modeLabel">GENERAL</span>
         </div>
@@ -7298,8 +7324,8 @@
         }, 0);
       }
       function renameChat(id) { const n = prompt('ENTER NEW SESSION NAME:'); if (!n) return; fetch('/rename_chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: id, title: n }) }).then(() => location.reload()); }
-      function deleteChat(id) { if (!confirm('LOG OUT?')) return; fetch('/delete_chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: id }) }).then(() => location.reload()); }
-      function shareChat(id) { fetch('/share_chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: id }) }).then(r => r.json()).then(d => alert('SHARE URL: ' + d.share_url)); }
+      function deleteChat(id) { if (!confirm('DELETE THIS SESSION?')) return; fetch('/delete_chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: id }) }).then(() => location.reload()); }
+      function shareChat(id) { fetch('/share_chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: id }) }).then(r => r.json()).then(d => { const fullUrl = window.location.origin + d.share_url; if (navigator.clipboard) { navigator.clipboard.writeText(fullUrl).then(() => alert('Public share link copied to clipboard:\n' + fullUrl)).catch(() => prompt('Copy share URL:', fullUrl)); } else { prompt('Copy share URL:', fullUrl); } }); }
 
       function collaborateChat(id) {
         fetch('/collab/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: id }) })
@@ -13270,6 +13296,24 @@ def find_max(arr):
         `;
         }
       })();
+    </script>
+    <script>
+      function toggleSidebar() {
+        const sb = document.getElementById('sidebar');
+        const scrim = document.getElementById('mobileScrim');
+        if (window.innerWidth <= 768) {
+          sb.classList.toggle('mobile-open');
+          if (sb.classList.contains('mobile-open')) {
+            scrim.classList.add('show');
+          } else {
+            scrim.classList.remove('show');
+          }
+        } else {
+          sb.classList.toggle('collapsed');
+          const isCol = sb.classList.contains('collapsed');
+          localStorage.setItem('cb_sidebar', isCol ? '1' : '0');
+        }
+      }
     </script>
 </body>
 
