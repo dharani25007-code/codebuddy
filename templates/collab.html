@@ -1150,6 +1150,60 @@
         max-width: 150px;
       }
     }
+
+    @media (max-width: 768px) {
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        height: 100vh;
+        z-index: 1000;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+      }
+      .sidebar.mobile-open {
+        transform: translateX(0);
+      }
+      .main {
+        width: 100vw;
+      }
+      .mobile-scrim {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 999;
+        backdrop-filter: blur(2px);
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+      .mobile-scrim.show {
+        display: block;
+        opacity: 1;
+      }
+      .mobile-nav-btn {
+        display: block !important;
+        background: none;
+        border: none;
+        color: var(--plasma);
+        font-size: 20px;
+        cursor: pointer;
+        padding: 4px 8px;
+        margin-right: 8px;
+      }
+      .chat-box {
+        padding: 10px;
+      }
+      .bubble-content {
+        font-size: 11.5px;
+        padding: 10px 12px;
+      }
+    }
+    
+    .mobile-nav-btn {
+      display: none;
+    }
   </style>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/theme-system.css') }}">
 </head>
@@ -1158,6 +1212,7 @@
   <script src="{{ url_for('static', filename='js/theme-system.js') }}"></script>
 
   <div class="layout">
+    <div class="mobile-scrim" id="mobileScrim" onclick="toggleSidebar()"></div>
 
     <!-- SIDEBAR -->
     <aside class="sidebar">
@@ -1202,6 +1257,7 @@
     <!-- MAIN -->
     <div class="main">
     <div class="topbar">
+      <button class="mobile-nav-btn" onclick="toggleSidebar()">☰</button>
       <div class="topbar-brand">CODEBUDDY</div>
       <div class="topbar-sep"></div>
       <div class="topbar-title">{{ room.chat_title }}</div>
@@ -1356,6 +1412,17 @@
     let isStreaming = false;
     let typingTimer = null;
     let typingEl = null;
+
+    function toggleSidebar() {
+      const sb = document.querySelector('.sidebar');
+      const scrim = document.getElementById('mobileScrim');
+      sb.classList.toggle('mobile-open');
+      if (sb.classList.contains('mobile-open')) {
+        scrim.classList.add('show');
+      } else {
+        scrim.classList.remove('show');
+      }
+    }
 
     function autoResize(el) {
       el.style.height = 'auto';
