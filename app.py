@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """CodeBuddy – AI-powered programming assistant backend.
    ╔════════════════════════════════════════════════════════╗
    ║  v9.0 — 3 MORE WORLD-FIRST FEATURES ADDED              ║
@@ -19,7 +20,7 @@
    ║      peak window analytics from session timestamps)    ║
    ╚════════════════════════════════════════════════════════╝
 """
-# ── GEVENT MONKEY-PATCH ───────────────────────────────────────────────────────
+# -- GEVENT MONKEY-PATCH -------------------------------------------------------
 # MUST be the very first code executed before any other imports.
 # Patches Python's standard I/O so gevent greenlets work correctly on Render.
 # Skipped on Windows to avoid breaking local development.
@@ -79,7 +80,7 @@ OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 GROQ_API_KEY       = os.getenv("GROQ_API_KEY")
 FREE_ONLY_MODE     = os.getenv("FREE_ONLY_MODE", "false").lower() == "true"
 
-# ── API base URLs ─────────────────────────────────────────────────────────────
+# -- API base URLs -------------------------------------------------------------
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 GROQ_URL       = "https://api.groq.com/openai/v1/chat/completions"
 
@@ -150,7 +151,7 @@ def _connect_db(database=None, *args, **kwargs):
         import psycopg2.extras
         import psycopg2.pool
 
-        # ── Persistent connection pool (created once, reused per request) ──────
+        # -- Persistent connection pool (created once, reused per request) ------
         # Avoids a new TCP+TLS handshake to Neon on every sqlite3.connect() call.
         global _pg_pool
         if _pg_pool is None:
@@ -277,7 +278,7 @@ def _connect_db(database=None, *args, **kwargs):
 
 sqlite3.connect = _connect_db
 
-# ── STABLE SECRET KEY ─────────────────────────────────────────────────────────
+# -- STABLE SECRET KEY ---------------------------------------------------------
 # FIX: secrets.token_hex(32) generates a NEW key every restart, invalidating
 # all session cookies → "ERROR LOADING SESSION" on every page click.
 # Solution: derive stable key from machine fingerprint, or use SECRET_KEY in .env
@@ -288,7 +289,7 @@ if not _raw_secret:
     _raw_secret = "cb-" + hashlib.sha256(_fp.encode()).hexdigest()
 app.secret_key = _raw_secret
 
-# ── SESSION CONFIG ─────────────────────────────────────────────────────────────
+# -- SESSION CONFIG -------------------------------------------------------------
 from datetime import timedelta
 app.config.update(
     SESSION_COOKIE_SAMESITE="Lax",
@@ -303,7 +304,7 @@ app.config.update(
     REMEMBER_COOKIE_SAMESITE="Lax",
 )
 
-# ── SOCKETIO: auto-detect async mode ──────────────────────────────────────────
+# -- SOCKETIO: auto-detect async mode ------------------------------------------
 # Use gevent on Render (Linux + DATABASE_URL set) for WebSocket support.
 # Fall back to threading on Windows / local dev to avoid gevent bind errors.
 import sys as _sys
@@ -382,7 +383,7 @@ def _room_delete(room_code):
     conn.commit()
     conn.close()
 
-# ── Security headers on every response ──
+# -- Security headers on every response --
 @app.after_request
 def add_security_headers(resp):
     resp.headers["X-Content-Type-Options"] = "nosniff"
@@ -983,7 +984,7 @@ def init_db():
 
     conn.commit()
 
-    # ── MIGRATIONS ──
+    # -- MIGRATIONS --
     migrations = [
         ("conversations", "mode",         "TEXT DEFAULT 'general'"),
         ("conversations", "pinned",       "INTEGER DEFAULT 0"),
@@ -1265,7 +1266,7 @@ def generate_chat_title(user_message):
 
 # ================= CHANGE 1: MODEL SELECTION (OpenRouter + Groq dual provider) =================
 
-# ── OpenRouter free models (best quality for each task) ───────────────────────
+# -- OpenRouter free models (best quality for each task) -----------------------
 MODELS = {
     "code":       "nvidia/llama-3.1-nemotron-70b-instruct:free",   # best free coding model (confirmed working)
     "fast":       "nvidia/llama-3.1-nemotron-70b-instruct:free",   # fast general tasks
@@ -1274,14 +1275,14 @@ MODELS = {
     "indic":      "nvidia/llama-3.1-nemotron-70b-instruct:free",   # best free multilingual
 }
 
-# ── Groq models (ultra-fast, free tier, no credit card needed) ────────────────
+# -- Groq models (ultra-fast, free tier, no credit card needed) ----------------
 GROQ_MODELS = {
     "fast":       "llama-3.1-8b-instant",   # fastest — classifier, title, mood, quick checks
     "smart":      "llama-3.3-70b-versatile", # smarter — main chat fallback, code review
     "code":       "llama-3.3-70b-versatile", # code tasks on Groq
 }
 
-# ── OpenRouter fallback chain (used when primary model rate-limits) ───────────
+# -- OpenRouter fallback chain (used when primary model rate-limits) -----------
 # Ordered by reliability: confirmed-working models first, then others as backup.
 FREE_FALLBACKS = [
     "nvidia/llama-3.1-nemotron-70b-instruct:free",  # confirmed working Jul 2026
@@ -1293,7 +1294,7 @@ FREE_FALLBACKS = [
 
 import time as _time
 
-# ── Groq helper — fast non-streaming call ─────────────────────────────────────
+# -- Groq helper — fast non-streaming call -------------------------------------
 def _groq_call(messages, model=None, max_tokens=500, temperature=0.3, timeout=15):
     """Call Groq API directly. Ultra-fast (500-1000 TPS). Used for classifier,
     title generation, mood detection, complexity, focus zone tip, dead code, naming.
@@ -1325,7 +1326,7 @@ def _groq_call(messages, model=None, max_tokens=500, temperature=0.3, timeout=15
         app.logger.warning(f"_groq_call exception: {exc}")
         return None
 
-# ── Groq streaming helper — used as fallback in /chat streaming ───────────────
+# -- Groq streaming helper — used as fallback in /chat streaming ---------------
 def _groq_stream(messages, model=None, max_tokens=1200, temperature=0.3, timeout=60):
     """Generator: streams tokens from Groq. Yields text chunks.
     Used as fallback when OpenRouter models are rate-limited.
@@ -1633,7 +1634,7 @@ def _local_ai_response(messages, mode=None, max_tokens=1000, temperature=0.3):
 
     return _local_quick_explain(_extract_first_code_block(user_text) or user_text, "intermediate")
 
-# ── Central AI call: tries Groq first (fast), then OpenRouter + fallbacks ─────
+# -- Central AI call: tries Groq first (fast), then OpenRouter + fallbacks -----
 def _ai_call(messages, model=None, max_tokens=1000, temperature=0.3, timeout=30,
              prefer_groq=False, groq_model=None):
     """Smart dual-provider AI call.
@@ -1646,7 +1647,7 @@ def _ai_call(messages, model=None, max_tokens=1000, temperature=0.3, timeout=30,
     if _free_only_active():
         return _local_ai_response(messages, mode=model, max_tokens=max_tokens, temperature=temperature)
 
-    # ── Groq-first path (fast utility calls) ──────────────────────────────────
+    # -- Groq-first path (fast utility calls) ----------------------------------
     if prefer_groq and GROQ_API_KEY:
         result = _groq_call(messages, model=groq_model or GROQ_MODELS["fast"],
                             max_tokens=max_tokens, temperature=temperature, timeout=15)
@@ -1654,7 +1655,7 @@ def _ai_call(messages, model=None, max_tokens=1000, temperature=0.3, timeout=30,
             return result
         app.logger.info("_ai_call: Groq failed, falling back to OpenRouter")
 
-    # ── OpenRouter path ────────────────────────────────────────────────────────
+    # -- OpenRouter path --------------------------------------------------------
     or_headers = _or_headers()
     chain = []
     if model and model not in chain:
@@ -1697,7 +1698,7 @@ def _ai_call(messages, model=None, max_tokens=1000, temperature=0.3, timeout=30,
             app.logger.warning(f"_ai_call OpenRouter {m} exception: {exc}")
             continue
 
-    # ── Final fallback: Groq smart model (if not already tried) ───────────────
+    # -- Final fallback: Groq smart model (if not already tried) ---------------
     if not prefer_groq and GROQ_API_KEY:
         app.logger.info("_ai_call: All OpenRouter fallbacks failed, trying Groq smart model")
         result = _groq_call(messages, model=GROQ_MODELS["smart"],
@@ -2511,16 +2512,111 @@ def get_bookmarks():
     conn.close()
     return jsonify({"bookmarks": [dict(b) for b in bookmarks]})
 
-# ================= CHANGE 6: PISTON API CODE EXECUTION =================
+@app.route("/run_code", methods=["POST"])
+@login_required
+@rate_limit(max_calls=30, window=60)
+def run_code():
+    """Predict and simulate code execution output using CodeBuddy AI."""
+    code = request.json.get("code", "")
+    language = request.json.get("language", "python").lower().strip()
 
-PISTON_ENDPOINTS = [
-    "https://emkc.org/api/v2/piston/execute",
-    "https://api.piston.rs/api/v2/execute",
-    "https://piston.rodentshire.com/api/v2/execute",
-]
-PISTON_API = PISTON_ENDPOINTS[0]  # backward-compat alias
+    if not code.strip():
+        return jsonify({"output": "No code to run.", "exit_code": 1})
 
-# Piston language aliases
+    lang_aliases = {
+        "js": "javascript", "ts": "typescript", "c++": "cpp",
+        "c#": "csharp", "golang": "go", "rb": "ruby", "py": "python"
+    }
+    language = lang_aliases.get(language, language)
+
+    # Ask the AI to predict the execution output
+    system_prompt = (
+        "You are an offline code execution simulator. Analyze the given code for the specified programming language. "
+        "Predict and return the EXACT output (stdout and stderr combined) that would be printed to the console if "
+        "this code was compiled and executed. Do not explain, describe, or add markdown syntax. Return ONLY the "
+        "raw output of the script. If there are syntax/runtime errors, return the compiler/interpreter error message exactly."
+    )
+    user_prompt = f"Language: {language}\n\nCode:\n{code}"
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt}
+    ]
+
+    try:
+        ai_out = _ai_call(messages, max_tokens=1000, temperature=0.1, prefer_groq=True)
+        if ai_out:
+            ai_out = ai_out.strip()
+            if ai_out.startswith("```"):
+                lines = ai_out.splitlines()
+                if lines[0].startswith("```"):
+                    lines = lines[1:]
+                if lines and lines[-1].strip() == "```":
+                    lines = lines[:-1]
+                ai_out = "\n".join(lines).strip()
+            bump_stat(current_user.id, "code_runs")
+            return jsonify({
+                "output": ai_out or "[No output]",
+                "exit_code": 0,
+                "language": language
+            })
+    except Exception as e:
+        app.logger.warning(f"AI simulation failed: {e}. Falling back to local execution.")
+
+    # Local fallback logic if offline or AI call fails
+    import subprocess
+    import sys
+    import os
+    if language == "python":
+        try:
+            proc = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=10)
+            output = proc.stdout + (proc.stderr if proc.stderr else "")
+            bump_stat(current_user.id, "code_runs")
+            return jsonify({"output": output or "[No output]", "exit_code": proc.returncode, "language": language})
+        except Exception as e:
+            return jsonify({"output": f"⚠ Run failed: {str(e)}", "exit_code": -1, "language": language})
+    elif language == "javascript":
+        try:
+            proc = subprocess.run(["node", "-e", code], capture_output=True, text=True, timeout=10)
+            output = proc.stdout + (proc.stderr if proc.stderr else "")
+            bump_stat(current_user.id, "code_runs")
+            return jsonify({"output": output or "[No output]", "exit_code": proc.returncode, "language": language})
+        except Exception as e:
+            return jsonify({"output": f"⚠ Run failed: {str(e)}", "exit_code": -1, "language": language})
+    elif language == "java":
+        try:
+            import re
+            match = re.search(r"public\s+class\s+(\w+)", code)
+            class_name = match.group(1) if match else "Main"
+            temp_dir = os.getcwd()
+            java_file = os.path.join(temp_dir, f"{class_name}.java")
+            with open(java_file, "w", encoding="utf-8") as f:
+                f.write(code)
+            try:
+                c_proc = subprocess.run(["javac", java_file], capture_output=True, text=True, timeout=10)
+                if c_proc.returncode != 0:
+                    return jsonify({"output": "[Compile Error]\n" + c_proc.stderr, "exit_code": c_proc.returncode, "language": language})
+                r_proc = subprocess.run(["java", "-cp", temp_dir, class_name], capture_output=True, text=True, timeout=10)
+                output = r_proc.stdout + (r_proc.stderr if r_proc.stderr else "")
+                bump_stat(current_user.id, "code_runs")
+                return jsonify({"output": output or "[No output]", "exit_code": r_proc.returncode, "language": language})
+            finally:
+                if os.path.exists(java_file):
+                    os.remove(java_file)
+                c_file = os.path.join(temp_dir, f"{class_name}.class")
+                if os.path.exists(c_file):
+                    os.remove(c_file)
+        except Exception as e:
+            return jsonify({"output": f"⚠ Run failed: {str(e)}", "exit_code": -1, "language": language})
+
+    return jsonify({
+        "output": (
+            "⚠ Offline execution requires local compilers. "
+            "Connect to the internet to let CodeBuddy simulate and predict the output of your code."
+        ),
+        "exit_code": -1,
+        "language": language
+    })
+
 PISTON_LANGUAGES = {
     "python": ("python", "3.10.0"),
     "javascript": ("javascript", "18.15.0"),
@@ -2550,85 +2646,6 @@ PISTON_LANGUAGES = {
     "nim": ("nim", "1.6.14"),
     "crystal": ("crystal", "1.7.3"),
 }
-
-@app.route("/run_code", methods=["POST"])
-@login_required
-@rate_limit(max_calls=30, window=60)
-def run_code():
-    """Execute code via Piston API (free, sandboxed, 50+ languages)."""
-    code = request.json.get("code", "")
-    language = request.json.get("language", "python").lower().strip()
-
-    if not code.strip():
-        return jsonify({"output": "No code to run.", "exit_code": 1})
-
-    # Normalize common aliases
-    lang_aliases = {
-        "js": "javascript", "ts": "typescript", "c++": "cpp",
-        "c#": "csharp", "golang": "go", "rb": "ruby", "py": "python"
-    }
-    language = lang_aliases.get(language, language)
-
-    if language not in PISTON_LANGUAGES:
-        # Try anyway with Piston using the raw name
-        piston_lang, piston_ver = language, "*"
-    else:
-        piston_lang, piston_ver = PISTON_LANGUAGES[language]
-
-    piston_payload = {
-        "language": piston_lang,
-        "version": piston_ver,
-        "files": [{"name": f"main.{language[:10]}", "content": code}],
-        "stdin": "",
-        "args": [],
-        "compile_timeout": 10000,
-        "run_timeout": 10000,
-    }
-    resp = None
-    last_err = "All Piston endpoints failed"
-    for _ep in PISTON_ENDPOINTS:
-        try:
-            _r = requests.post(_ep, json=piston_payload, timeout=20)
-            if _r.status_code == 200:
-                resp = _r
-                break
-            last_err = f"HTTP {_r.status_code} from {_ep}"
-        except requests.exceptions.RequestException as _e:
-            last_err = str(_e)
-            continue
-    if resp is None:
-        return jsonify({"output": f"⚠ Code execution unavailable: {last_err}", "exit_code": -1})
-    try:
-
-        result = resp.json()
-        run = result.get("run", {})
-        compile_out = result.get("compile", {})
-
-        output = ""
-        if compile_out.get("stderr"):
-            output += f"[Compile Error]\n{compile_out['stderr']}\n"
-        if run.get("stdout"):
-            output += run["stdout"]
-        if run.get("stderr"):
-            output += run["stderr"]
-        if not output.strip():
-            output = "(No output)"
-
-        exit_code = run.get("code", 0)
-        bump_stat(current_user.id, "code_runs")
-
-        return jsonify({
-            "output": output[:8000],
-            "exit_code": exit_code,
-            "language": language
-        })
-
-    except requests.exceptions.Timeout:
-        return jsonify({"output": "⏱ Execution timed out (10s). Check for infinite loops.", "exit_code": -1})
-    except requests.exceptions.ConnectionError:
-        return jsonify({"output": "🔌 Cannot reach execution service. Check your internet.", "exit_code": -1})
-    except Exception as e:
-        return jsonify({"output": f"Server error: {str(e)}", "exit_code": -1})
 
 @app.route("/supported_languages")
 def supported_languages():
@@ -3004,7 +3021,7 @@ def chat():
     api_messages = [{"role": "system", "content": system_prompt}]
     api_messages.extend(history)
 
-    # ── Language enforcement injection ────────────────────────────────────────
+    # -- Language enforcement injection ----------------------------------------
     # For non-English languages: inject a REMINDER as a user-role message
     # immediately before the actual user query.
     # Why: AI models (especially Gemini) respond to user-role instructions
@@ -3464,7 +3481,7 @@ def _smart_split(text, gtts_lang, is_tanglish=False):
     Sentence-level split with inline English word extraction for gTTS.
 
     Strategy (revised after choppy-audio feedback):
-    ─────────────────────────────────────────────────────────────────────────────
+    -----------------------------------------------------------------------------
     PROBLEM WITH WORD-LEVEL SPLITTING:
     Word-level splitting creates many tiny 1-2 word fragments (e.g. "में", "লো",
     "ಬಳಸಿ") each generating a separate gTTS HTTP call. When concatenated, the
@@ -3496,7 +3513,7 @@ def _smart_split(text, gtts_lang, is_tanglish=False):
     which is ACCEPTABLE and far better than choppy word-by-word splitting.
 
     Tanglish: entire text to Tamil gTTS (Roman-script Tamil reads naturally).
-    ─────────────────────────────────────────────────────────────────────────────
+    -----------------------------------------------------------------------------
     """
     script_range = _SCRIPT_RANGES.get(gtts_lang)
 
@@ -3593,7 +3610,7 @@ def tts():
     """TTS endpoint — word-level mixed-language routing for gTTS.
 
     Language behaviour:
-    ─────────────────────────────────────────────────────────────────────────────
+    -----------------------------------------------------------------------------
     Hindi (hi-IN)   → Native Hindi gTTS. English tech words inside Hindi sentences
                       (e.g. "Python loop likhna hai") are split word-by-word and
                       routed to English gTTS so they sound natural.
@@ -3615,7 +3632,7 @@ def tts():
 
     World langs     → Straight native gTTS. English words inside those sentences
                       are generally handled well by their respective engines.
-    ─────────────────────────────────────────────────────────────────────────────
+    -----------------------------------------------------------------------------
     """
     if not _GTTS_OK:
         return jsonify({"error": "gTTS not installed. Run: pip install gtts"}), 503
@@ -3693,7 +3710,7 @@ def tts():
 
 # ================= FEATURE 11-16: WORLD-FIRST ROUTES =================
 
-# ── FEATURE PAGE ──────────────────────────────────────────────────────
+# -- FEATURE PAGE ------------------------------------------------------
 
 @app.route("/features")
 @login_required
@@ -3702,12 +3719,12 @@ def features_page():
     return render_template("codebuddy_world_first.html", username=current_user.username)
 
 
-# ─────────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------
 # FEATURE 11 — THOUGHT REPLAY DEBUGGER
 # Streams the AI's internal reasoning step-by-step as it debugs code.
 # Each reasoning step is yielded as a JSON line so the frontend can
 # animate them one-by-one onto a visual timeline.
-# ─────────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------
 
 @app.route("/thought_replay", methods=["POST"])
 @login_required
@@ -3764,14 +3781,14 @@ Rules:
         return jsonify({"error": str(exc)}), 503
 
 
-# ─────────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------
 # FEATURE 12 — VOICE-TO-VOICE CODING LOOP
 # Takes transcribed speech text + language, returns a spoken fix.
 # The frontend handles speech-to-text (Web Speech API) and
 # text-to-speech (existing /tts endpoint). This backend endpoint
 # handles the middle step: understanding the spoken problem and
 # generating a clear, speakable fix.
-# ─────────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------
 
 @app.route("/voice_fix", methods=["POST"])
 @login_required
@@ -3841,11 +3858,11 @@ Rules:
         return jsonify({"error": str(exc)}), 500
 
 
-# ─────────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------
 # FEATURE 13 — LIVE CODE BATTLE
 # Manages battle sessions: create, join, submit, judge.
 # Battles are stored in SQLite for persistence and multi-tab support.
-# ─────────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------
 
 def _init_battle_tables():
     """Create battle-related DB tables if they don't exist."""
@@ -4068,10 +4085,10 @@ def battle_status(battle_id):
     })
 
 
-# ─────────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------
 # FEATURE 14 — CODE KARMA SYSTEM
 # Users earn karma by helping others. Karma unlocks features and ranks.
-# ─────────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------
 
 def _init_karma_tables():
     """Create karma DB tables."""
@@ -4241,11 +4258,11 @@ def karma_leaderboard():
     return jsonify({"leaderboard": result})
 
 
-# ─────────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------
 # FEATURE 15 — REPLAY MY LEARNING
 # Returns the user's conversation history formatted as a learning
 # journey timeline — milestones, insights, stats.
-# ─────────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------
 
 @app.route("/learning_replay")
 @login_required
@@ -4388,11 +4405,11 @@ def learning_insight():
         return jsonify({"insight": f"During '{milestone}', you asked great questions that show real depth of curiosity."})
 
 
-# ─────────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------
 # FEATURE 16 — BLIND CODE REVIEW
 # Users submit code anonymously. Other users review without knowing
 # the author. AI aggregates all reviews into a consensus report.
-# ─────────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------
 
 def _init_blind_review_tables():
     """Create blind review DB tables."""
@@ -5149,7 +5166,7 @@ def analyze_link():
     if parsed.scheme not in ("http", "https"):
         return jsonify({"error": "URL must start with http:// or https://"}), 400
 
-    # ── Detect URL type from domain / path for richer context ─────────────────
+    # -- Detect URL type from domain / path for richer context -----------------
     domain = parsed.netloc.lower().replace("www.", "")
     path   = parsed.path.lower()
 
@@ -5189,7 +5206,7 @@ def analyze_link():
     url_lower = url.lower()
     detected_type = _guess_url_type(domain, path, url_lower)
 
-    # ── Try to fetch page title / description for richer context ──────────────
+    # -- Try to fetch page title / description for richer context --------------
     page_snippet = ""
     try:
         import urllib.request as _ureq
@@ -5208,7 +5225,7 @@ def analyze_link():
     except Exception:
         page_snippet = ""  # silently ignore — AI can still analyse from URL alone
 
-    # ── Build AI prompt ────────────────────────────────────────────────────────
+    # -- Build AI prompt --------------------------------------------------------
     default_q = (
         "1. Is this URL related to programming or software development?\n"
         "2. What programming language(s), framework(s), or topic(s) does it cover?\n"
@@ -5610,7 +5627,7 @@ def voice_clone_tts():
         except Exception:
             pass
 
-    # ── XTTS-v2: real voice clone ─────────────────────────────────────────
+    # -- XTTS-v2: real voice clone -----------------------------------------
     if tts_engine == "xtts_v2" and _vc_os.path.exists(audio_path):
         wav = _xtts_speak(raw, audio_path, lang_code)
         if wav:
@@ -5618,7 +5635,7 @@ def voice_clone_tts():
                             headers={"Cache-Control":"no-cache","X-TTS-Engine":"xtts_v2","X-Lang":lang_code})
         app.logger.warning("XTTS-v2 failed — falling back to gTTS")
 
-    # ── gTTS fallback ─────────────────────────────────────────────────────
+    # -- gTTS fallback -----------------------------------------------------
     if not _GTTS_OK:
         return jsonify({"error": "No TTS engine. Run: pip install gtts"}), 503
     text      = _clean_for_tts(raw)
@@ -5642,7 +5659,7 @@ def voice_clone_tts():
         return jsonify({"error": f"TTS failed: {str(exc)}"}), 502
 
 
-# ── /coqui/* aliases → /voice_clone/* ────────────────────────────────────────
+# -- /coqui/* aliases → /voice_clone/* ----------------------------------------
 @app.route("/coqui/status")
 @login_required
 def coqui_status_alias():
@@ -5932,7 +5949,7 @@ def collab_end(room_code):
     return jsonify({"ended": True})
 
 
-# ── SocketIO events ──
+# -- SocketIO events --
 if _SOCKETIO_OK and socketio:
     @socketio.on("join_collab")
     def on_join(data):
