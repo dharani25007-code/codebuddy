@@ -39,7 +39,7 @@ CodeBuddy is a full-stack AI-powered programming assistant with **28 world-first
 | 🌍 **20+ Languages** | 9 Indian languages + French, German, Spanish, Japanese, Chinese & more |
 | 🗣️ **Tanglish AI** |  Tamil+English mixed language coding assistant |
 | 🔁 **Streaming** | Token-by-token with free-tier and local fallbacks |
-| ▶️ **Code Execution** | Run 50+ languages via sandboxed free Piston endpoints |
+| ▶️ **Code Execution** | AI execution simulator (predicts outputs of all 50+ languages with zero local setup) + local compiler fallbacks |
 | 🧬 **Code DNA** | Builds your personal coding style — AI silently matches it |
 | 📁 **File Forge** | Upload, edit, run, and AI-refactor code files in the browser |
 | 🎬 **Video Analyzer** | Upload videos or analyze coding/tutorial links from the UI |
@@ -193,7 +193,7 @@ If any model returns 429/404/503 → next free model is tried automatically, the
 | PostgreSQL / SQLite | Cloud database (Neon) / Local database |
 | psycopg2-binary | PostgreSQL driver |
 | OpenRouter / Groq | Free-tier AI fallback chain |
-| Piston API | Sandboxed code execution (50+ languages, free endpoints) |
+| AI Output Simulator | Predicts and simulates run outputs of 50+ languages via OpenRouter/Groq + local compiler fallbacks |
 | gTTS / XTTS-v2 | Text-to-speech and voice cloning |
 | Gunicorn (gthread) | Production WSGI server |
 | python-dotenv | Load `.env` configuration |
