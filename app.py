@@ -829,7 +829,8 @@ def init_db():
         password TEXT,
         created_at TEXT DEFAULT (datetime('now')),
         bio TEXT DEFAULT '',
-        avatar_color TEXT DEFAULT '#00ffe0'
+        avatar_color TEXT DEFAULT '#00ffe0',
+        is_pro INTEGER DEFAULT 0
     )""")
 
     c.execute("""CREATE TABLE IF NOT EXISTS conversations(
@@ -1001,6 +1002,7 @@ def init_db():
         ("users",         "bio",          "TEXT DEFAULT ''"),
         ("users",         "avatar_color", "TEXT DEFAULT '#00ffe0'"),
         ("users",         "created_at",   "TEXT DEFAULT (datetime('now'))"),
+        ("users",         "is_pro",       "INTEGER DEFAULT 0"),
         ("messages",      "tokens_used",  "INTEGER DEFAULT 0"),
     ]
     for table, column, col_def in migrations:
@@ -3182,6 +3184,35 @@ def chat():
     }
 
     def generate():
+        # Check user hourly message rate limit to protect API keys (for cloud calls)
+        # Note: we only apply this if Ollama is NOT running, because Ollama is free/unlimited!
+        is_local_ollama = OLLAMA_ENABLED and _ollama_available()
+        
+        if not is_local_ollama:
+            try:
+                db_limit = get_db()
+                user_row = db_limit.execute("SELECT is_pro FROM users WHERE id = ?", (current_user.id,)).fetchone()
+                user_is_pro = user_row["is_pro"] if user_row else 0
+                
+                if not user_is_pro:
+                    # Count messages sent by this user in the last hour
+                    one_hour_ago = (datetime.now() - timedelta(hours=1)).isoformat()
+                    # Filter by role='user' to count only user queries
+                    count_row = db_limit.execute(
+                        """SELECT COUNT(*) as cnt FROM messages m
+                           JOIN conversations c ON m.conversation_id = c.id
+                           WHERE c.user_id = ? AND m.role = 'user' AND m.timestamp > ?""",
+                        (current_user.id, one_hour_ago)
+                    ).fetchone()
+                    msg_count = count_row["cnt"] if count_row else 0
+                    
+                    HOURLY_LIMIT = 15
+                    if msg_count >= HOURLY_LIMIT:
+                        yield f"⚠ Hourly rate limit reached ({HOURLY_LIMIT} messages/hour). Upgrade to Pro for unlimited chats and voice coding!"
+                        return
+            except Exception as e:
+                app.logger.warning(f"Rate limit database check failed: {e}")
+
         full = ""
         stream_buf = ""
         used_groq = False
