@@ -2240,7 +2240,6 @@
       flex-shrink: 0;
       position: relative;
       z-index: 10;
-      margin-bottom: 56px;
     }
 
     .input-zone::before {
@@ -5479,7 +5478,7 @@
         top: 0;
         left: 0;
         bottom: 0;
-        height: 100vh;
+        height: 100% !important;
         z-index: 1000;
         transform: translateX(-100%);
         transition: transform 0.3s ease;
@@ -5494,6 +5493,10 @@
       }
       .main {
         width: 100vw;
+        height: 100% !important;
+      }
+      .input-zone {
+        margin-bottom: 56px;
       }
       .mobile-scrim {
         display: none;
@@ -6673,6 +6676,48 @@
         });
       }
       function copyCode(btn, code) { navigator.clipboard.writeText(code).then(() => { btn.textContent = '✓ COPIED'; btn.classList.add('copied'); setTimeout(() => { btn.textContent = 'COPY'; btn.classList.remove('copied'); }, 2000); }); }
+      window.runCodeDirectly = async (code, language) => {
+        const langMap = {
+          "python": "python", "py": "python", "javascript": "javascript", "js": "javascript",
+          "java": "java", "cpp": "cpp", "c++": "cpp", "c": "c", "csharp": "csharp", "c#": "csharp",
+          "go": "go", "golang": "go", "rust": "rust", "rs": "rust", "ruby": "ruby", "rb": "ruby",
+          "php": "php", "swift": "swift", "kotlin": "kt", "kt": "kt", "bash": "bash"
+        };
+        const pistonLang = langMap[language.toLowerCase()] || language;
+        const endpoints = [
+          "https://emkc.org/api/v2/piston/execute",
+          "https://api.piston.rs/api/v2/execute",
+          "https://piston.rodentshire.com/api/v2/execute"
+        ];
+        const payload = {
+          "language": pistonLang,
+          "version": "*",
+          "files": [{"name": "main", "content": code}]
+        };
+        for (const ep of endpoints) {
+          try {
+            const res = await fetch(ep, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload)
+            });
+            if (res.ok) {
+              const result = await res.json();
+              const run = result.run || {};
+              const stdout = run.stdout || "";
+              const stderr = run.stderr || "";
+              return {
+                output: stdout + (stderr ? "\n" + stderr : ""),
+                exit_code: run.code
+              };
+            }
+          } catch (e) {
+            console.warn("Direct fetch failed for endpoint:", ep, e);
+          }
+        }
+        throw new Error("All direct Piston endpoints failed");
+      };
+
       function liveRun(btn, lang) {
         const pre = btn.closest('pre'), code = pre.querySelector('code').textContent.trim();
         const out = pre.querySelector('.run-output'), content = pre.querySelector('.run-content');
@@ -6710,6 +6755,12 @@
                   renderRunOutput({ output: r.output, exit_code: r.exit_code }, 'python (browser)', content, btn);
                 } catch (e) { renderRunOutput(data, displayLang, content, btn); }
                 return;
+              } else if (data.exit_code === -1 && data.output && (data.output.includes('NameResolutionError') || data.output.includes('unavailable'))) {
+                content.innerHTML = `<div class="run-console"><span class="con-info" style="opacity:0.6">🔌 Server offline. Executing ${displayLang.toUpperCase()} in browser via Piston…</span></div>`;
+                window.runCodeDirectly(code, displayLang)
+                  .then(r => renderRunOutput(r, displayLang + ' (browser direct)', content, btn))
+                  .catch(err => { console.error(err); });
+                return;
               }
               if (data.runtime_missing) {
                 if (displayLang === 'javascript' || displayLang === 'js') { runInBrowser(code, content, btn); return; }
@@ -6741,8 +6792,14 @@
                   btn.classList.remove('running'); btn.classList.add('run-active'); btn.textContent = '■ CLOSE';
                 }
               } else {
-                content.innerHTML = '<div class="run-console"><span class="con-err">🔌 Code server unreachable. HTML/CSS/JS runs in browser always. For ' + normLang.toUpperCase() + ' check internet.</span></div>';
-                btn.classList.remove('running'); btn.classList.add('run-active'); btn.textContent = '■ CLOSE';
+                content.innerHTML = `<div class="run-console"><span class="con-info" style="opacity:0.6">🔌 Server unreachable. Executing ${displayLang.toUpperCase()} in browser via Piston…</span></div>`;
+                try {
+                  const directResult = await window.runCodeDirectly(code, displayLang);
+                  renderRunOutput(directResult, displayLang + ' (browser direct)', content, btn);
+                } catch (e) {
+                  content.innerHTML = '<div class="run-console"><span class="con-err">🔌 Code server unreachable. Check internet connection.</span></div>';
+                  btn.classList.remove('running'); btn.classList.add('run-active'); btn.textContent = '■ CLOSE';
+                }
               }
             });
           lastCodeBlock = code;
@@ -8258,11 +8315,29 @@ Hints used: ${IV.hintCount} | Skipped: ${IV.skipCount} | Best streak: ${IV.maxSt
               body: JSON.stringify({ code, language: lang })
             });
             const d = await r.json();
+            if (d.exit_code === -1 && d.output && (d.output.includes('NameResolutionError') || d.output.includes('unavailable'))) {
+              outPre.textContent = '🔌 Server offline. Executing in browser via Piston…';
+              try {
+                const directResult = await window.runCodeDirectly(code, lang);
+                outPre.textContent = directResult.output || '(no output)';
+                outPre.style.color = directResult.exit_code === 0 ? 'rgba(74,222,128,0.9)' : '#ff6b2b';
+                return;
+              } catch (err) {
+                console.error(err);
+              }
+            }
             outPre.textContent = d.output || '(no output)';
             outPre.style.color = d.exit_code === 0 ? 'rgba(74,222,128,0.9)' : '#ff6b2b';
           } catch (e) {
-            outPre.textContent = '⚠ Run failed: ' + e.message;
-            outPre.style.color = '#ff6b2b';
+            outPre.textContent = '🔌 Server unreachable. Executing in browser via Piston…';
+            try {
+              const directResult = await window.runCodeDirectly(code, lang);
+              outPre.textContent = directResult.output || '(no output)';
+              outPre.style.color = directResult.exit_code === 0 ? 'rgba(74,222,128,0.9)' : '#ff6b2b';
+            } catch (err) {
+              outPre.textContent = '⚠ Run failed: ' + e.message;
+              outPre.style.color = '#ff6b2b';
+            }
           }
         }
 
