@@ -1,3 +1,10 @@
+/* Hide default system cursor on desktop */
+@media (min-width: 769px) and (pointer: fine) {
+    html, body, a, button, select, [role="button"], label {
+        cursor: none !important;
+    }
+}
+
 /* Central cursor styles — per-theme symbol and visibility tweaks */
 #cursor,
 #cursor-ring,
