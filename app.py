@@ -83,6 +83,14 @@ FREE_ONLY_MODE     = os.getenv("FREE_ONLY_MODE", "false").lower() == "true"
 # -- API base URLs -------------------------------------------------------------
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 GROQ_URL       = "https://api.groq.com/openai/v1/chat/completions"
+OLLAMA_URL     = os.getenv("OLLAMA_URL", "http://localhost:11434")
+
+# -- Ollama local models (FREE, unlimited, no API key needed) ------------------
+OLLAMA_MODELS = {
+    "smart":      os.getenv("OLLAMA_MODEL", "llama3"),        # main chat, code review
+    "fast":       os.getenv("OLLAMA_FAST_MODEL", "llama3"),   # classifier, title, mood
+}
+OLLAMA_ENABLED = os.getenv("OLLAMA_ENABLED", "true").lower() != "false"
 
 # Database path is configurable from .env so the filename is not hardcoded.
 DEFAULT_DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "codebuddy.db")
@@ -1294,6 +1302,76 @@ FREE_FALLBACKS = [
 
 import time as _time
 
+# -- Ollama helpers (local AI, zero cost, unlimited) ---------------------------
+def _ollama_available():
+    """Quick health check: is Ollama running locally?"""
+    if not OLLAMA_ENABLED:
+        return False
+    try:
+        resp = requests.get(f"{OLLAMA_URL}/api/tags", timeout=2)
+        return resp.status_code == 200
+    except Exception:
+        return False
+
+def _ollama_call(messages, model=None, max_tokens=500, temperature=0.3, timeout=30):
+    """Call Ollama API locally. Zero cost, no rate limits.
+    Returns content string or None on failure so callers can fall back.
+    """
+    if not OLLAMA_ENABLED:
+        return None
+    m = model or OLLAMA_MODELS["smart"]
+    try:
+        resp = requests.post(
+            f"{OLLAMA_URL}/api/chat",
+            json={"model": m, "messages": messages, "stream": False,
+                  "options": {"temperature": temperature, "num_predict": max_tokens}},
+            timeout=timeout,
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            content = data.get("message", {}).get("content", "").strip()
+            if content:
+                return content
+            app.logger.warning(f"_ollama_call: empty content from {m}")
+        else:
+            app.logger.warning(f"_ollama_call: HTTP {resp.status_code} from {m}")
+        return None
+    except requests.RequestException as exc:
+        app.logger.warning(f"_ollama_call exception ({m}): {exc}")
+        return None
+
+def _ollama_stream(messages, model=None, max_tokens=1200, temperature=0.3, timeout=120):
+    """Generator: streams tokens from Ollama. Yields text chunks.
+    Used as Priority 1 streaming provider before Groq/OpenRouter.
+    """
+    if not OLLAMA_ENABLED:
+        return
+    m = model or OLLAMA_MODELS["smart"]
+    try:
+        resp = requests.post(
+            f"{OLLAMA_URL}/api/chat",
+            json={"model": m, "messages": messages, "stream": True,
+                  "options": {"temperature": temperature, "num_predict": max_tokens}},
+            stream=True,
+            timeout=(10, timeout),
+        )
+        if resp.status_code != 200:
+            app.logger.warning(f"_ollama_stream: HTTP {resp.status_code}")
+            return
+        for line in resp.iter_lines():
+            if line:
+                try:
+                    chunk = json.loads(line.decode("utf-8"))
+                    token = chunk.get("message", {}).get("content", "")
+                    if token:
+                        yield token
+                    if chunk.get("done", False):
+                        break
+                except (json.JSONDecodeError, KeyError):
+                    pass
+    except requests.RequestException as exc:
+        app.logger.warning(f"_ollama_stream exception: {exc}")
+
 # -- Groq helper — fast non-streaming call -------------------------------------
 def _groq_call(messages, model=None, max_tokens=500, temperature=0.3, timeout=15):
     """Call Groq API directly. Ultra-fast (500-1000 TPS). Used for classifier,
@@ -1634,18 +1712,29 @@ def _local_ai_response(messages, mode=None, max_tokens=1000, temperature=0.3):
 
     return _local_quick_explain(_extract_first_code_block(user_text) or user_text, "intermediate")
 
-# -- Central AI call: tries Groq first (fast), then OpenRouter + fallbacks -----
+# -- Central AI call: tries Ollama -> Groq -> OpenRouter + fallbacks -----------
 def _ai_call(messages, model=None, max_tokens=1000, temperature=0.3, timeout=30,
              prefer_groq=False, groq_model=None):
-    """Smart dual-provider AI call.
+    """Smart multi-provider AI call.
 
     Strategy:
-    - prefer_groq=True  → try Groq first (fast tasks: classifier, title, mood etc.)
-    - prefer_groq=False → try OpenRouter first (main chat, code review, deep tasks)
-    - Always falls back to the other provider if primary fails/rate-limits.
+    - Priority 1: Ollama (local, free, unlimited) — if running
+    - Priority 2: Groq (fast, free tier) — if prefer_groq or Ollama unavailable
+    - Priority 3: OpenRouter (free fallback chain)
+    - Always falls back to the next provider if current fails/rate-limits.
     """
     if _free_only_active():
         return _local_ai_response(messages, mode=model, max_tokens=max_tokens, temperature=temperature)
+
+    # -- Ollama-first path (local AI, zero cost, no limits) --------------------
+    if OLLAMA_ENABLED:
+        ollama_model = OLLAMA_MODELS["fast"] if prefer_groq else OLLAMA_MODELS["smart"]
+        result = _ollama_call(messages, model=ollama_model,
+                              max_tokens=max_tokens, temperature=temperature, timeout=timeout)
+        if result:
+            app.logger.info(f"_ai_call: Ollama ({ollama_model}) responded successfully")
+            return result
+        app.logger.info("_ai_call: Ollama unavailable, falling back to cloud providers")
 
     # -- Groq-first path (fast utility calls) ----------------------------------
     if prefer_groq and GROQ_API_KEY:
@@ -3096,6 +3185,40 @@ def chat():
         full = ""
         stream_buf = ""
         used_groq = False
+        used_ollama = False
+
+        # -- Priority 0: Try Ollama local streaming first (free, fastest) ------
+        if OLLAMA_ENABLED and _ollama_available():
+            app.logger.info("Streaming: trying Ollama local model first")
+            used_ollama = True
+            for token in _ollama_stream(api_messages, model=OLLAMA_MODELS["smart"],
+                                         max_tokens=1200,
+                                         temperature=payload["temperature"]):
+                token = _filter_response(token)
+                stream_buf += token
+                full += token
+                if any(c in stream_buf for c in '.!?,\n') or len(stream_buf) > 80:
+                    yield _filter_response(stream_buf)
+                    stream_buf = ""
+            if stream_buf:
+                yield _filter_response(stream_buf)
+            if full.strip():
+                # Ollama succeeded — handle mood nudge and save
+                if _mood_data.get("nudge"):
+                    yield f"\n\n---\n{_mood_data['nudge']}"
+                    _mood_data["nudge"] = ""
+                full = _filter_response(full)
+                save_conn = sqlite3.connect("codebuddy.db")
+                save_conn.execute(
+                    "INSERT INTO messages(conversation_id,role,content,timestamp) VALUES (?,?,?,?)",
+                    (conversation_id, "assistant", full, datetime.now().isoformat()))
+                save_conn.commit(); save_conn.close()
+                return
+            # Ollama returned empty — fall through to cloud providers
+            app.logger.warning("Ollama stream returned empty, falling back to cloud")
+            used_ollama = False
+            full = ""
+            stream_buf = ""
         try:
             response = requests.post(
                 OPENROUTER_URL,
