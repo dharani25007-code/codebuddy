@@ -1673,6 +1673,117 @@
       border-color: rgba(8, 145, 178, 0.15);
       color: #0c2a3a;
     }
+
+    /* ── BATTLE ARENA STYLES ── */
+    .ba-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 14px;
+    }
+    .ba-player {
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .ba-player-head {
+      padding: 10px 14px;
+      background: rgba(0, 0, 0, 0.2);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .ba-editor {
+      width: 100%;
+      min-height: 240px;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 13px;
+      padding: 14px;
+      resize: none;
+      line-height: 1.6;
+    }
+    .ba-metrics {
+      display: flex;
+      border-top: 1px solid var(--border);
+      background: rgba(0, 0, 0, 0.1);
+    }
+    .ba-metric {
+      flex: 1;
+      padding: 8px;
+      text-align: center;
+      font-family: var(--display);
+      font-size: 8px;
+      letter-spacing: 1px;
+      color: var(--text-3);
+      border-right: 1px solid var(--border);
+    }
+    .ba-metric:last-child {
+      border-right: none;
+    }
+    .ba-metric span {
+      display: block;
+      font-size: 11px;
+      color: var(--plasma);
+      font-weight: 700;
+      margin-top: 2px;
+    }
+
+    /* ── MOBILE RESPONSIVENESS OVERRIDES ── */
+    @media (max-width: 768px) {
+      .panel-shell {
+        margin: 10px auto;
+        padding: 0 10px 40px;
+      }
+      .panel-header {
+        padding: 12px 14px;
+      }
+      .tab-bar {
+        padding: 0;
+      }
+      .tab {
+        padding: 10px 14px;
+        font-size: 7px;
+      }
+      .panel-body {
+        min-height: auto;
+      }
+      .tab-pane {
+        padding: 16px 12px;
+      }
+      .pane-head {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        padding-bottom: 14px;
+      }
+      .pane-title {
+        font-size: 15px;
+      }
+      .pane-desc {
+        font-size: 11px;
+      }
+      .btn-row {
+        gap: 8px;
+      }
+      .btn {
+        padding: 9px 16px;
+        font-size: 7px;
+      }
+      .ba-grid {
+        grid-template-columns: 1fr;
+      }
+      #baLobby > div:first-child {
+        grid-template-columns: 1fr !important;
+      }
+    }
   </style>
 </head>
 
