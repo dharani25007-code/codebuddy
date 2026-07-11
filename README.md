@@ -8,6 +8,7 @@
 ![Flask](https://img.shields.io/badge/Flask-3.0%2B-000000?style=for-the-badge&logo=flask&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-Local%20Dev-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
+![Ollama](https://img.shields.io/badge/Ollama-Local%20AI-FF6F00?style=for-the-badge&logo=ollama&logoColor=white)
 ![Free AI Fallbacks](https://img.shields.io/badge/Free%20AI%20Fallbacks-Open%20Source%20%2B%20Free%20Tier-7C3AED?style=for-the-badge)
 ![Socket.IO](https://img.shields.io/badge/Socket.IO-4.0%2B-010101?style=for-the-badge&logo=socket.io&logoColor=white)
 ![Render](https://img.shields.io/badge/Deployed%20on-Render-46E3B7?style=for-the-badge&logo=render&logoColor=white)
@@ -16,7 +17,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-brightgreen.svg?style=for-the-badge)](https://github.com/dharani25007-code/codebuddy/pulls)
 
-> ⚡ **28 World-First Features · 5 Themes · 20+ Languages · Free-first AI stack · Live on Render**
+> ⚡ **28 World-First Features · 5 Themes · 20+ Languages · Ollama Local AI + Free Cloud Fallbacks · Live on Render**
 
 🌐 **[Live Demo → https://codebuddy-0slh.onrender.com](https://codebuddy-0slh.onrender.com)**
 
@@ -27,7 +28,7 @@
 
 ## 📌 Overview
 
-CodeBuddy is a full-stack AI-powered programming assistant with **28 world-first features** — including Tanglish (Tamil + English) voice coding, File Forge upload/edit/run, Video Analyzer, Code DNA fingerprinting, Rubber Duck+ Mode, and a free-first AI fallback chain. The app is deployed live on **Render** with a **Neon PostgreSQL** database for permanent, free cloud storage, and also supports SQLite for local development with zero configuration.
+CodeBuddy is a full-stack AI-powered programming assistant with **28 world-first features** — including Tanglish (Tamil + English) voice coding, File Forge upload/edit/run, Video Analyzer, Code DNA fingerprinting, Rubber Duck+ Mode, and a **triple-provider AI architecture** (Ollama local GPU → Groq → OpenRouter). The app is deployed live on **Render** with a **Neon PostgreSQL** database for permanent, free cloud storage, and also supports SQLite for local development with zero configuration.
 
 ---
 
@@ -97,7 +98,8 @@ codebuddy/
 - Python 3.10 or newer
 - Pip (bundled with modern Python) and a virtual environment (recommended)
 - No paid API keys are required for the default free-only mode
-- Optional free-tier API keys for higher-quality hosted replies: OpenRouter and/or Groq
+- **[Ollama](https://ollama.com)** (optional, recommended) — run AI locally on your GPU, zero cost, unlimited
+- Optional free-tier API keys for higher-quality cloud replies: OpenRouter and/or Groq
 
 ### Install
 ```bash
@@ -115,17 +117,37 @@ OPENROUTER_API_KEY=your-openrouter-key
 GROQ_API_KEY=your-groq-key
 # Leave DATABASE_URL commented out for local SQLite development
 # DATABASE_URL=postgresql://...
+
+# Ollama Local AI (optional — auto-detected at localhost:11434)
+OLLAMA_ENABLED=true
+OLLAMA_MODEL=llama3
+# OLLAMA_URL=http://localhost:11434
 ```
 
 The app runs without any AI keys in free-only mode. Add optional free-tier keys only if you want better hosted responses.
 
 ### Run Locally
+
+**With Ollama (recommended — free, fastest, unlimited):**
+```bash
+# Terminal 1: Start Ollama (if not running as service)
+ollama serve
+
+# Terminal 2: Pull a model (one-time)
+ollama pull llama3
+
+# Terminal 3: Start CodeBuddy
+python app.py
+```
+
+**Without Ollama (uses cloud APIs):**
 ```bash
 python app.py
 ```
+
 Open: `http://127.0.0.1:5000` → Register → New Chat → Pick a mode 🚀
 
-> **Note:** Running locally uses **SQLite** by default (fast, no configuration needed). The cloud deployment uses PostgreSQL.
+> **Note:** Running locally uses **SQLite** by default (fast, no configuration needed). The cloud deployment uses PostgreSQL. If Ollama is running, all AI queries hit your local GPU (₹0 cost). If not, the app falls back to Groq/OpenRouter cloud APIs automatically.
 
 ---
 
@@ -149,6 +171,7 @@ CodeBuddy is deployed 100% free using:
 | `OPENROUTER_API_KEY` | Your OpenRouter free API key |
 | `GROQ_API_KEY` | Your Groq free API key |
 | `FREE_ONLY_MODE` | `false` |
+| `OLLAMA_ENABLED` | `false` (no Ollama on Render) |
 | `COOKIE_SECURE` | `true` |
 
 5. Click **Deploy** — Render will automatically build and launch your app!
@@ -160,16 +183,27 @@ The app uses a smart **database compatibility wrapper** built into `app.py`:
 
 ---
 
-## 🤖 AI Fallback Chain (Free-First)
+## 🤖 AI Provider Architecture (Triple Redundancy)
 
-| Role | Model |
-|---|---|
-| Code tasks | `deepseek/deepseek-chat-v3-0324:free` |
-| Fast / multilingual | `meta-llama/llama-3.3-70b-instruct:free` |
-| Classification | `nvidia/llama-3.1-nemotron-70b-instruct:free` |
-| Last resort | local heuristics / graceful fallback |
+```
+User Query
+    │
+    ▼
+┌─────────────────────────────────────────────────┐
+│  Priority 1: OLLAMA (Local GPU)                 │  ← FREE, fastest, unlimited
+│  Priority 2: GROQ (Cloud - Ultra Fast)          │  ← Free tier, 30 req/min
+│  Priority 3: OPENROUTER (Cloud - Fallback Chain)│  ← Free fallback chain
+└─────────────────────────────────────────────────┘
+```
 
-If any model returns 429/404/503 → next free model is tried automatically, then the app falls back to local heuristics where possible.
+| Priority | Provider | Models | Cost | Speed |
+|---|---|---|---|---|
+| 🥇 **1st** | **Ollama** (local) | `llama3` / any Ollama model | **₹0 forever** | ~50ms |
+| 🥈 **2nd** | **Groq** (cloud) | `llama-3.1-8b` / `llama-3.3-70b` | Free tier | ~200ms |
+| 🥉 **3rd** | **OpenRouter** (cloud) | `nemotron-70b:free` → `llama-3.3-70b:free` → `qwen3-coder:free` → `gemma-3-4b:free` → `openrouter/free` | Free tier | ~500ms |
+| 🔧 **4th** | **Local heuristics** | Built-in pattern matching | ₹0 | Instant |
+
+If any provider fails (offline/rate-limited/error) → the next provider is tried automatically. Zero downtime.
 
 ---
 
@@ -191,8 +225,9 @@ If any model returns 429/404/503 → next free model is tried automatically, the
 | Flask-SocketIO | Real-time WebSocket collaboration |
 | PostgreSQL / SQLite | Cloud database (Neon) / Local database |
 | psycopg2-binary | PostgreSQL driver |
-| OpenRouter / Groq | Free-tier AI fallback chain |
-| AI Output Simulator | Predicts and simulates run outputs of 50+ languages via OpenRouter/Groq + local compiler fallbacks |
+| Ollama | Local GPU AI — zero cost, unlimited, offline capable |
+| OpenRouter / Groq | Cloud AI fallback chain (free tier) |
+| AI Output Simulator | Predicts and simulates run outputs of 50+ languages via Ollama/Groq/OpenRouter + local compiler fallbacks |
 | gTTS / XTTS-v2 | Text-to-speech and voice cloning |
 | Gunicorn (gthread) | Production WSGI server |
 | python-dotenv | Load `.env` configuration |
