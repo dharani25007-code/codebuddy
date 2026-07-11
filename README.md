@@ -106,6 +106,7 @@ cd codebuddy
 pip install -r requirements.txt
 ```
 
+
 ### Configure (Local Development)
 Create a `.env` file in the project root:
 ```env
