@@ -88,7 +88,7 @@ OLLAMA_URL     = os.getenv("OLLAMA_URL", "http://localhost:11434")
 # -- Ollama local models (FREE, unlimited, no API key needed) ------------------
 OLLAMA_MODELS = {
     "smart":      os.getenv("OLLAMA_MODEL", "qwen2.5-coder:7b"),  # main chat, code review
-    "fast":       os.getenv("OLLAMA_FAST_MODEL", "llama3"),       # classifier, title, mood
+    "fast":       os.getenv("OLLAMA_FAST_MODEL", "llama3.2:3b"),  # classifier, title, mood
 }
 OLLAMA_ENABLED = os.getenv("OLLAMA_ENABLED", "true").lower() != "false"
 

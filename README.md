@@ -120,7 +120,7 @@ GROQ_API_KEY=your-groq-key
 
 # Ollama Local AI (optional — auto-detected at localhost:11434)
 OLLAMA_ENABLED=true
-OLLAMA_MODEL=llama3
+OLLAMA_MODEL=qwen2.5-coder:7b
 # OLLAMA_URL=http://localhost:11434
 ```
 
@@ -133,8 +133,9 @@ The app runs without any AI keys in free-only mode. Add optional free-tier keys 
 # Terminal 1: Start Ollama (if not running as service)
 ollama serve
 
-# Terminal 2: Pull a model (one-time)
-ollama pull llama3
+# Terminal 2: Pull models (one-time)
+ollama pull qwen2.5-coder:7b
+ollama pull llama3.2:3b
 
 # Terminal 3: Start CodeBuddy
 python app.py
@@ -198,7 +199,7 @@ User Query
 
 | Priority | Provider | Models | Cost | Speed |
 |---|---|---|---|---|
-| 🥇 **1st** | **Ollama** (local) | `llama3` / any Ollama model | **₹0 forever** | ~50ms |
+| 🥇 **1st** | **Ollama** (local) | `qwen2.5-coder:7b` (coding) & `llama3.2:3b` (fast tasks) | **₹0 forever** | ~50ms |
 | 🥈 **2nd** | **Groq** (cloud) | `llama-3.1-8b` / `llama-3.3-70b` | Free tier | ~200ms |
 | 🥉 **3rd** | **OpenRouter** (cloud) | `nemotron-70b:free` → `llama-3.3-70b:free` → `qwen3-coder:free` → `gemma-3-4b:free` → `openrouter/free` | Free tier | ~500ms |
 | 🔧 **4th** | **Local heuristics** | Built-in pattern matching | ₹0 | Instant |
