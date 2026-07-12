@@ -2997,6 +2997,11 @@
       flex-direction: column;
       overflow: hidden;
     }
+    #interviewHUD, #ivSetup, #ivReport {
+      --text: #e2f4ff !important;
+      --text-2: rgba(226, 244, 255, 0.65) !important;
+      --text-3: rgba(226, 244, 255, 0.4) !important;
+    }
 
     body.mode-interview #interviewHUD {
       display: flex;
@@ -5565,8 +5570,8 @@
       }
     }
   </style>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/cursor.css') }}">
-  <script src="{{ url_for('static', filename='js/cursor.js') }}" defer></script>
+  <!-- <link rel="stylesheet" href="{{ url_for('static', filename='css/cursor.css') }}">
+  <script src="{{ url_for('static', filename='js/cursor.js') }}" defer></script> -->
 </head>
 
 <body>
@@ -11997,14 +12002,14 @@ def find_max(arr):
             const col = moodCol[dom] || '#94a3b8';
             ov.style.display = 'block';
             ov.innerHTML = `
-          <div style="padding:14px 16px;border:1px solid ${col}30;border-radius:8px;background:rgba(0,0,0,0.3);margin-bottom:14px">
+          <div style="padding:14px 16px;border:1px solid ${col}30;border-radius:8px;background:var(--surface2);margin-bottom:14px">
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px">
               <div>
                 <div style="font-family:var(--display);font-size:9px;letter-spacing:2px;color:var(--text-3);margin-bottom:4px">DOMINANT MOOD</div>
                 <div style="font-family:var(--display);font-size:24px;font-weight:900;color:${col}">${emojis[dom] || '😐'} ${dom.toUpperCase()}</div>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-                ${Object.entries(s).map(([m, c]) => `<div style="padding:6px 10px;border-radius:4px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.05)">
+                ${Object.entries(s).map(([m, c]) => `<div style="padding:6px 10px;border-radius:4px;background:var(--surface);border:1px solid var(--border)">
                   <div style="font-family:var(--display);font-size:7px;letter-spacing:1px;color:var(--text-3)">${emojis[m] || ''} ${m.toUpperCase()}</div>
                   <div style="font-family:var(--display);font-size:18px;font-weight:800;color:${moodCol[m] || '#94a3b8'}">${c}</div>
                 </div>`).join('')}
@@ -12017,11 +12022,11 @@ def find_max(arr):
             const recent = (d.recent || []).slice(0, 20);
             if (!recent.length) { list.innerHTML = '<div style="font-family:var(--mono);font-size:11px;color:var(--text-3)">No mood signals yet. Start chatting to build your history.</div>'; return; }
             list.innerHTML = `<div style="font-family:var(--display);font-size:8px;letter-spacing:2px;color:var(--text-3);margin-bottom:8px">RECENT SIGNALS</div>` +
-              recent.map(m => `<div style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:4px;border:1px solid rgba(255,255,255,0.05);background:rgba(0,0,0,0.15);margin-bottom:5px">
+              recent.map(m => `<div style="display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:4px;border:1px solid var(--border);background:var(--surface);margin-bottom:5px">
             <span style="font-size:16px">${emojis[m.mood] || '😐'}</span>
             <span style="font-family:var(--display);font-size:8px;font-weight:700;letter-spacing:1.5px;color:${moodCol[m.mood] || '#94a3b8'};flex:1">${(m.mood || '').toUpperCase()}</span>
             <span style="font-family:var(--mono);font-size:9px;color:var(--text-3)">${(m.detected_at || '').slice(0, 16)}</span>
-            <div style="width:40px;height:4px;border-radius:2px;background:rgba(255,255,255,0.05);overflow:hidden"><div style="height:100%;width:${Math.round((m.score || 0) * 100)}%;background:${moodCol[m.mood] || '#94a3b8'};border-radius:2px"></div></div>
+            <div style="width:40px;height:4px;border-radius:2px;background:var(--border);overflow:hidden"><div style="height:100%;width:${Math.round((m.score || 0) * 100)}%;background:${moodCol[m.mood] || '#94a3b8'};border-radius:2px"></div></div>
           </div>`).join('');
           } catch (e) { list.innerHTML = `<span style="color:var(--fire);font-family:var(--mono);font-size:10px">Failed: ${e.message}</span>`; }
         }
