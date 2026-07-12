@@ -1067,28 +1067,56 @@ def bump_stat(user_id, field, amount=1):
     conn.commit()
 
 def update_streak(user_id):
-    """Update daily streak — call once per day per user."""
+    """Update daily streak — auto-heals using message history if needed."""
     conn = sqlite3.connect("codebuddy.db")
     conn.row_factory = sqlite3.Row
-    row = conn.execute("SELECT last_active, streak_days FROM user_stats WHERE user_id=?", (user_id,)).fetchone()
-    today = date.today().isoformat()
-    if row and row["last_active"]:
-        last_val = row["last_active"]
+    
+    # 1. Fetch unique active dates from messages
+    rows_dates = conn.execute("""
+        SELECT DISTINCT substr(m.timestamp, 1, 10) as msg_date
+        FROM messages m
+        JOIN conversations c ON m.conversation_id = c.id
+        WHERE c.user_id = ?
+        ORDER BY msg_date DESC LIMIT 100
+    """, (user_id,)).fetchall()
+    
+    active_dates = {r["msg_date"] for r in rows_dates if r["msg_date"]}
+    
+    # Also check user_stats.last_active if it's not in messages
+    row_stats = conn.execute("SELECT last_active, streak_days FROM user_stats WHERE user_id=?", (user_id,)).fetchone()
+    if row_stats and row_stats["last_active"]:
+        last_val = row_stats["last_active"]
         if isinstance(last_val, str):
-            last = last_val[:10]
+            active_dates.add(last_val[:10])
         elif hasattr(last_val, "strftime"):
-            last = last_val.strftime("%Y-%m-%d")
-        else:
-            last = str(last_val)[:10]
-
-        if last == today:
-            conn.close()
-            return
+            active_dates.add(last_val.strftime("%Y-%m-%d"))
+            
+    today = date.today()
+    
+    # Calculate streak from active_dates
+    streak = 0
+    current_date = today
+    
+    # If they weren't active today, check if they were active yesterday to preserve/calculate the streak
+    if current_date.isoformat() not in active_dates:
         from datetime import timedelta
-        yesterday = (date.today() - timedelta(days=1)).isoformat()
-        new_streak = (row["streak_days"] or 0) + 1 if last == yesterday else 1
-    else:
+        current_date = today - timedelta(days=1)
+        
+    while current_date.isoformat() in active_dates:
+        streak += 1
+        from datetime import timedelta
+        current_date = current_date - timedelta(days=1)
+        
+    # Ensure streak is at least 1 if they are active today
+    if streak == 0 and today.isoformat() in active_dates:
+        streak = 1
+        
+    # If the database current streak is lower, update it to the calculated streak
+    db_streak = row_stats["streak_days"] if row_stats else 0
+    new_streak = max(db_streak, streak)
+    if new_streak == 0:
         new_streak = 1
+        
     conn.execute("""
         INSERT INTO user_stats(user_id, streak_days, last_active)
         VALUES (?, ?, datetime('now'))
