@@ -1057,13 +1057,14 @@ def bump_stat(user_id, field, amount=1):
         _tl.conn = conn
     # Safe because field is whitelisted — not user-supplied
     # Use EXCLUDED + table-qualified name for PostgreSQL compatibility
+    now_str = datetime.now().isoformat()
     conn.execute(f"""
         INSERT INTO user_stats(user_id, {field}, last_active)
-        VALUES (?, ?, datetime('now'))
+        VALUES (?, ?, ?)
         ON CONFLICT(user_id) DO UPDATE SET
             {field} = user_stats.{field} + ?,
-            last_active = datetime('now')
-    """, (user_id, amount, amount))
+            last_active = ?
+    """, (user_id, amount, now_str, amount, now_str))
     conn.commit()
 
 def update_streak(user_id):
@@ -1111,17 +1112,17 @@ def update_streak(user_id):
     if streak == 0 and today.isoformat() in active_dates:
         streak = 1
         
-    # If the database current streak is lower, update it to the calculated streak
-    db_streak = row_stats["streak_days"] if row_stats else 0
-    new_streak = max(db_streak, streak)
+    # Correct the streak to reflect the calculated consecutive active days
+    new_streak = streak
     if new_streak == 0:
         new_streak = 1
         
+    now_str = datetime.now().isoformat()
     conn.execute("""
         INSERT INTO user_stats(user_id, streak_days, last_active)
-        VALUES (?, ?, datetime('now'))
-        ON CONFLICT(user_id) DO UPDATE SET streak_days=?, last_active=datetime('now')
-    """, (user_id, new_streak, new_streak))
+        VALUES (?, ?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET streak_days=?, last_active=?
+    """, (user_id, new_streak, now_str, new_streak, now_str))
     conn.commit()
     conn.close()
 
@@ -2272,8 +2273,9 @@ def register():
         try:
             conn = sqlite3.connect("codebuddy.db")
             conn.execute("INSERT INTO users(username,password) VALUES (?,?)", (username, hashed))
+            now_str = datetime.now().isoformat()
             conn.execute("""INSERT INTO user_stats(user_id, last_active)
-                           VALUES ((SELECT id FROM users WHERE username=?), datetime('now'))""", (username,))
+                           VALUES ((SELECT id FROM users WHERE username=?), ?)""", (username, now_str))
             conn.commit()
             conn.close()
             return redirect(url_for("login"))
