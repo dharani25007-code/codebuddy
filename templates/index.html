@@ -5652,7 +5652,7 @@
         <div id="ivReportRecs" style="font-family:var(--mono);font-size:11px;color:var(--text-2);line-height:1.7;">
         </div>
       </div>
-      <button class="iv-report-btn" onclick="document.getElementById('ivReport').classList.remove('show')">✕ CLOSE
+      <button class="iv-report-btn" onclick="document.getElementById('ivReport').classList.remove('show'); ivResetModeToGeneral();">✕ CLOSE
         REPORT</button>
       <button class="iv-report-btn" onclick="ivExportReport()"
         style="margin-top:6px;border-color:rgba(168,85,247,0.3);color:var(--nova);">⬇ EXPORT REPORT</button>
@@ -7224,8 +7224,11 @@
             bar.innerHTML = `<button class="play-speak-btn" onclick="speakMsgBtn(this)">🔊 PLAY</button><button class="rxn-btn" onclick="react(this,'like')">▲ <span>0</span></button><button class="rxn-btn" onclick="react(this,'dislike')">▼ <span>0</span></button><button class="rxn-btn" onclick="copyMsg(this)">COPY</button>`;
             forge.appendChild(bar);
           }
-          setProgress(100); setTimeout(ensurePlayBars, 100); updateStats(full, (Date.now() - t0) / 1000);
           addHistory('b', full);
+          setProgress(100); setTimeout(ensurePlayBars, 100); updateStats(full, (Date.now() - t0) / 1000);
+          if (typeof window.onAISendComplete === 'function') {
+            try { window.onAISendComplete(full); } catch (e) { console.error(e); }
+          }
           // Update live mood badge from server
           _fetchMoodBadge();
           // sessionMsgCount counts user messages only; check <= 1 to trigger title refresh after first user message
@@ -7656,7 +7659,7 @@ Format: Start with "SCORE: X/10" then your analysis.`;
       function ivSkip() {
         if (!IV.active) return;
         IV.skipCount++;
-        IV.scores.push({ q: IV.questions[IV.currentQ].q.slice(0, 50), score: 0, skipped: true });
+        IV.scores[IV.currentQ] = { q: IV.questions[IV.currentQ].q.slice(0, 50), score: 0, skipped: true };
         addFeedbackItem(IV.questions[IV.currentQ].q.slice(0, 50) + '...', 0, 'SKIPPED');
         IV.streak = 0;
         ivUpdateScores();
@@ -7664,24 +7667,27 @@ Format: Start with "SCORE: X/10" then your analysis.`;
       }
 
       function ivUpdateScores() {
-        if (!IV.scores.length) return;
-        const valid = IV.scores.filter(s => !s.skipped);
-        if (!valid.length) return;
-
-        const avg = valid.reduce((a, s) => a + s.score, 0) / valid.length;
+        const valid = IV.scores.filter(s => s && !s.skipped);
         const correct = valid.filter(s => s.score >= 7).length;
+        const avg = valid.length ? valid.reduce((a, s) => a + s.score, 0) / valid.length : 0;
 
         const avgEl = document.getElementById('ivScoreAvg');
-        avgEl.textContent = avg.toFixed(1);
-        avgEl.className = 'iv-score-val ' + (avg >= 7 ? 'good' : avg >= 5 ? 'ok' : 'bad');
+        if (avgEl) {
+          avgEl.textContent = avg.toFixed(1);
+          avgEl.className = 'iv-score-val ' + (avg >= 7 ? 'good' : avg >= 5 ? 'ok' : 'bad');
+        }
 
         const cEl = document.getElementById('ivScoreCorrect');
-        cEl.textContent = correct + '/' + valid.length;
-        cEl.className = 'iv-score-val ' + (correct / valid.length >= 0.7 ? 'good' : correct / valid.length >= 0.5 ? 'ok' : 'bad');
+        if (cEl) {
+          cEl.textContent = correct + '/' + IV.totalQ;
+          cEl.className = 'iv-score-val ' + (correct / IV.totalQ >= 0.7 ? 'good' : correct / IV.totalQ >= 0.5 ? 'ok' : 'bad');
+        }
 
         const sEl = document.getElementById('ivScoreStreak');
-        sEl.textContent = IV.streak;
-        sEl.className = 'iv-score-val ' + (IV.streak >= 3 ? 'good' : IV.streak >= 1 ? 'ok' : 'na');
+        if (sEl) {
+          sEl.textContent = IV.streak;
+          sEl.className = 'iv-score-val ' + (IV.streak >= 3 ? 'good' : IV.streak >= 1 ? 'ok' : 'na');
+        }
       }
 
       function addFeedbackItem(qText, score, feedback) {
@@ -7729,10 +7735,11 @@ Please score this answer 1-10 and provide detailed feedback. Start with "SCORE: 
         if (!IV.active || !IV.feedbackPending) return;
         IV.feedbackPending = false;
 
-        const score = ivParseAIScore(text) || 5;
+        const score = ivParseAIScore(text);
+        if (score === null) return; // Wait for correct format / next completion
         const q = IV.questions[IV.currentQ];
 
-        IV.scores.push({ q: q.q.slice(0, 50), score, skipped: false });
+        IV.scores[IV.currentQ] = { q: q.q.slice(0, 50), score, skipped: false };
 
         // Update streak
         if (score >= 7) { IV.streak++; IV.maxStreak = Math.max(IV.maxStreak, IV.streak); }
@@ -7774,17 +7781,23 @@ Please evaluate this answer out of 10. Start your response with "SCORE: X/10" th
           }
         }
         await _realSend.apply(this, arguments);
+      };
+
+      window.onAISendComplete = function (fullText) {
         if (document.getElementById('mode').value === 'interview' && IV.active) {
-          // Parse response after streaming
-          setTimeout(() => {
-            const msgs = document.querySelectorAll('#chatBox .msg-row.bot .bubble-content');
-            if (msgs.length) {
-              const lastText = msgs[msgs.length - 1].innerText || '';
-              ivOnAIResponse(lastText);
-            }
-          }, 1500);
+          ivOnAIResponse(fullText);
         }
       };
+
+      function ivResetModeToGeneral() {
+        IV.active = false;
+        clearInterval(IV.timerInterval);
+        const sel = document.getElementById('mode');
+        if (sel) {
+          sel.value = 'general';
+          onModeChange(sel);
+        }
+      }
 
       function ivEndSession() {
         IV.active = false;
