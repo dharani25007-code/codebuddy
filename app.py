@@ -2200,6 +2200,10 @@ def logout():
 @app.route("/")
 @login_required
 def dashboard():
+    try:
+        update_streak(current_user.id)
+    except Exception as e:
+        app.logger.warning(f"Failed to update streak: {e}")
     conn = sqlite3.connect("codebuddy.db")
     conn.row_factory = sqlite3.Row
     chats = conn.execute(
