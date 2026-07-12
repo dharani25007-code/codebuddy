@@ -1073,7 +1073,14 @@ def update_streak(user_id):
     row = conn.execute("SELECT last_active, streak_days FROM user_stats WHERE user_id=?", (user_id,)).fetchone()
     today = date.today().isoformat()
     if row and row["last_active"]:
-        last = row["last_active"][:10]
+        last_val = row["last_active"]
+        if isinstance(last_val, str):
+            last = last_val[:10]
+        elif hasattr(last_val, "strftime"):
+            last = last_val.strftime("%Y-%m-%d")
+        else:
+            last = str(last_val)[:10]
+
         if last == today:
             conn.close()
             return
