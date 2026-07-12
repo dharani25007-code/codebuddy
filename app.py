@@ -1128,7 +1128,8 @@ def extract_and_save_memory(user_id, message):
     msg_lower = message.lower()
     # Detect preferred language
     for lang in ["python", "javascript", "typescript", "java", "c++", "rust", "go", "swift", "kotlin"]:
-        if f"i use {lang}" in msg_lower or f"i prefer {lang}" in msg_lower or f"i code in {lang}" in msg_lower:
+        if (f"i use {lang}" in msg_lower or f"i prefer {lang}" in msg_lower or f"i code in {lang}" in msg_lower or
+            f"in {lang}" in msg_lower or f"using {lang}" in msg_lower or f"with {lang}" in msg_lower):
             set_user_memory(user_id, "preferred_language", lang)
             break
     # Detect experience level
@@ -7330,7 +7331,7 @@ def changelog_generate():
     convos = conn.execute("""
         SELECT c.id, c.title, c.mode
         FROM conversations c
-        WHERE c.user_id=? AND DATE(c.updated_at)=?
+        WHERE c.user_id=? AND SUBSTR(c.updated_at, 1, 10)=?
         ORDER BY c.id ASC
     """, (current_user.id, target_date)).fetchall()
 
