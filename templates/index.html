@@ -4565,6 +4565,393 @@
       border-top-color: rgba(8, 145, 178, 0.14) !important;
     }
 
+    /* ═══════════════════════════════════════════════════
+       ALL LIGHT THEMES — shared overrides for
+       professional · warm · minimal
+       (body.light already has its own block above)
+    ═══════════════════════════════════════════════════ */
+
+    body.theme-professional .topbar,
+    body.theme-warm .topbar,
+    body.theme-minimal .topbar {
+      background: linear-gradient(180deg, var(--panel) 0%, var(--deep) 100%) !important;
+      border-bottom: 1px solid var(--border-hi) !important;
+      box-shadow: 0 2px 20px var(--plasma-glow) !important;
+    }
+
+    body.theme-professional .topbar-left *,
+    body.theme-professional .topbar-right *,
+    body.theme-warm .topbar-left *,
+    body.theme-warm .topbar-right *,
+    body.theme-minimal .topbar-left *,
+    body.theme-minimal .topbar-right * {
+      color: var(--text);
+    }
+
+    body.theme-professional .mode-select,
+    body.theme-warm .mode-select,
+    body.theme-minimal .mode-select {
+      background: var(--surface) !important;
+      border-color: var(--border-hi) !important;
+      color: var(--text) !important;
+    }
+
+    body.theme-professional .mode-select option,
+    body.theme-warm .mode-select option,
+    body.theme-minimal .mode-select option {
+      background: var(--void);
+      color: var(--text);
+    }
+
+    body.theme-professional .mode-chip,
+    body.theme-warm .mode-chip,
+    body.theme-minimal .mode-chip {
+      background: var(--surface) !important;
+      border-color: var(--border) !important;
+      color: var(--text-2) !important;
+    }
+
+    body.theme-professional .mode-chip.active,
+    body.theme-professional .mode-chip:hover,
+    body.theme-warm .mode-chip.active,
+    body.theme-warm .mode-chip:hover,
+    body.theme-minimal .mode-chip.active,
+    body.theme-minimal .mode-chip:hover {
+      background: var(--plasma-dim) !important;
+      border-color: var(--plasma) !important;
+      color: var(--plasma) !important;
+    }
+
+    body.theme-professional .hud-badge,
+    body.theme-warm .hud-badge,
+    body.theme-minimal .hud-badge {
+      color: var(--text-2) !important;
+      border-color: var(--border) !important;
+    }
+
+    body.theme-professional .live-btn,
+    body.theme-warm .live-btn,
+    body.theme-minimal .live-btn {
+      background: var(--surface) !important;
+      border-color: var(--border-hi) !important;
+      color: var(--plasma) !important;
+    }
+
+    body.theme-professional .live-btn:hover,
+    body.theme-warm .live-btn:hover,
+    body.theme-minimal .live-btn:hover {
+      background: var(--plasma-dim) !important;
+    }
+
+    body.theme-professional #liveBtn .lb-dot,
+    body.theme-warm #liveBtn .lb-dot,
+    body.theme-minimal #liveBtn .lb-dot {
+      background: var(--plasma) !important;
+      box-shadow: 0 0 5px var(--plasma) !important;
+    }
+
+    body.theme-professional #hubNavBtn,
+    body.theme-warm #hubNavBtn,
+    body.theme-minimal #hubNavBtn {
+      color: var(--plasma) !important;
+      border-color: var(--border-hi) !important;
+      background: var(--surface) !important;
+    }
+
+    body.theme-professional #voiceLabBtn,
+    body.theme-warm #voiceLabBtn,
+    body.theme-minimal #voiceLabBtn {
+      color: var(--nova) !important;
+      border-color: var(--nova-dim) !important;
+      background: var(--nova-dim) !important;
+    }
+
+    body.theme-professional #fp-topbtn,
+    body.theme-warm #fp-topbtn,
+    body.theme-minimal #fp-topbtn {
+      color: var(--plasma) !important;
+      border-color: var(--border-hi) !important;
+      background: var(--surface) !important;
+    }
+
+    body.theme-professional #videoAnalyzerBtn,
+    body.theme-warm #videoAnalyzerBtn,
+    body.theme-minimal #videoAnalyzerBtn {
+      color: var(--plasma) !important;
+      border-color: var(--border-hi) !important;
+      background: var(--surface) !important;
+    }
+
+    /* Profile / user dropdown */
+    body.theme-professional .user-menu-btn .user-menu-name,
+    body.theme-professional .user-menu-btn .user-menu-caret,
+    body.theme-warm .user-menu-btn .user-menu-name,
+    body.theme-warm .user-menu-btn .user-menu-caret,
+    body.theme-minimal .user-menu-btn .user-menu-name,
+    body.theme-minimal .user-menu-btn .user-menu-caret {
+      color: var(--text);
+    }
+
+    body.theme-professional .user-dropdown,
+    body.theme-warm .user-dropdown,
+    body.theme-minimal .user-dropdown {
+      background: var(--deep) !important;
+      border: 1px solid var(--border-hi) !important;
+      box-shadow: 0 8px 32px var(--plasma-glow) !important;
+    }
+
+    body.theme-professional .udrop-header,
+    body.theme-warm .udrop-header,
+    body.theme-minimal .udrop-header {
+      background: var(--surface2);
+      border-bottom-color: var(--border) !important;
+    }
+
+    body.theme-professional .udrop-name,
+    body.theme-warm .udrop-name,
+    body.theme-minimal .udrop-name {
+      color: var(--text) !important;
+    }
+
+    body.theme-professional .udrop-role,
+    body.theme-warm .udrop-role,
+    body.theme-minimal .udrop-role {
+      color: var(--text-2) !important;
+    }
+
+    body.theme-professional .udrop-divider,
+    body.theme-warm .udrop-divider,
+    body.theme-minimal .udrop-divider {
+      background: var(--border) !important;
+    }
+
+    body.theme-professional .udrop-item,
+    body.theme-warm .udrop-item,
+    body.theme-minimal .udrop-item {
+      color: var(--text-2) !important;
+    }
+
+    body.theme-professional .udrop-item:hover,
+    body.theme-warm .udrop-item:hover,
+    body.theme-minimal .udrop-item:hover {
+      background: var(--plasma-dim) !important;
+      color: var(--plasma) !important;
+    }
+
+    body.theme-professional .udrop-item.logout:hover,
+    body.theme-warm .udrop-item.logout:hover,
+    body.theme-minimal .udrop-item.logout:hover {
+      background: var(--fire-dim) !important;
+      color: var(--fire) !important;
+    }
+
+    /* Sidebar */
+    body.theme-professional .chat-item,
+    body.theme-warm .chat-item,
+    body.theme-minimal .chat-item {
+      border-color: var(--border) !important;
+      color: var(--text) !important;
+    }
+
+    body.theme-professional .chat-item:hover,
+    body.theme-warm .chat-item:hover,
+    body.theme-minimal .chat-item:hover {
+      background: var(--surface2) !important;
+      border-color: var(--border-hi) !important;
+    }
+
+    body.theme-professional .chat-item.active,
+    body.theme-warm .chat-item.active,
+    body.theme-minimal .chat-item.active {
+      background: var(--plasma-dim) !important;
+      border-color: var(--border-hi) !important;
+    }
+
+    body.theme-professional .chat-title,
+    body.theme-warm .chat-title,
+    body.theme-minimal .chat-title {
+      color: var(--text) !important;
+    }
+
+    body.theme-professional .new-chat-btn,
+    body.theme-warm .new-chat-btn,
+    body.theme-minimal .new-chat-btn {
+      background: var(--surface) !important;
+      border-color: var(--border-hi) !important;
+      color: var(--plasma) !important;
+    }
+
+    body.theme-professional .nav-label,
+    body.theme-warm .nav-label,
+    body.theme-minimal .nav-label {
+      color: var(--text-3) !important;
+    }
+
+    body.theme-professional #sidebarSearch,
+    body.theme-warm #sidebarSearch,
+    body.theme-minimal #sidebarSearch {
+      background: var(--surface) !important;
+      border-color: var(--border) !important;
+      color: var(--text) !important;
+    }
+
+    body.theme-professional #sidebarSearch::placeholder,
+    body.theme-warm #sidebarSearch::placeholder,
+    body.theme-minimal #sidebarSearch::placeholder {
+      color: var(--text-3) !important;
+    }
+
+    body.theme-professional .menu-btn,
+    body.theme-warm .menu-btn,
+    body.theme-minimal .menu-btn {
+      color: var(--text-3) !important;
+    }
+
+    body.theme-professional .menu-btn:hover,
+    body.theme-warm .menu-btn:hover,
+    body.theme-minimal .menu-btn:hover {
+      background: var(--plasma-dim) !important;
+      color: var(--plasma) !important;
+    }
+
+    /* Chat bubbles */
+    body.theme-professional .bubble-content,
+    body.theme-warm .bubble-content,
+    body.theme-minimal .bubble-content {
+      color: var(--text) !important;
+    }
+
+    body.theme-professional .msg-row.ai .bubble-content,
+    body.theme-warm .msg-row.ai .bubble-content,
+    body.theme-minimal .msg-row.ai .bubble-content {
+      background: var(--surface) !important;
+      border-color: var(--border) !important;
+    }
+
+    body.theme-professional .msg-row.user .bubble-content,
+    body.theme-warm .msg-row.user .bubble-content,
+    body.theme-minimal .msg-row.user .bubble-content {
+      background: var(--nova-dim) !important;
+      border-color: var(--nova-dim) !important;
+    }
+
+    body.theme-professional .msg-role,
+    body.theme-warm .msg-role,
+    body.theme-minimal .msg-role {
+      color: var(--text-3) !important;
+    }
+
+    body.theme-professional .rxn-btn,
+    body.theme-professional .play-speak-btn,
+    body.theme-professional .code-btn,
+    body.theme-warm .rxn-btn,
+    body.theme-warm .play-speak-btn,
+    body.theme-warm .code-btn,
+    body.theme-minimal .rxn-btn,
+    body.theme-minimal .play-speak-btn,
+    body.theme-minimal .code-btn {
+      background: var(--surface) !important;
+      border-color: var(--border) !important;
+      color: var(--text-2) !important;
+    }
+
+    body.theme-professional .rxn-btn:hover,
+    body.theme-professional .play-speak-btn:hover,
+    body.theme-professional .code-btn:hover,
+    body.theme-warm .rxn-btn:hover,
+    body.theme-warm .play-speak-btn:hover,
+    body.theme-warm .code-btn:hover,
+    body.theme-minimal .rxn-btn:hover,
+    body.theme-minimal .play-speak-btn:hover,
+    body.theme-minimal .code-btn:hover {
+      background: var(--plasma-dim) !important;
+      color: var(--plasma) !important;
+    }
+
+    /* Code blocks — keep dark for readability */
+    body.theme-professional .bubble-content pre,
+    body.theme-warm .bubble-content pre,
+    body.theme-minimal .bubble-content pre {
+      background: #1a2b3f !important;
+      border-color: var(--border-hi) !important;
+    }
+
+    body.theme-professional .bubble-content pre code,
+    body.theme-warm .bubble-content pre code,
+    body.theme-minimal .bubble-content pre code {
+      color: #e2f4ff !important;
+    }
+
+    body.theme-professional .code-toolbar,
+    body.theme-warm .code-toolbar,
+    body.theme-minimal .code-toolbar {
+      background: rgba(26, 43, 63, 0.95) !important;
+      border-bottom-color: var(--border) !important;
+    }
+
+    body.theme-professional .lang-tag,
+    body.theme-warm .lang-tag,
+    body.theme-minimal .lang-tag {
+      color: rgba(226, 244, 255, 0.5) !important;
+    }
+
+    body.theme-professional .run-output,
+    body.theme-warm .run-output,
+    body.theme-minimal .run-output {
+      background: #111827 !important;
+      border-color: var(--border) !important;
+    }
+
+    body.theme-professional .run-console,
+    body.theme-warm .run-console,
+    body.theme-minimal .run-console {
+      background: #111827 !important;
+      color: #e2f4ff !important;
+    }
+
+    /* Input area */
+    body.theme-professional .input-area,
+    body.theme-warm .input-area,
+    body.theme-minimal .input-area {
+      background: linear-gradient(180deg, var(--panel) 0%, var(--deep) 100%) !important;
+      border-top-color: var(--border) !important;
+    }
+
+    /* Dropdowns */
+    body.theme-professional .dropdown,
+    body.theme-warm .dropdown,
+    body.theme-minimal .dropdown {
+      background: var(--deep) !important;
+      border-color: var(--border-hi) !important;
+      box-shadow: 0 8px 30px var(--plasma-glow) !important;
+    }
+
+    body.theme-professional .dropdown div,
+    body.theme-professional .dropdown a,
+    body.theme-warm .dropdown div,
+    body.theme-warm .dropdown a,
+    body.theme-minimal .dropdown div,
+    body.theme-minimal .dropdown a {
+      color: var(--text) !important;
+      font-weight: 700 !important;
+    }
+
+    body.theme-professional .dropdown div:hover,
+    body.theme-professional .dropdown a:hover,
+    body.theme-warm .dropdown div:hover,
+    body.theme-warm .dropdown a:hover,
+    body.theme-minimal .dropdown div:hover,
+    body.theme-minimal .dropdown a:hover {
+      background: var(--plasma-dim) !important;
+      color: var(--plasma) !important;
+    }
+
+    body.theme-professional #cbThemeWrap .theme-morph .morph-icons,
+    body.theme-warm #cbThemeWrap .theme-morph .morph-icons,
+    body.theme-minimal #cbThemeWrap .theme-morph .morph-icons {
+      color: var(--text);
+    }
+
     /* ══════════════════════════════════════════════════
        INPUT ZONE — PER-THEME OVERRIDES
        5 themes: gaming · darkpro · professional · warm · minimal
