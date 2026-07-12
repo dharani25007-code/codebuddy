@@ -397,7 +397,7 @@
       width: 28px;
       height: 28px;
       border-radius: 50%;
-      background: var(--deep);
+      background: var(--abyss);
       border: 1px solid var(--border-hi);
       color: var(--plasma);
       display: flex;
@@ -405,14 +405,23 @@
       justify-content: center;
       cursor: pointer;
       z-index: 30;
-      font-size: 10px;
       transition: all 0.3s;
-      box-shadow: 0 0 12px var(--plasma-glow);
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
     }
 
     .sidebar-collapse:hover {
       background: var(--plasma-dim);
-      box-shadow: 0 0 20px var(--plasma);
+      box-shadow: 0 0 14px var(--plasma);
+    }
+
+    .sb-toggle-svg {
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      display: block;
+      color: inherit;
+    }
+
+    .sidebar.collapsed .sb-toggle-svg {
+      transform: rotate(180deg);
     }
 
     .sidebar-body {
@@ -4579,6 +4588,17 @@
       box-shadow: 0 2px 20px var(--plasma-glow) !important;
     }
 
+    /* Clean, non-globby sidebar toggle button for light themes */
+    body.light .sidebar-collapse,
+    body.theme-professional .sidebar-collapse,
+    body.theme-warm .sidebar-collapse,
+    body.theme-minimal .sidebar-collapse {
+      background: var(--abyss) !important;
+      border-color: var(--border-hi) !important;
+      color: var(--plasma) !important;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+    }
+
     body.theme-professional .topbar-left *,
     body.theme-professional .topbar-right *,
     body.theme-warm .topbar-left *,
@@ -6116,7 +6136,9 @@
 
   <!-- SIDEBAR -->
   <div class="sidebar" id="sidebar">
-    <div class="sidebar-collapse" id="sidebarToggle" onclick="toggleSidebar()">◀</div>
+    <div class="sidebar-collapse" id="sidebarToggle" onclick="toggleSidebar()">
+      <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round" class="sb-toggle-svg"><polyline points="15 18 9 12 15 6"></polyline></svg>
+    </div>
     <div class="sidebar-body">
       <div class="logo-area">
         <div class="logo-hex">
@@ -6953,7 +6975,7 @@
       /* THEME: legacy two-mode toggle removed; new 5-theme system initialized later */
 
       /* SIDEBAR */
-      function toggleSidebar() { const sb = document.getElementById('sidebar'), tg = document.getElementById('sidebarToggle'); sb.classList.toggle('collapsed'); tg.textContent = sb.classList.contains('collapsed') ? '▶' : '◀'; }
+      function toggleSidebar() { const sb = document.getElementById('sidebar'); sb.classList.toggle('collapsed'); }
       function sidebarLiveSearch(q) {
         const items = document.querySelectorAll('#chatList .chat-item');
         const term = q.trim().toLowerCase();
