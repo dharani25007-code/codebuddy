@@ -267,45 +267,6 @@
       cursor: default;
     }
 
-    /* CURSOR — custom cursor disabled; elements hidden */
-    #cursor,
-    #cursor-ring,
-    .trail-dot {
-      display: none !important;
-    }
-
-    body:has(button:hover) #cursor,
-    body:has(a:hover) #cursor {
-      width: 20px;
-      height: 20px;
-    }
-
-    body:has(button:hover) #cursor-ring,
-    body:has(a:hover) #cursor-ring {
-      width: 48px;
-      height: 48px;
-      border-color: var(--fire);
-    }
-
-    .trail-dot {
-      position: fixed;
-      width: 4px;
-      height: 4px;
-      border-radius: 50%;
-      background: var(--plasma);
-      pointer-events: none;
-      z-index: 99990;
-      transform: translate(-50%, -50%);
-      animation: trailFade 0.5s ease forwards;
-    }
-
-    @keyframes trailFade {
-      to {
-        opacity: 0;
-        transform: translate(-50%, -50%) scale(0);
-      }
-    }
-
     /* NEURAL CANVAS */
     #neuralCanvas {
       position: fixed;
@@ -5977,13 +5938,10 @@
       }
     }
   </style>
-  <!-- <link rel="stylesheet" href="{{ url_for('static', filename='css/cursor.css') }}">
-  <script src="{{ url_for('static', filename='js/cursor.js') }}" defer></script> -->
 </head>
 
 <body>
 
-  <div id="cursor"></div>
 
   <!-- INTERVIEW SETUP MODAL -->
   <div id="ivSetup">
@@ -6131,7 +6089,6 @@
       <button class="iv-btn danger" onclick="ivEndSession()">END</button>
     </div>
   </div>
-  <div id="cursor-ring"></div>
   <canvas id="neuralCanvas"></canvas>
 
   <!-- SIDEBAR -->
@@ -6942,29 +6899,6 @@
         }
         draw();
       })();
-
-      /* CURSOR */
-      const curEl = document.getElementById('cursor'), ringEl = document.getElementById('cursor-ring');
-      let cx = window.innerWidth / 2, cy = window.innerHeight / 2, rx = cx, ry = cy;
-      let cursorVisible = false;
-      // Show cursor on first mouse move, stay visible always after
-      document.addEventListener('mousemove', e => {
-        cx = e.clientX; cy = e.clientY;
-        curEl.style.left = cx + 'px'; curEl.style.top = cy + 'px';
-        if (!cursorVisible) { cursorVisible = true; curEl.style.opacity = '1'; ringEl.style.opacity = '0.6'; }
-        spawnTrail(cx, cy);
-      });
-      // Hide when mouse leaves window, show when it re-enters
-      document.addEventListener('mouseleave', () => { curEl.style.opacity = '0'; ringEl.style.opacity = '0'; cursorVisible = false; });
-      document.addEventListener('mouseenter', e => { cx = e.clientX; cy = e.clientY; curEl.style.left = cx + 'px'; curEl.style.top = cy + 'px'; curEl.style.opacity = '1'; ringEl.style.opacity = '0.6'; cursorVisible = true; });
-      // Smooth ring follows cursor with lag
-      (function animRing() { rx += (cx - rx) * 0.14; ry += (cy - ry) * 0.14; ringEl.style.left = rx + 'px'; ringEl.style.top = ry + 'px'; requestAnimationFrame(animRing); })();
-      // Click burst
-      document.addEventListener('mousedown', () => { curEl.style.transform = 'translate(-50%,-50%) scale(0.7)'; });
-      document.addEventListener('mouseup', () => { curEl.style.transform = 'translate(-50%,-50%) scale(1)'; });
-      let trailTimer = 0;
-      function spawnTrail(x, y) { const now = Date.now(); if (now - trailTimer < 70) return; trailTimer = now; const d = document.createElement('div'); d.className = 'trail-dot'; d.style.left = x + 'px'; d.style.top = y + 'px'; d.style.opacity = 0.6; document.body.appendChild(d); setTimeout(() => d.remove(), 500); }
-
       /* STATE */
       let currentChatId = null, lastAIResponse = '', isStreaming = false;
       let sessionMsgCount = 0, overlayOpen = false, lastCodeBlock = '', recognition = null;

@@ -50,7 +50,6 @@
       align-items: center;
       justify-content: center;
       position: relative;
-      cursor: none;
     }
 
     /* ── NEURAL CANVAS ── */
@@ -360,7 +359,7 @@
       transform: translateY(-50%);
       background: none;
       border: none;
-      cursor: none;
+      cursor: pointer;
       color: var(--text-3);
       font-size: 14px;
       transition: color 0.2s;
@@ -413,7 +412,7 @@
       font-weight: 700;
       letter-spacing: 3px;
       text-transform: uppercase;
-      cursor: none;
+      cursor: pointer;
       border-radius: 2px;
       position: relative;
       overflow: hidden;
@@ -466,14 +465,14 @@
       letter-spacing: 1.5px;
       text-transform: uppercase;
       color: var(--text-3);
-      cursor: none;
+      cursor: pointer;
     }
 
     .remember-row input[type=checkbox] {
       accent-color: var(--plasma);
       width: 13px;
       height: 13px;
-      cursor: none;
+      cursor: pointer;
     }
 
     /* ── REGISTER LINK ── */
@@ -567,8 +566,6 @@
   </style>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/theme-system.css', v='1.3') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/auth-theme-switcher.css', v='1.3') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/cursor.css', v='1.3') }}">
-  <script src="{{ url_for('static', filename='js/cursor.js', v='1.3') }}" defer></script>
   <script>
     (function(){
       var t = localStorage.getItem('cb-theme') || 'gaming';
@@ -585,8 +582,6 @@
 
 
 
-  <div id="cursor"></div>
-  <div id="cursor-ring"></div>
   <canvas id="neuralCanvas"></canvas>
 
   <div class="forge-card">
@@ -738,28 +733,6 @@
   </div>
 
   <script>
-    /* ── CURSOR ── */
-    const cur = document.getElementById('cursor'), ring = document.getElementById('cursor-ring');
-    let cx = 0, cy = 0, rx = 0, ry = 0, trailT = 0;
-    document.addEventListener('mousemove', e => {
-      cx = e.clientX; cy = e.clientY;
-      cur.style.left = cx + 'px'; cur.style.top = cy + 'px';
-      const now = Date.now();
-      if (now - trailT > 40) {
-        trailT = now;
-        const d = document.createElement('div');
-        d.className = 'trail-dot';
-        d.style.left = cx + 'px'; d.style.top = cy + 'px';
-        document.body.appendChild(d);
-        setTimeout(() => d.remove(), 500);
-      }
-    });
-    (function animRing() {
-      rx += (cx - rx) * 0.12; ry += (cy - ry) * 0.12;
-      ring.style.left = rx + 'px'; ring.style.top = ry + 'px';
-      requestAnimationFrame(animRing);
-    })();
-
     /* ── PASSWORD TOGGLE ── */
     function togglePwd() {
       const f = document.getElementById('pwdField');

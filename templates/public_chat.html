@@ -11,8 +11,6 @@
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-  <!-- <link rel="stylesheet" href="{{ url_for('static', filename='css/cursor.css') }}">
-  <script src="{{ url_for('static', filename='js/cursor.js') }}" defer></script> -->
   <style>
     :root {
       --void: #020408;
@@ -80,53 +78,6 @@
       pointer-events: none;
       opacity: 0.4;
     }
-
-    /* ── CURSOR ── */
-    #cursor {
-      position: fixed;
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: var(--plasma);
-      box-shadow: 0 0 12px var(--plasma), 0 0 24px var(--plasma-glow);
-      pointer-events: none;
-      z-index: 99999;
-      transform: translate(-50%, -50%);
-      mix-blend-mode: screen;
-    }
-
-    #cursor-ring {
-      position: fixed;
-      width: 30px;
-      height: 30px;
-      border-radius: 50%;
-      border: 1px solid rgba(0, 255, 224, 0.6);
-      pointer-events: none;
-      z-index: 99998;
-      transform: translate(-50%, -50%);
-      transition: transform 0.12s ease, width 0.25s, height 0.25s;
-      opacity: 0.5;
-    }
-
-    .trail-dot {
-      position: fixed;
-      width: 4px;
-      height: 4px;
-      border-radius: 50%;
-      background: var(--plasma);
-      pointer-events: none;
-      z-index: 99990;
-      transform: translate(-50%, -50%);
-      animation: trailFade 0.5s ease forwards;
-    }
-
-    @keyframes trailFade {
-      to {
-        opacity: 0;
-        transform: translate(-50%, -50%) scale(0);
-      }
-    }
-
     /* ── TOPBAR ── */
     .topbar {
       position: sticky;
@@ -273,7 +224,7 @@
       text-decoration: none;
       border-radius: 2px;
       transition: all 0.2s;
-      cursor: none;
+      cursor: pointer;
       position: relative;
       overflow: hidden;
     }
@@ -713,8 +664,6 @@
   <script src="{{ url_for('static', filename='js/theme-system.js') }}"></script>
 
 
-  <div id="cursor"></div>
-  <div id="cursor-ring"></div>
   <canvas id="neuralCanvas"></canvas>
 
   <!-- TOPBAR -->
@@ -811,29 +760,7 @@
       <div class="sbar-dot"></div>CODEBUDDY · PUBLIC CHANNEL · READ-ONLY
     </div>
     <div class="sbar-right" id="clockBar">—</div>
-  </div>
-
-  <script>
-    /* ── CURSOR ── */
-    const cur = document.getElementById('cursor'), ring = document.getElementById('cursor-ring');
-    let cx = 0, cy = 0, rx = 0, ry = 0, trailT = 0;
-    document.addEventListener('mousemove', e => {
-      cx = e.clientX; cy = e.clientY;
-      cur.style.left = cx + 'px'; cur.style.top = cy + 'px';
-      const now = Date.now();
-      if (now - trailT > 40) {
-        trailT = now;
-        const d = document.createElement('div');
-        d.className = 'trail-dot'; d.style.left = cx + 'px'; d.style.top = cy + 'px';
-        document.body.appendChild(d); setTimeout(() => d.remove(), 500);
-      }
-    });
-    (function animRing() {
-      rx += (cx - rx) * 0.12; ry += (cy - ry) * 0.12;
-      ring.style.left = rx + 'px'; ring.style.top = ry + 'px';
-      requestAnimationFrame(animRing);
-    })();
-
+  </div>  <script>
     /* ── RENDER MARKDOWN ── */
     document.querySelectorAll('.bubble-content').forEach(el => {
       el.innerHTML = marked.parse(el.textContent || '');
