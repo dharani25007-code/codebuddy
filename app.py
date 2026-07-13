@@ -827,11 +827,18 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE,
         password TEXT,
+        email TEXT,
         created_at TEXT DEFAULT (datetime('now')),
         bio TEXT DEFAULT '',
         avatar_color TEXT DEFAULT '#00ffe0',
         is_pro INTEGER DEFAULT 0
     )""")
+
+    try:
+        c.execute("ALTER TABLE users ADD COLUMN email TEXT")
+        conn.commit()
+    except Exception:
+        pass
 
     c.execute("""CREATE TABLE IF NOT EXISTS conversations(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2242,9 +2249,10 @@ RULES:
 # ================= USER =================
 
 class User(UserMixin):
-    def __init__(self, id, username):
+    def __init__(self, id, username, email=None):
         self.id = id
         self.username = username
+        self.email = email
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -2253,7 +2261,8 @@ def load_user(user_id):
     user = conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
     conn.close()
     if user:
-        return User(user["id"], user["username"])
+        email_val = user["email"] if "email" in user.keys() else None
+        return User(user["id"], user["username"], email_val)
     return None
 
 # ================= AUTH =================
@@ -2262,17 +2271,26 @@ def load_user(user_id):
 def register():
     if request.method == "POST":
         username = request.form["username"].strip()
+        email = request.form.get("email", "").strip()
         password = request.form["password"]
 
         if len(username) < 3:
             return render_template("register.html", error="Username must be at least 3 characters.")
+        if not email or "@" not in email:
+            return render_template("register.html", error="Please enter a valid email address.")
         if len(password) < 6:
             return render_template("register.html", error="Password must be at least 6 characters.")
 
         hashed = bcrypt.generate_password_hash(password).decode()
         try:
             conn = sqlite3.connect("codebuddy.db")
-            conn.execute("INSERT INTO users(username,password) VALUES (?,?)", (username, hashed))
+            # Check if email is already taken
+            existing_email = conn.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone()
+            if existing_email:
+                conn.close()
+                return render_template("register.html", error="Email address already registered.")
+                
+            conn.execute("INSERT INTO users(username,password,email) VALUES (?,?,?)", (username, hashed, email))
             now_str = datetime.now().isoformat()
             conn.execute("""INSERT INTO user_stats(user_id, last_active)
                            VALUES ((SELECT id FROM users WHERE username=?), ?)""", (username, now_str))
@@ -2301,7 +2319,8 @@ def login():
         conn.close()
 
         if user and bcrypt.check_password_hash(user["password"], password):
-            login_user(User(user["id"], user["username"]), remember=remember_me)
+            email_val = user["email"] if "email" in user.keys() else None
+            login_user(User(user["id"], user["username"], email_val), remember=remember_me)
             session.permanent = True
             update_streak(user["id"])
             return redirect(url_for("dashboard"))
@@ -2317,6 +2336,61 @@ def logout():
     session.clear()
     logout_user()
     return redirect(url_for("login"))
+
+@app.route("/delete_account", methods=["POST"])
+@login_required
+def delete_account():
+    email = request.form.get("email", "").strip()
+    password = request.form.get("password")
+
+    conn = sqlite3.connect("codebuddy.db")
+    conn.row_factory = sqlite3.Row
+    user = conn.execute("SELECT * FROM users WHERE id=?", (current_user.id,)).fetchone()
+    
+    if not user:
+        conn.close()
+        return jsonify({"success": False, "error": "User not found."}), 404
+        
+    db_email = user["email"] if "email" in user.keys() else None
+    
+    if not db_email or db_email.lower() != email.lower():
+        conn.close()
+        return jsonify({"success": False, "error": "Incorrect confirmation email address."}), 400
+        
+    if not bcrypt.check_password_hash(user["password"], password):
+        conn.close()
+        return jsonify({"success": False, "error": "Incorrect password."}), 400
+
+    try:
+        # Delete user record and all associated records from other tables:
+        conn.execute("DELETE FROM users WHERE id=?", (current_user.id,))
+        conn.execute("DELETE FROM user_stats WHERE user_id=?", (current_user.id,))
+        conn.execute("DELETE FROM user_memory WHERE user_id=?", (current_user.id,))
+        
+        convo_ids = [row["id"] for row in conn.execute("SELECT id FROM conversations WHERE user_id=?", (current_user.id,)).fetchall()]
+        if convo_ids:
+            placeholders = ",".join("?" for _ in convo_ids)
+            conn.execute(f"DELETE FROM messages WHERE conversation_id IN ({placeholders})", convo_ids)
+        conn.execute("DELETE FROM conversations WHERE user_id=?", (current_user.id,))
+        conn.execute("DELETE FROM bookmarks WHERE user_id=?", (current_user.id,))
+        conn.execute("DELETE FROM focus_sessions WHERE user_id=?", (current_user.id,))
+        conn.execute("DELETE FROM karma WHERE user_id=?", (current_user.id,))
+        conn.execute("DELETE FROM karma_events WHERE user_id=?", (current_user.id,))
+        conn.execute("DELETE FROM blind_submissions WHERE user_id=?", (current_user.id,))
+        conn.execute("DELETE FROM blind_reviews WHERE reviewer_id=?", (current_user.id,))
+        
+        conn.commit()
+        conn.close()
+        
+        session.clear()
+        logout_user()
+        
+        return jsonify({"success": True, "message": "Your account has been deleted permanently."})
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        app.logger.error(f"Failed to delete account: {e}")
+        return jsonify({"success": False, "error": "Internal server error. Please try again later."}), 500
 
 @app.route("/")
 @login_required
