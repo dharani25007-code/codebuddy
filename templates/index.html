@@ -1514,31 +1514,48 @@
 
     /* ── LIGHT THEME OVERRIDES FOR ONBOARDING ── */
     body.light .ob-card {
-      background: rgba(255, 255, 255, 0.35);
-      backdrop-filter: blur(16px) saturate(180%);
-      -webkit-backdrop-filter: blur(16px) saturate(180%);
-      border: 1px solid var(--border);
-      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.04), inset 0 1px 0 0 rgba(255, 255, 255, 0.6);
+      background: linear-gradient(135deg, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.25) 50%, rgba(255,255,255,0.5) 100%);
+      backdrop-filter: blur(20px) saturate(200%);
+      -webkit-backdrop-filter: blur(20px) saturate(200%);
+      border: 1.5px solid rgba(255, 255, 255, 0.65);
+      border-radius: 14px;
+      box-shadow:
+        0 4px 24px 0 rgba(0, 0, 0, 0.06),
+        0 1px 3px 0 rgba(0, 0, 0, 0.04),
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.9),
+        inset 0 -1px 0 0 rgba(0, 0, 0, 0.03);
     }
 
     body.light .ob-card:hover {
-      background: rgba(255, 255, 255, 0.55);
+      background: linear-gradient(135deg, rgba(255,255,255,0.75) 0%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0.65) 100%);
       border-color: var(--border-hi);
-      box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.08), inset 0 1px 0 0 rgba(255, 255, 255, 0.75);
-      transform: translateY(-2px) translateX(2px);
+      box-shadow:
+        0 8px 32px 0 rgba(0, 0, 0, 0.1),
+        0 2px 6px 0 rgba(0, 0, 0, 0.06),
+        inset 0 1px 0 0 rgba(255, 255, 255, 1),
+        inset 0 -1px 0 0 rgba(0, 0, 0, 0.04);
+      transform: translateY(-3px);
     }
 
     body.light .ob-card.ob-new {
-      background: rgba(168, 85, 247, 0.04);
-      border: 1px solid rgba(168, 85, 247, 0.18);
-      box-shadow: 0 8px 32px 0 rgba(168, 85, 247, 0.04), inset 0 1px 0 0 rgba(255, 255, 255, 0.6);
+      background: linear-gradient(135deg, rgba(168,85,247,0.06) 0%, rgba(255,255,255,0.3) 50%, rgba(168,85,247,0.04) 100%);
+      border: 1.5px solid rgba(168, 85, 247, 0.22);
+      box-shadow:
+        0 4px 24px 0 rgba(168, 85, 247, 0.06),
+        0 1px 3px 0 rgba(0, 0, 0, 0.03),
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.85),
+        inset 0 -1px 0 0 rgba(168, 85, 247, 0.04);
     }
 
     body.light .ob-card.ob-new:hover {
-      background: rgba(168, 85, 247, 0.08);
-      border-color: rgba(168, 85, 247, 0.35);
-      box-shadow: 0 12px 40px 0 rgba(168, 85, 247, 0.12), inset 0 1px 0 0 rgba(255, 255, 255, 0.75);
-      transform: translateY(-2px) translateX(2px);
+      background: linear-gradient(135deg, rgba(168,85,247,0.1) 0%, rgba(255,255,255,0.45) 50%, rgba(168,85,247,0.08) 100%);
+      border-color: rgba(168, 85, 247, 0.4);
+      box-shadow:
+        0 8px 32px 0 rgba(168, 85, 247, 0.12),
+        0 2px 6px 0 rgba(0, 0, 0, 0.04),
+        inset 0 1px 0 0 rgba(255, 255, 255, 1),
+        inset 0 -1px 0 0 rgba(168, 85, 247, 0.06);
+      transform: translateY(-3px);
     }
 
     body.light .ob-num {
