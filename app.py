@@ -838,7 +838,10 @@ def init_db():
         c.execute("ALTER TABLE users ADD COLUMN email TEXT")
         conn.commit()
     except Exception:
-        pass
+        try:
+            conn.rollback()
+        except Exception:
+            pass
 
     c.execute("""CREATE TABLE IF NOT EXISTS conversations(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
