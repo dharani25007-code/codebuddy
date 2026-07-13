@@ -339,7 +339,7 @@ body:has(.sidebar.collapsed) #cbVoiceBar { left: 60px; }
 #cbTranscript .interim { color: var(--plasma); font-style: italic; }
 #cbTranscript .final { color: var(--text); }
 #cbTranscript .cmd { color: var(--nova); font-weight: 600; }
-#cbStatus { font-family: 'Orbitron', monospace; font-size: 7.5px; font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase; padding: 4px 12px; border-radius: 20px; flex-shrink: 0; transition: all 0.3s; }
+#cbStatus { font-family: var(--display); font-size: 7.5px; font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase; padding: 4px 12px; border-radius: 20px; flex-shrink: 0; transition: all 0.3s; }
 #cbStatus.idle { color: var(--text-2); border: 1px solid var(--border); background: var(--surface); }
 #cbStatus.listening { color: var(--fire); border: 1px solid rgba(255, 107, 43, 0.4); background: rgba(255, 107, 43, 0.08); animation: cbBlink 1s ease infinite; box-shadow: 0 0 12px rgba(255, 107, 43, 0.2); }
 #cbStatus.speaking { color: var(--plasma); border: 1px solid var(--border-hi); background: var(--surface2); box-shadow: 0 0 12px var(--plasma-glow); }
@@ -349,7 +349,7 @@ body:has(.sidebar.collapsed) #cbVoiceBar { left: 60px; }
 .cbCtrl { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); font-size: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; flex-shrink: 0; }
 .cbCtrl:hover { border-color: var(--plasma); color: var(--plasma); background: var(--surface2); box-shadow: 0 0 12px var(--plasma-glow); }
 .cbCtrl.active { color: var(--plasma); border-color: var(--border-hi); background: var(--surface2); }
-#cbLangSel { appearance: none; -webkit-appearance: none; background: var(--surface); border: 1px solid var(--border); color: var(--plasma); padding: 5px 12px; font-family: 'Orbitron', monospace; font-size: 8px; font-weight: 700; letter-spacing: 1px; border-radius: 8px; cursor: pointer; outline: none; flex-shrink: 0; transition: all 0.2s; height: 32px; min-width: 160px; max-width: 200px; }
+#cbLangSel { appearance: none; -webkit-appearance: none; background: var(--surface); border: 1px solid var(--border); color: var(--plasma); padding: 5px 12px; font-family: var(--display); font-size: 8px; font-weight: 700; letter-spacing: 1px; border-radius: 8px; cursor: pointer; outline: none; flex-shrink: 0; transition: all 0.2s; height: 32px; min-width: 160px; max-width: 200px; }
 #cbLangSel:hover { border-color: var(--border-hi); background: var(--surface2); box-shadow: 0 0 12px var(--plasma-glow); }
 #cbUploadBtn { width: 32px; height: 32px; border-radius: 8px; border: 1px solid rgba(168,85,247,0.2); background: rgba(168,85,247,0.04); color: var(--nova); font-size: 13px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; flex-shrink: 0; position: relative; }
 #cbUploadBtn:hover { border-color: var(--nova); background: rgba(168,85,247,0.1); box-shadow: 0 0 14px rgba(168,85,247,0.3); color: var(--nova); }
@@ -360,13 +360,13 @@ body:has(.sidebar.collapsed) #cbVoiceBar { left: 60px; }
 #cbFileBadge .cb-fname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #cbFileBadge .cb-fclose { cursor: pointer; opacity: 0.6; flex-shrink: 0; }
 #cbFileBadge .cb-fclose:hover { opacity: 1; color: #ff6b2b; }
-#cbAutoSpeak { display: flex; align-items: center; gap: 6px; font-family: 'Orbitron', monospace; font-size: 7px; font-weight: 600; letter-spacing: 1.5px; color: var(--text-2); cursor: pointer; flex-shrink: 0; text-transform: uppercase; transition: color 0.2s; padding: 0 4px; }
+#cbAutoSpeak { display: flex; align-items: center; gap: 6px; font-family: var(--display); font-size: 7px; font-weight: 600; letter-spacing: 1.5px; color: var(--text-2); cursor: pointer; flex-shrink: 0; text-transform: uppercase; transition: color 0.2s; padding: 0 4px; }
 #cbAutoSpeak.on { color: var(--plasma); }
 #cbAutoSpeak .cb-toggle { width: 28px; height: 14px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface); position: relative; transition: all 0.3s; }
 #cbAutoSpeak.on .cb-toggle { background: var(--plasma-dim); border-color: var(--border-hi); box-shadow: 0 0 8px var(--plasma-glow); }
 #cbAutoSpeak .cb-knob { width: 9px; height: 9px; border-radius: 50%; background: var(--text-3); position: absolute; top: 1.5px; left: 1.5px; transition: all 0.3s; }
 #cbAutoSpeak.on .cb-knob { background: var(--plasma); transform: translateX(13px); box-shadow: 0 0 8px var(--plasma); }
-#cbLabBtn { font-size: 8px; font-family: 'Orbitron', monospace; font-weight: 700; letter-spacing: 1.5px; padding: 0 12px; height: 32px; border-radius: 8px; border: 1px solid rgba(168,85,247,0.25); background: rgba(168,85,247,0.06); color: var(--nova); cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 5px; flex-shrink: 0; white-space: nowrap; }
+#cbLabBtn { font-size: 8px; font-family: var(--display); font-weight: 700; letter-spacing: 1.5px; padding: 0 12px; height: 32px; border-radius: 8px; border: 1px solid rgba(168,85,247,0.25); background: rgba(168,85,247,0.06); color: var(--nova); cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 5px; flex-shrink: 0; white-space: nowrap; }
 #cbLabBtn:hover { border-color: rgba(168,85,247,0.6); background: rgba(168,85,247,0.12); color: var(--nova); box-shadow: 0 0 16px rgba(168,85,247,0.25); }
 .cb-divider { width: 1px; height: 24px; background: var(--border); flex-shrink: 0; margin: 0 2px; }
 #cbVolSlider { -webkit-appearance: none; appearance: none; width: 60px; height: 2px; border-radius: 1px; background: var(--border); outline: none; flex-shrink: 0; cursor: pointer; }
@@ -375,12 +375,12 @@ body:has(.sidebar.collapsed) #cbVoiceBar { left: 60px; }
 #cbVoicePanel.hidden { transform: translateY(20px) scale(0.97); opacity: 0; pointer-events: none; }
 body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
 #cbPanelHeader { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
-.cbPanelTitle { font-family: 'Orbitron', monospace; font-size: 9px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--plasma); display: flex; align-items: center; gap: 8px; }
+.cbPanelTitle { font-family: var(--display); font-size: 9px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--plasma); display: flex; align-items: center; gap: 8px; }
 .cbPanelDot { width: 5px; height: 5px; border-radius: 50%; background: var(--plasma); box-shadow: 0 0 6px var(--plasma); animation: cbBlink 1.4s ease infinite; }
 #cbPanelClose { background: none; border: none; color: var(--text-2); cursor: pointer; font-size: 14px; transition: color 0.15s; }
 #cbPanelClose:hover { color: var(--fire); }
 #cbPanelTabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
-.cbPTab { flex: 1; padding: 8px; text-align: center; font-family: 'Orbitron', monospace; font-size: 7px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--text-2); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; }
+.cbPTab { flex: 1; padding: 8px; text-align: center; font-family: var(--display); font-size: 7px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--text-2); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; }
 .cbPTab.active { color: var(--plasma); border-color: var(--plasma); }
 .cbPTab:hover:not(.active) { color: var(--text); }
 #cbPanelBody { flex: 1; overflow-y: auto; padding: 14px; }
@@ -392,26 +392,26 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
 .cbCmd { padding: 8px 10px; border-radius: 2px; border: 1px solid var(--border); background: var(--surface); font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--text-2); cursor: pointer; transition: all 0.15s; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 3px; }
 .cbCmd:hover { border-color: var(--plasma); color: var(--plasma); background: var(--surface2); }
 .cbCmd .cbCmdIcon { font-size: 14px; }
-.cbCmd .cbCmdLabel { font-size: 8px; font-family: 'Orbitron',monospace; letter-spacing: 1px; }
-.cbSymLabel { font-family: 'Orbitron', monospace; font-size: 7px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--text-2); margin: 10px 0 6px; }
+.cbCmd .cbCmdLabel { font-size: 8px; font-family: var(--display); letter-spacing: 1px; }
+.cbSymLabel { font-family: var(--display); font-size: 7px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--text-2); margin: 10px 0 6px; }
 .cbSymRow { display: flex; justify-content: space-between; align-items: center; padding: 5px 8px; border-radius: 2px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; transition: background 0.12s; margin-bottom: 2px; }
 .cbSymRow:hover { background: var(--surface2); }
 .cbSymPhrase { color: var(--text-2); }
 .cbSymResult { color: var(--plasma); background: var(--surface); padding: 1px 6px; border-radius: 2px; font-size: 11px; }
 .cbSettingRow { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .cbSettingRow:last-child { border-bottom: none; }
-.cbSettingLabel { font-family: 'Orbitron', monospace; font-size: 8px; font-weight: 600; letter-spacing: 1px; color: var(--text-2); text-transform: uppercase; }
+.cbSettingLabel { font-family: var(--display); font-size: 8px; font-weight: 600; letter-spacing: 1px; color: var(--text-2); text-transform: uppercase; }
 .cbSettingCtrl input[type=range] { -webkit-appearance: none; width: 90px; height: 2px; border-radius: 1px; background: var(--border); outline: none; cursor: pointer; }
 .cbSettingCtrl input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; border-radius: 50%; background: var(--plasma); box-shadow: 0 0 6px var(--plasma); cursor: pointer; }
 .cbHistEntry { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-family: 'IBM Plex Mono', monospace; font-size: 10px; }
 .cbHistEntry:last-child { border-bottom: none; }
-.cbHistRole { font-family: 'Orbitron', monospace; font-size: 7px; font-weight: 700; letter-spacing: 1px; color: var(--nova); flex-shrink: 0; margin-top: 1px; }
+.cbHistRole { font-family: var(--display); font-size: 7px; font-weight: 700; letter-spacing: 1px; color: var(--nova); flex-shrink: 0; margin-top: 1px; }
 .cbHistText { color: var(--text-2); line-height: 1.5; word-break: break-word; }
 #cbImgPreview { display: none; max-width: 100%; max-height: 120px; border: 1px solid var(--border); border-radius: 2px; margin-top: 8px; object-fit: contain; }
 #cbImgPreview.visible { display: block; }
-#cbWakeIndicator { position: fixed; top: 70px; right: 20px; background: var(--surface); border: 1px solid var(--border-hi); padding: 6px 12px; border-radius: 2px; font-family: 'Orbitron', monospace; font-size: 8px; font-weight: 700; letter-spacing: 2px; color: var(--plasma); display: none; z-index: 9000; animation: cbFadeIn 0.3s ease; box-shadow: 0 0 16px var(--plasma-glow); }
+#cbWakeIndicator { position: fixed; top: 70px; right: 20px; background: var(--surface); border: 1px solid var(--border-hi); padding: 6px 12px; border-radius: 2px; font-family: var(--display); font-size: 8px; font-weight: 700; letter-spacing: 2px; color: var(--plasma); display: none; z-index: 9000; animation: cbFadeIn 0.3s ease; box-shadow: 0 0 16px var(--plasma-glow); }
 @keyframes cbFadeIn { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:none} }
-#cbDropOverlay { display: none; position: fixed; inset: 0; z-index: 9999; background: var(--surface); border: 3px dashed var(--border-hi); align-items: center; justify-content: center; flex-direction: column; gap: 12px; font-family: 'Orbitron', monospace; font-size: 14px; font-weight: 700; letter-spacing: 4px; color: var(--plasma); text-shadow: 0 0 20px var(--plasma); backdrop-filter: blur(4px); }
+#cbDropOverlay { display: none; position: fixed; inset: 0; z-index: 9999; background: var(--surface); border: 3px dashed var(--border-hi); align-items: center; justify-content: center; flex-direction: column; gap: 12px; font-family: var(--display); font-size: 14px; font-weight: 700; letter-spacing: 4px; color: var(--plasma); text-shadow: 0 0 20px var(--plasma); backdrop-filter: blur(4px); }
 #cbDropOverlay.active { display: flex; }
 #cbDropOverlay .cbDropIcon { font-size: 48px; filter: drop-shadow(0 0 20px var(--plasma)); animation: cbFloat 2s ease infinite; }
 @keyframes cbFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
@@ -437,7 +437,7 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
     <div id="cbWaveform">
       ${Array(14).fill('<div class="cbWave" style="height:3px"></div>').join('')}
     </div>
-    <div id="cbTranscript"><span style="opacity:0.25;font-family:Orbitron,monospace;font-size:8px;letter-spacing:2px">SAY "HEY BUDDY" TO ACTIVATE · NEURAL VOICE ENGINE</span></div>
+    <div id="cbTranscript"><span style="opacity:0.25;font-family:var(--display);font-size:8px;letter-spacing:2px">SAY "HEY BUDDY" TO ACTIVATE · NEURAL VOICE ENGINE</span></div>
     <div id="cbFileBadge">
       <span>📎</span>
       <span class="cb-fname" id="cbFName"></span>
@@ -563,13 +563,13 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
         <div class="cbSettingRow">
           <div class="cbSettingLabel">CODE CONTEXT</div>
           <div class="cbSettingCtrl">
-            <div id="cbCodeCtxToggle" onclick="toggleCodeContext()" style="cursor:pointer;font-family:Orbitron,monospace;font-size:8px;font-weight:700;letter-spacing:1px;color:#00ffe0;">ON</div>
+            <div id="cbCodeCtxToggle" onclick="toggleCodeContext()" style="cursor:pointer;font-family:var(--display);font-size:8px;font-weight:700;letter-spacing:1px;color:#00ffe0;">ON</div>
           </div>
         </div>
         <div class="cbSettingRow">
           <div class="cbSettingLabel">LANGUAGE</div>
           <div class="cbSettingCtrl">
-            <select id="cbLangSel2" onchange="CBVoice.setLang(this.value)" style="background:rgba(0,255,224,0.04);border:1px solid rgba(0,255,224,0.15);color:#00ffe0;padding:4px 8px;font-family:Orbitron,monospace;font-size:8px;border-radius:2px;outline:none;cursor:pointer;">
+            <select id="cbLangSel2" onchange="CBVoice.setLang(this.value)" style="background:rgba(0,255,224,0.04);border:1px solid rgba(0,255,224,0.15);color:#00ffe0;padding:4px 8px;font-family:var(--display);font-size:8px;border-radius:2px;outline:none;cursor:pointer;">
               <optgroup label="── English ──">
                 <option value="en-US">🇺🇸 English</option>
               </optgroup>
@@ -598,8 +598,8 @@ body:has(.sidebar.collapsed) #cbVoicePanel { left: 60px; }
           </div>
         </div>
         <div style="margin-top:12px;padding:10px;border:1px solid rgba(0,255,224,0.08);border-radius:2px;background:rgba(0,255,224,0.02);">
-          <div style="font-family:Orbitron,monospace;font-size:7px;font-weight:700;letter-spacing:2px;color:rgba(226,244,255,0.3);margin-bottom:6px;">TEST VOICE</div>
-          <button onclick="CBVoice.testVoice()" style="width:100%;padding:7px;background:rgba(0,255,224,0.06);border:1px solid rgba(0,255,224,0.2);color:#00ffe0;font-family:Orbitron,monospace;font-size:8px;font-weight:700;letter-spacing:2px;cursor:pointer;border-radius:2px;transition:all 0.2s;" onmouseover="this.style.background='rgba(0,255,224,0.12)'" onmouseout="this.style.background='rgba(0,255,224,0.06)'">▶ SPEAK TEST PHRASE</button>
+          <div style="font-family:var(--display);font-size:7px;font-weight:700;letter-spacing:2px;color:rgba(226,244,255,0.3);margin-bottom:6px;">TEST VOICE</div>
+          <button onclick="CBVoice.testVoice()" style="width:100%;padding:7px;background:rgba(0,255,224,0.06);border:1px solid rgba(0,255,224,0.2);color:#00ffe0;font-family:var(--display);font-size:8px;font-weight:700;letter-spacing:2px;cursor:pointer;border-radius:2px;transition:all 0.2s;" onmouseover="this.style.background='rgba(0,255,224,0.12)'" onmouseout="this.style.background='rgba(0,255,224,0.06)'">▶ SPEAK TEST PHRASE</button>
         </div>
       </div>
     </div>

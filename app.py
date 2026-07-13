@@ -251,6 +251,8 @@ def _connect_db(database=None, *args, **kwargs):
                 return cur
             def commit(self):
                 self._conn.commit()
+            def rollback(self):
+                self._conn.rollback()
             def close(self):
                 # Return connection to pool instead of closing it
                 if self._pool and self._conn:
