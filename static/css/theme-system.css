@@ -4,25 +4,25 @@ body.light {
     --deep: #d4ecf5;
     --abyss: #eaf6fb;
     --panel: rgba(231, 244, 249, 0.98);
-    --panel-soft: rgba(8, 145, 178, 0.05);
-    --panel-strong: rgba(8, 145, 178, 0.09);
-    --plasma: #0891b2;
-    --plasma-dim: rgba(8, 145, 178, 0.1);
-    --plasma-glow: rgba(8, 145, 178, 0.2);
-    --plasma-hard: rgba(8, 145, 178, 0.7);
-    --fire: #0e7490;
-    --fire-dim: rgba(14, 116, 144, 0.12);
-    --nova: #6d28d9;
-    --nova-dim: rgba(109, 40, 217, 0.08);
+    --panel-soft: rgba(3, 102, 214, 0.08);
+    --panel-strong: rgba(3, 102, 214, 0.12);
+    --plasma: #0066d6;
+    --plasma-dim: rgba(3, 102, 214, 0.15);
+    --plasma-glow: rgba(3, 102, 214, 0.3);
+    --plasma-hard: rgba(3, 102, 214, 0.8);
+    --fire: #c41e3a;
+    --fire-dim: rgba(196, 30, 58, 0.15);
+    --nova: #5e21b6;
+    --nova-dim: rgba(94, 33, 182, 0.12);
     --gold: #d97706;
     --ice: #0369a1;
     --text: #0c2a3a;
-    --text-2: rgba(12, 42, 58, 0.55);
-    --text-3: rgba(12, 42, 58, 0.3);
-    --border: rgba(8, 145, 178, 0.12);
-    --border-hi: rgba(8, 145, 178, 0.4);
-    --surface: rgba(8, 145, 178, 0.05);
-    --surface2: rgba(8, 145, 178, 0.09);
+    --text-2: rgba(12, 42, 58, 0.65);
+    --text-3: rgba(12, 42, 58, 0.45);
+    --border: rgba(3, 102, 214, 0.25);
+    --border-hi: rgba(3, 102, 214, 0.55);
+    --surface: rgba(3, 102, 214, 0.08);
+    --surface2: rgba(3, 102, 214, 0.12);
 }
 
 body.theme-gaming {

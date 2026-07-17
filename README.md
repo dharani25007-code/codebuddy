@@ -265,9 +265,4 @@ python scripts/load_benchmark.py --mode live --base-url https://codebuddy-0slh.o
 python -m unittest discover -s tests -p "test_*.py"
 ```
 
----
-<div align="center">
-<img src="https://capsule-render.vercel.app/api?type=waving&color=0:4ecdc4,100:0f1117&height=120&section=footer"/>
-
-**Built by [Dharanidharan M](https://github.com/dharani25007-code)**
-</div>
+-
