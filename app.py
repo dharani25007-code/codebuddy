@@ -1614,13 +1614,17 @@ _ALLOWED_STAT_FIELDS = frozenset({
 import threading as _threading
 _stat_thread_local = _threading.local()
 
-def bump_stat(user_id, field, amount=1):
+def bump_stat(user_id, field, amount=1, conn=None):
     """Securely increment a stat column using a whitelist.
 
     Uses a thread-local SQLite connection so we reuse one connection per
     thread rather than opening (and immediately closing) a brand-new
     connection for every single stat increment.  This eliminates hundreds
     of short-lived sqlite3.connect() calls on busy endpoints.
+
+    conn: optionally pass an already-open connection (e.g. from new_chat)
+    to reuse it instead of opening a second one — halves the number of
+    pool checkouts / connects on routes that both write a row and bump a stat.
     """
     if field not in _ALLOWED_STAT_FIELDS:
         app.logger.warning(f"bump_stat: rejected unknown field '{field}'")
@@ -1628,8 +1632,13 @@ def bump_stat(user_id, field, amount=1):
         
     # If using PostgreSQL, bypass thread-local caching to prevent connection pool exhaustion
     if os.getenv("DATABASE_URL"):
-        conn = sqlite3.connect("codebuddy.db")
+        owns_conn = conn is None
+        if owns_conn:
+            conn = sqlite3.connect("codebuddy.db")
         now_str = datetime.now().isoformat()
+        # IMPORTANT: read/compare last_active BEFORE the UPSERT below overwrites
+        # it to "now" — otherwise the streak day-diff always sees 0.
+        update_streak(user_id, conn=conn)
         conn.execute(f"""
             INSERT INTO user_stats(user_id, {field}, last_active)
             VALUES (?, ?, ?)
@@ -1637,8 +1646,9 @@ def bump_stat(user_id, field, amount=1):
                 {field} = user_stats.{field} + ?,
                 last_active = ?
         """, (user_id, amount, now_str, amount, now_str))
-        conn.commit()
-        conn.close()
+        if owns_conn:
+            conn.commit()
+            conn.close()
         return
 
     conn = getattr(_stat_thread_local, "conn", None)
@@ -1649,6 +1659,8 @@ def bump_stat(user_id, field, amount=1):
     # Safe because field is whitelisted — not user-supplied
     # Use EXCLUDED + table-qualified name for PostgreSQL compatibility
     now_str = datetime.now().isoformat()
+    # Same ordering fix as above: compute streak from the OLD last_active first.
+    update_streak(user_id, conn=conn)
     conn.execute(f"""
         INSERT INTO user_stats(user_id, {field}, last_active)
         VALUES (?, ?, ?)
@@ -1658,42 +1670,51 @@ def bump_stat(user_id, field, amount=1):
     """, (user_id, amount, now_str, amount, now_str))
     conn.commit()
 
-def update_streak(user_id):
-    """Update daily streak safely, preserving count even if message history is deleted/cleared."""
-    conn = sqlite3.connect("codebuddy.db")
+def update_streak(user_id, conn=None):
+    """Update daily streak safely, preserving count even if message history is deleted/cleared.
+
+    FIX: previously only called from /login and the "/" dashboard route. In an
+    SPA that loads "/" once then talks to /chat, /new_chat etc. via fetch(),
+    that page load never happens again for the rest of the (30-day) session —
+    so streak_days silently froze while bump_stat() kept moving last_active
+    forward. bump_stat() now calls this on every real stat bump.
+
+    conn: pass an already-open connection to reuse it instead of opening a
+    second one (avoids a second pool checkout / round trip per action).
+    """
+    owns_conn = conn is None
+    if owns_conn:
+        conn = sqlite3.connect("codebuddy.db")
     conn.row_factory = sqlite3.Row
-    
-    # Fetch current stats
+
     row = conn.execute("SELECT streak_days, last_active FROM user_stats WHERE user_id=?", (user_id,)).fetchone()
-    
+
     today = date.today()
     now_str = datetime.now().isoformat()
-    
+
     if not row:
-        # First time stats creation
         conn.execute("""
             INSERT INTO user_stats(user_id, streak_days, last_active)
             VALUES (?, 1, ?)
         """, (user_id, now_str))
-        conn.commit()
-        conn.close()
+        if owns_conn:
+            conn.commit()
+            conn.close()
         return
 
     current_streak = row["streak_days"] or 0
     last_active_str = row["last_active"]
-    
+
     if not last_active_str:
-        # No last active info, initialize
         conn.execute("""
             UPDATE user_stats SET streak_days = 1, last_active = ? WHERE user_id = ?
         """, (now_str, user_id))
-        conn.commit()
-        conn.close()
+        if owns_conn:
+            conn.commit()
+            conn.close()
         return
 
-    # Parse last active date
     try:
-        # Handles both ISO formats (e.g. 2026-07-18T12:00:00 or just date 2026-07-18)
         last_active_date = datetime.fromisoformat(last_active_str).date()
     except Exception:
         try:
@@ -1702,22 +1723,22 @@ def update_streak(user_id):
             last_active_date = today
 
     days_diff = (today - last_active_date).days
-    
-    # If the user is active on the same day, preserve the streak
+
     if days_diff == 0:
         new_streak = max(current_streak, 1)
-    # If the user is active on the consecutive day, increment the streak by 1
     elif days_diff == 1:
         new_streak = current_streak + 1
-    # If they missed a day (days_diff > 1), the streak breaks and resets to 1
     else:
+        # Covers missed days AND a negative diff (last_active in the future,
+        # e.g. server/client timezone mismatch) — both break the streak.
         new_streak = 1
-        
+
     conn.execute("""
         UPDATE user_stats SET streak_days = ?, last_active = ? WHERE user_id = ?
     """, (new_streak, now_str, user_id))
-    conn.commit()
-    conn.close()
+    if owns_conn:
+        conn.commit()
+        conn.close()
 
 # ================= CHANGE 5: PERSISTENT MEMORY HELPERS =================
 
@@ -3544,9 +3565,9 @@ def new_chat():
         (current_user.id, "New Chat", mode, datetime.now().isoformat(), datetime.now().isoformat())
     )
     chat_id = cursor.lastrowid
+    bump_stat(current_user.id, "total_chats", conn=conn)  # reuse conn: one round trip, not two
     conn.commit()
     conn.close()
-    bump_stat(current_user.id, "total_chats")
     return jsonify({"status": "created", "chat_id": chat_id})
 
 @app.route("/load_messages/<int:chat_id>")
