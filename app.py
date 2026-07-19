@@ -2936,6 +2936,16 @@ def generate_valid_username(email_or_name):
     username = f"G_{p_lower[:8]}_{secrets.randbelow(100)}!"
     return username
 
+def _get_google_redirect_uri():
+    redirect_uri = url_for("login_google_callback", _external=True)
+    # Force HTTPS when behind reverse proxies / on Render
+    if "onrender.com" in redirect_uri or request.headers.get("X-Forwarded-Proto") == "https":
+        redirect_uri = redirect_uri.replace("http://", "https://")
+    # Map 127.0.0.1 to localhost to match Google Credentials Console setup
+    if "127.0.0.1:5000" in redirect_uri:
+        redirect_uri = redirect_uri.replace("127.0.0.1:5000", "localhost:5000")
+    return redirect_uri
+
 @app.route("/login/google")
 def login_google():
     client_id = os.getenv("GOOGLE_CLIENT_ID")
@@ -2945,7 +2955,7 @@ def login_google():
     state = secrets.token_urlsafe(16)
     session["google_oauth_state"] = state
     
-    redirect_uri = url_for("login_google_callback", _external=True)
+    redirect_uri = _get_google_redirect_uri()
     auth_url = (
         "https://accounts.google.com/o/oauth2/v2/auth"
         f"?response_type=code"
@@ -2971,7 +2981,7 @@ def login_google_callback():
         
     client_id = os.getenv("GOOGLE_CLIENT_ID")
     client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
-    redirect_uri = url_for("login_google_callback", _external=True)
+    redirect_uri = _get_google_redirect_uri()
     
     token_url = "https://oauth2.googleapis.com/token"
     data = {
