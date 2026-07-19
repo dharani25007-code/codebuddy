@@ -1064,8 +1064,6 @@ def init_db():
     conn.commit()
     conn.close()
 
-init_db()
-
 def generate_pwa_icons():
     """Create PWA icons in static/icons directory on startup to prevent 404 logs."""
     icons_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "icons")
@@ -1113,7 +1111,17 @@ def generate_pwa_icons():
         except Exception:
             pass
 
-generate_pwa_icons()
+def _async_startup():
+    try:
+        init_db()
+        generate_pwa_icons()
+    except Exception as e:
+        try:
+            app.logger.error(f"Startup async init failed: {e}")
+        except Exception:
+            print(f"Startup async init failed: {e}")
+
+threading.Thread(target=_async_startup, daemon=True).start()
 
 # ================= EMAIL & SECURITY HELPERS =================
 
