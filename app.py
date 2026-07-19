@@ -1670,17 +1670,49 @@ def bump_stat(user_id, field, amount=1, conn=None):
     """, (user_id, amount, now_str, amount, now_str))
     conn.commit()
 
+def get_user_today():
+    """Get the user's local date based on their browser's timezone offset cookie, falling back to UTC."""
+    try:
+        offset_str = request.cookies.get("timezone_offset")
+        if offset_str is not None:
+            offset_mins = int(offset_str)
+            from datetime import timedelta, timezone
+            utc_now = datetime.now(timezone.utc)
+            local_now = utc_now - timedelta(minutes=offset_mins)
+            return local_now.date()
+    except Exception:
+        pass
+    return date.today()
+
+def get_user_date(utc_dt):
+    """Convert a UTC datetime object or ISO string to the user's local date."""
+    try:
+        offset_str = request.cookies.get("timezone_offset")
+        if offset_str is not None:
+            offset_mins = int(offset_str)
+            from datetime import timedelta, timezone
+            if isinstance(utc_dt, str):
+                utc_dt = datetime.fromisoformat(utc_dt)
+            if utc_dt.tzinfo is None:
+                utc_dt = utc_dt.replace(tzinfo=timezone.utc)
+            local_dt = utc_dt - timedelta(minutes=offset_mins)
+            return local_dt.date()
+    except Exception:
+        pass
+    if isinstance(utc_dt, str):
+        try:
+            return datetime.fromisoformat(utc_dt).date()
+        except Exception:
+            try:
+                return datetime.strptime(utc_dt[:10], "%Y-%m-%d").date()
+            except Exception:
+                return date.today()
+    return utc_dt.date()
+
 def update_streak(user_id, conn=None):
     """Update daily streak safely, preserving count even if message history is deleted/cleared.
 
-    FIX: previously only called from /login and the "/" dashboard route. In an
-    SPA that loads "/" once then talks to /chat, /new_chat etc. via fetch(),
-    that page load never happens again for the rest of the (30-day) session —
-    so streak_days silently froze while bump_stat() kept moving last_active
-    forward. bump_stat() now calls this on every real stat bump.
-
-    conn: pass an already-open connection to reuse it instead of opening a
-    second one (avoids a second pool checkout / round trip per action).
+    Uses user's local timezone offset cookie to correctly compute consecutive days in their timezone.
     """
     owns_conn = conn is None
     if owns_conn:
@@ -1689,7 +1721,7 @@ def update_streak(user_id, conn=None):
 
     row = conn.execute("SELECT streak_days, last_active FROM user_stats WHERE user_id=?", (user_id,)).fetchone()
 
-    today = date.today()
+    today = get_user_today()
     now_str = datetime.now().isoformat()
 
     if not row:
@@ -1714,14 +1746,7 @@ def update_streak(user_id, conn=None):
             conn.close()
         return
 
-    try:
-        last_active_date = datetime.fromisoformat(last_active_str).date()
-    except Exception:
-        try:
-            last_active_date = datetime.strptime(last_active_str[:10], "%Y-%m-%d").date()
-        except Exception:
-            last_active_date = today
-
+    last_active_date = get_user_date(last_active_str)
     days_diff = (today - last_active_date).days
 
     if days_diff == 0:
@@ -1729,8 +1754,6 @@ def update_streak(user_id, conn=None):
     elif days_diff == 1:
         new_streak = current_streak + 1
     else:
-        # Covers missed days AND a negative diff (last_active in the future,
-        # e.g. server/client timezone mismatch) — both break the streak.
         new_streak = 1
 
     conn.execute("""

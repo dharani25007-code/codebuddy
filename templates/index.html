@@ -5,6 +5,7 @@
   <script>
     /* Global session-expiry handler — intercepts ALL fetch calls */
     (function () {
+      document.cookie = "timezone_offset=" + new Date().getTimezoneOffset() + "; path=/; max-age=31536000; SameSite=Lax";
       const _orig = window.fetch.bind(window);
       window.fetch = function (url, opts) {
         if (typeof url === 'string' && url.startsWith('/')) {
