@@ -274,14 +274,19 @@ def _connect_db(database=None, *args, **kwargs):
             def rollback(self):
                 self._conn.rollback()
             def close(self):
-                # Return connection to pool instead of closing it
-                if self._pool and self._conn:
-                    try:
-                        self._conn.rollback()  # reset any open txn
-                        self._pool.putconn(self._conn)
-                    except Exception:
+                if self._conn:
+                    if self._pool:
                         try:
-                            self._pool.putconn(self._conn, close=True)
+                            self._conn.rollback()  # reset any open txn
+                            self._pool.putconn(self._conn)
+                        except Exception:
+                            try:
+                                self._pool.putconn(self._conn, close=True)
+                            except Exception:
+                                pass
+                    else:
+                        try:
+                            self._conn.close()
                         except Exception:
                             pass
                     self._conn = None
@@ -1620,6 +1625,22 @@ def bump_stat(user_id, field, amount=1):
     if field not in _ALLOWED_STAT_FIELDS:
         app.logger.warning(f"bump_stat: rejected unknown field '{field}'")
         return
+        
+    # If using PostgreSQL, bypass thread-local caching to prevent connection pool exhaustion
+    if os.getenv("DATABASE_URL"):
+        conn = sqlite3.connect("codebuddy.db")
+        now_str = datetime.now().isoformat()
+        conn.execute(f"""
+            INSERT INTO user_stats(user_id, {field}, last_active)
+            VALUES (?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+                {field} = user_stats.{field} + ?,
+                last_active = ?
+        """, (user_id, amount, now_str, amount, now_str))
+        conn.commit()
+        conn.close()
+        return
+
     conn = getattr(_stat_thread_local, "conn", None)
     if conn is None:
         conn = sqlite3.connect("codebuddy.db", check_same_thread=False)
