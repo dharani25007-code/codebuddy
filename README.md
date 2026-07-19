@@ -56,6 +56,8 @@ CodeBuddy is a full-stack AI-powered programming assistant with **28 world-first
 | 🔬 **Error Autopsy** | Probabilistic root-cause ranking + diagnosis tree |
 | 🏷️ **Pair Naming Assistant** | Name quality scoring + reverse name-to-body check |
 | 🎯 **Focus Zone Detector** | Peak window analytics from your session timestamps |
+| 📱 **PWA Support** | Installable Progressive Web App with offline assets caching and startup icon generator |
+| 🔑 **Secure Recovery** | Self-service timed token-based password reset/recovery flow powered by SMTP mailers
 
 ---
 
@@ -63,7 +65,7 @@ CodeBuddy is a full-stack AI-powered programming assistant with **28 world-first
 
 ```
 codebuddy/
-├── app.py                          # Main Flask backend (~8000 lines)
+├── app.py                          # Main Flask backend (~9000 lines) with integrated PWA/SMTP helpers
 ├── Procfile                        # Render/Heroku startup command
 ├── .env                            # API keys (local dev only, not committed)
 ├── codebuddy.db                    # SQLite database (auto-created for local dev)
@@ -79,14 +81,18 @@ codebuddy/
 │       ├── auth-theme-switcher.js  # Login/register theme picker
 │       └── cursor.js               # Shared custom cursor controller
 ├── templates/
-│   ├── index.html                  # Main dashboard + chat interface
+│   ├── index.html                  # Main dashboard + chat interface (with PWA manifest link)
 │   ├── login.html / register.html
+│   ├── forgot_password.html        # New: Request password recovery token UI
+│   ├── reset_password.html         # New: Reset password with timed token UI
 │   ├── profile.html
 │   ├── leaderboard.html
 │   ├── collab.html
 │   └── codebuddy_world_first.html  # 28 Features Hub
 ├── scripts/
 │   └── load_benchmark.py           # Concurrent endpoint benchmark harness
+├── scratch/
+│   └── generate_pwa_icons.py       # New: Generates high-quality PWA icons (192px/512px) using PIL
 └── coqui_profiles/                 # Voice clone samples (auto-created)
 ```
 
@@ -122,9 +128,16 @@ GROQ_API_KEY=your-groq-key
 OLLAMA_ENABLED=true
 OLLAMA_MODEL=qwen2.5-coder:7b
 # OLLAMA_URL=http://localhost:11434
+
+# SMTP Config for Password Recovery (optional, logs fallback if omitted)
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your-email@gmail.com
+SMTP_PASSWORD=your-app-password
+SMTP_SENDER=your-email@gmail.com
 ```
 
-The app runs without any AI keys in free-only mode. Add optional free-tier keys only if you want better hosted responses.
+The app runs without any AI keys in free-only mode. Add optional free-tier keys only if you want better hosted responses. If SMTP configuration is omitted, generated recovery links are safely output to the server logs.
 
 ### Run Locally
 
@@ -174,6 +187,11 @@ CodeBuddy is deployed 100% free using:
 | `FREE_ONLY_MODE` | `false` |
 | `OLLAMA_ENABLED` | `false` (no Ollama on Render) |
 | `COOKIE_SECURE` | `true` |
+| `SMTP_SERVER` | *(Optional)* SMTP server address (e.g., `smtp.gmail.com`) |
+| `SMTP_PORT` | *(Optional)* SMTP server port (e.g., `587`) |
+| `SMTP_USERNAME` | *(Optional)* SMTP auth username/email |
+| `SMTP_PASSWORD` | *(Optional)* SMTP app/account password |
+| `SMTP_SENDER` | *(Optional)* Mail sender email header address |
 
 5. Click **Deploy** — Render will automatically build and launch your app!
 
