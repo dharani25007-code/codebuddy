@@ -17,8 +17,8 @@ body.light {
     --gold: #d97706;
     --ice: #0369a1;
     --text: #0c2a3a;
-    --text-2: rgba(12, 42, 58, 0.65);
-    --text-3: rgba(12, 42, 58, 0.45);
+    --text-2: rgba(12, 42, 58, 0.88);
+    --text-3: rgba(12, 42, 58, 0.68);
     --border: rgba(3, 102, 214, 0.25);
     --border-hi: rgba(3, 102, 214, 0.55);
     --surface: rgba(3, 102, 214, 0.08);
@@ -43,8 +43,8 @@ body.theme-gaming {
     --gold: #ffe600;
     --ice: #00cfff;
     --text: #d0fff8;
-    --text-2: rgba(208, 255, 248, 0.65);
-    --text-3: rgba(208, 255, 248, 0.22);
+    --text-2: rgba(208, 255, 248, 0.85);
+    --text-3: rgba(208, 255, 248, 0.65);
     --border: rgba(0, 245, 212, 0.1);
     --border-hi: rgba(0, 245, 212, 0.32);
     --surface: rgba(0, 245, 212, 0.03);
@@ -69,8 +69,8 @@ body.theme-darkpro {
     --gold: #f0a500;
     --ice: #79c0ff;
     --text: #f0f6fc;
-    --text-2: rgba(240, 246, 252, 0.68);
-    --text-3: rgba(240, 246, 252, 0.28);
+    --text-2: rgba(240, 246, 252, 0.88);
+    --text-3: rgba(240, 246, 252, 0.68);
     --border: rgba(240, 165, 0, 0.1);
     --border-hi: rgba(240, 165, 0, 0.35);
     --surface: rgba(240, 165, 0, 0.04);
@@ -95,8 +95,8 @@ body.theme-professional {
     --gold: #b45309;
     --ice: #1d4ed8;
     --text: #0d1225;
-    --text-2: rgba(13, 18, 37, 0.78);
-    --text-3: rgba(13, 18, 37, 0.45);
+    --text-2: rgba(13, 18, 37, 0.88);
+    --text-3: rgba(13, 18, 37, 0.68);
     --border: rgba(55, 48, 163, 0.1);
     --border-hi: rgba(55, 48, 163, 0.38);
     --surface: rgba(55, 48, 163, 0.05);
@@ -121,8 +121,8 @@ body.theme-warm {
     --gold: #92400e;
     --ice: #0369a1;
     --text: #1c0a00;
-    --text-2: rgba(28, 10, 0, 0.75);
-    --text-3: rgba(28, 10, 0, 0.42);
+    --text-2: rgba(28, 10, 0, 0.88);
+    --text-3: rgba(28, 10, 0, 0.68);
     --border: rgba(194, 65, 12, 0.1);
     --border-hi: rgba(194, 65, 12, 0.38);
     --surface: rgba(194, 65, 12, 0.05);
@@ -147,8 +147,8 @@ body.theme-minimal {
     --gold: #854d0e;
     --ice: #1e40af;
     --text: #0a140d;
-    --text-2: rgba(10, 20, 13, 0.75);
-    --text-3: rgba(10, 20, 13, 0.42);
+    --text-2: rgba(10, 20, 13, 0.88);
+    --text-3: rgba(10, 20, 13, 0.68);
     --border: rgba(22, 101, 52, 0.1);
     --border-hi: rgba(22, 101, 52, 0.35);
     --surface: rgba(22, 101, 52, 0.05);

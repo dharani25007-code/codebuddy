@@ -2,5 +2,11 @@
     "venvPath": ".",
     "venv": ".venv",
     "pythonVersion": "3.11",
-    "typeCheckingMode": "basic"
+    "typeCheckingMode": "basic",
+    "exclude": [
+        "c:/__pyrefly_virtual__",
+        "**/reset_operators.py"
+    ],
+    "reportMissingImports": "warning",
+    "reportGeneralTypeIssues": "warning"
 }

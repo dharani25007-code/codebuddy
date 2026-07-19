@@ -45,6 +45,13 @@ from datetime import datetime, date
 from functools import wraps
 
 import requests
+import smtplib
+import ssl
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import threading
+from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
+
 from dotenv import load_dotenv
 from flask import (Flask, render_template, request, jsonify,
                    Response, redirect, url_for, session, g)
@@ -56,6 +63,17 @@ try:
     _SOCKETIO_OK = True
 except ImportError:
     _SOCKETIO_OK = False
+    class SocketIO:
+        def __init__(self, *args, **kwargs): pass
+        def emit(self, *args, **kwargs): pass
+        def run(self, *args, **kwargs): pass
+        def on(self, *args, **kwargs):
+            def decorator(f):
+                return f
+            return decorator
+    def emit(*args, **kwargs): pass
+    def join_room(*args, **kwargs): pass
+    def leave_room(*args, **kwargs): pass
 
 # ================= INIT =================
 
@@ -94,6 +112,8 @@ OLLAMA_ENABLED = os.getenv("OLLAMA_ENABLED", "true").lower() != "false"
 
 # Database path is configurable from .env so the filename is not hardcoded.
 DEFAULT_DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "codebuddy.db")
+if os.path.exists("/data") and os.access("/data", os.W_OK):
+    DEFAULT_DB_PATH = "/data/codebuddy.db"
 DB_PATH = os.getenv("CODEBUDDY_DB_PATH", DEFAULT_DB_PATH)
 
 # Shared request size limit for upload-heavy features like File Forge and video analysis.
@@ -318,19 +338,17 @@ app.config.update(
 # Use gevent on Render (Linux + DATABASE_URL set) for WebSocket support.
 # Fall back to threading on Windows / local dev to avoid gevent bind errors.
 import sys as _sys
-_socketio_mode = os.getenv(
+_socketio_mode: str = os.getenv(
     "SOCKETIO_ASYNC_MODE",
     "gevent" if (_sys.platform != "win32" and os.getenv("DATABASE_URL")) else "threading"
 )
+socketio = None
 if _SOCKETIO_OK:
-    socketio = SocketIO(
-        app, cors_allowed_origins="*",
-        async_mode=_socketio_mode,
-        message_queue=SOCKETIO_MESSAGE_QUEUE,
-        logger=False, engineio_logger=False,
-    )
-else:
-    socketio = None
+    _SIO = SocketIO
+    socketio = _SIO(app, cors_allowed_origins="*",
+                    async_mode=_socketio_mode,
+                    message_queue=SOCKETIO_MESSAGE_QUEUE,
+                    logger=False, engineio_logger=False)
 _collab_rooms = {}   # in-memory cache for fast SocketIO lookups (populated from DB on access)
 
 def _init_collab_table():
@@ -829,15 +847,25 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT UNIQUE,
         password TEXT,
-        email TEXT,
+        email TEXT UNIQUE,
         created_at TEXT DEFAULT (datetime('now')),
         bio TEXT DEFAULT '',
         avatar_color TEXT DEFAULT '#00ffe0',
-        is_pro INTEGER DEFAULT 0
+        is_pro INTEGER DEFAULT 0,
+        google_id TEXT UNIQUE
     )""")
 
     try:
         c.execute("ALTER TABLE users ADD COLUMN email TEXT")
+        conn.commit()
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+
+    try:
+        c.execute("ALTER TABLE users ADD COLUMN google_id TEXT")
         conn.commit()
     except Exception:
         try:
@@ -1038,6 +1066,530 @@ def init_db():
 
 init_db()
 
+def generate_pwa_icons():
+    """Create PWA icons in static/icons directory on startup to prevent 404 logs."""
+    icons_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "icons")
+    os.makedirs(icons_dir, exist_ok=True)
+    icon_192 = os.path.join(icons_dir, "icon-192.png")
+    icon_512 = os.path.join(icons_dir, "icon-512.png")
+    
+    # Check if they already exist to avoid rewriting on every restart
+    if os.path.exists(icon_192) and os.path.exists(icon_512):
+        return
+        
+    try:
+        from PIL import Image, ImageDraw
+        has_pil = True
+    except ImportError:
+        has_pil = False
+
+    if has_pil:
+        try:
+            for size, path in ((192, icon_192), (512, icon_512)):
+                img = Image.new("RGBA", (size, size), (6, 13, 26, 255))
+                draw = ImageDraw.Draw(img)
+                # Nice rounded circle outer glow
+                draw.ellipse([size*0.1, size*0.1, size*0.9, size*0.9], fill=(6, 13, 26, 255), outline=(0, 255, 224, 255), width=max(2, int(size*0.04)))
+                # Draw a nice lightning bolt/PWA indicator in the center
+                draw.polygon([
+                    (size*0.5, size*0.25),
+                    (size*0.65, size*0.48),
+                    (size*0.52, size*0.48),
+                    (size*0.58, size*0.75),
+                    (size*0.35, size*0.52),
+                    (size*0.48, size*0.52)
+                ], fill=(0, 255, 224, 255))
+                img.save(path)
+            return
+        except Exception:
+            pass
+
+    # Fallback tiny 1x1 transparent PNG to satisfy network requests and prevent 404
+    tiny_png = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4\x00\x00\x00\rIDATx\x9cc`\x00\x01\x00\x00\x0c\x00\x01\x12\xac\x1a\x1b\x00\x00\x00\x00IEND\xaeB`\x82'
+    for path in (icon_192, icon_512):
+        try:
+            with open(path, "wb") as f:
+                f.write(tiny_png)
+        except Exception:
+            pass
+
+generate_pwa_icons()
+
+# ================= EMAIL & SECURITY HELPERS =================
+
+# Serializer for password reset timed tokens (1 hour expiration)
+def get_reset_serializer():
+    return URLSafeTimedSerializer(app.config.get("SECRET_KEY", "codebuddy-reset-2026-03-21-newkey"))
+
+def _send_email_async(to_email, subject, body_html, body_text):
+    smtp_server = os.getenv("SMTP_SERVER")
+    smtp_port = os.getenv("SMTP_PORT")
+    smtp_username = os.getenv("SMTP_USERNAME")
+    smtp_password = os.getenv("SMTP_PASSWORD")
+    smtp_sender = os.getenv("SMTP_SENDER")
+    if not smtp_sender:
+        smtp_sender = smtp_username
+
+    if not smtp_server or not smtp_username or not smtp_password or not smtp_sender:
+        app.logger.warning(
+            f"SMTP not fully configured. Could not send email to {to_email}.\n"
+            f"Subject: {subject}\n"
+            f"HTML Body preview: {body_html[:150]}..."
+        )
+        return
+
+    try:
+        port = int(smtp_port) if smtp_port else 587
+        
+        from email.utils import formatdate, make_msgid, formataddr
+        
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = formataddr(("CodeBuddy", smtp_username))
+        msg["To"] = to_email
+        msg["Reply-To"] = smtp_username
+        msg["Date"] = formatdate(localtime=True)
+        msg["Message-ID"] = make_msgid(domain="gmail.com")
+        msg["MIME-Version"] = "1.0"
+        msg["X-Priority"] = "3"
+        msg["List-Unsubscribe"] = f"<mailto:{smtp_username}?subject=unsubscribe>"
+
+        # Plain text MUST come first, then HTML (RFC 2046 order)
+        if body_text:
+            msg.attach(MIMEText(body_text, "plain", "utf-8"))
+        msg.attach(MIMEText(body_html, "html", "utf-8"))
+
+        # Gmail/SMTP Connection logic with timeout
+        if port == 465:
+            # SSL Connection
+            context = ssl.create_default_context()
+            with smtplib.SMTP_SSL(smtp_server, port, context=context, timeout=30) as server:
+                server.login(smtp_username, smtp_password)
+                refused = server.sendmail(smtp_sender, to_email, msg.as_string())
+                if refused:
+                    app.logger.error(f"Email refused for recipients: {refused}")
+                    return
+        else:
+            # TLS/STARTTLS Connection (e.g. Port 587)
+            context = ssl.create_default_context()
+            with smtplib.SMTP(smtp_server, port, timeout=30) as server:
+                server.ehlo()
+                server.starttls(context=context)
+                server.ehlo()
+                server.login(smtp_username, smtp_password)
+                refused = server.sendmail(smtp_sender, to_email, msg.as_string())
+                if refused:
+                    app.logger.error(f"Email refused for recipients: {refused}")
+                    return
+
+        app.logger.info(f"Email sent successfully to {to_email}. Subject: {subject}")
+    except smtplib.SMTPRecipientsRefused as e:
+        app.logger.error(f"Recipient refused: {to_email} — {e}")
+    except smtplib.SMTPAuthenticationError as e:
+        app.logger.error(f"SMTP auth failed (check App Password): {e}")
+    except smtplib.SMTPException as e:
+        app.logger.error(f"SMTP error sending to {to_email}: {e}")
+    except Exception as e:
+        app.logger.error(f"Failed to send email to {to_email}: {e}")
+
+def send_email(to_email, subject, body_html, body_text=""):
+    """Sends an email in a background thread to prevent blocking main UI request thread."""
+    thread = threading.Thread(target=_send_email_async, args=(to_email, subject, body_html, body_text))
+    thread.daemon = True
+    thread.start()
+
+def send_welcome_email(to_email, username):
+    subject = "Welcome to CodeBuddy - Thank you for registering"
+    body_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            body {{
+                font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+                background-color: #020408;
+                color: #e2f4ff;
+                margin: 0;
+                padding: 0;
+            }}
+            .wrapper {{
+                max-width: 560px;
+                margin: 0 auto;
+                padding: 40px 20px;
+            }}
+            .card {{
+                background: linear-gradient(135deg, rgba(6, 13, 26, 0.97) 0%, rgba(10, 20, 38, 0.95) 100%);
+                border: 1px solid rgba(0, 255, 224, 0.2);
+                border-radius: 16px;
+                padding: 40px 32px;
+                box-shadow: 0 0 40px rgba(0, 255, 224, 0.08), 0 8px 32px rgba(0, 0, 0, 0.5);
+            }}
+            .logo-section {{
+                text-align: center;
+                margin-bottom: 32px;
+            }}
+            .logo {{
+                font-size: 28px;
+                font-weight: 900;
+                letter-spacing: 4px;
+                background: linear-gradient(135deg, #00ffe0, #00b4d8);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+            }}
+            .logo-sub {{
+                font-size: 11px;
+                color: rgba(226, 244, 255, 0.4);
+                letter-spacing: 2px;
+                margin-top: 4px;
+            }}
+            .divider {{
+                height: 1px;
+                background: linear-gradient(90deg, transparent, rgba(0, 255, 224, 0.3), transparent);
+                margin: 24px 0;
+            }}
+            .greeting {{
+                font-size: 22px;
+                font-weight: 700;
+                color: #ffffff;
+                margin-bottom: 8px;
+            }}
+            .greeting .name {{
+                color: #00ffe0;
+            }}
+            .thank-you {{
+                font-size: 15px;
+                line-height: 1.7;
+                color: rgba(226, 244, 255, 0.85);
+                margin-bottom: 24px;
+            }}
+            .thank-you strong {{
+                color: #00ffe0;
+            }}
+            .features-title {{
+                font-size: 13px;
+                font-weight: 700;
+                color: #00ffe0;
+                letter-spacing: 2px;
+                text-transform: uppercase;
+                margin-bottom: 16px;
+            }}
+            .feature-item {{
+                display: flex;
+                align-items: flex-start;
+                gap: 12px;
+                margin-bottom: 14px;
+                padding: 12px 16px;
+                background: rgba(0, 255, 224, 0.04);
+                border: 1px solid rgba(0, 255, 224, 0.08);
+                border-radius: 10px;
+            }}
+            .feature-icon {{
+                font-size: 20px;
+                flex-shrink: 0;
+                margin-top: 2px;
+            }}
+            .feature-text {{
+                font-size: 13px;
+                line-height: 1.5;
+                color: rgba(226, 244, 255, 0.8);
+            }}
+            .feature-text strong {{
+                color: #e2f4ff;
+                font-weight: 600;
+            }}
+            .cta-section {{
+                text-align: center;
+                margin: 32px 0 24px;
+            }}
+            .cta-btn {{
+                display: inline-block;
+                padding: 14px 40px;
+                background: linear-gradient(135deg, #00ffe0, #00b4d8);
+                color: #020408;
+                font-size: 14px;
+                font-weight: 800;
+                letter-spacing: 2px;
+                text-decoration: none;
+                border-radius: 8px;
+                text-transform: uppercase;
+            }}
+            .footer {{
+                margin-top: 32px;
+                padding-top: 20px;
+                border-top: 1px solid rgba(0, 255, 224, 0.08);
+                text-align: center;
+            }}
+            .footer-text {{
+                font-size: 11px;
+                color: rgba(226, 244, 255, 0.35);
+                line-height: 1.6;
+                letter-spacing: 0.5px;
+            }}
+            .footer-brand {{
+                font-size: 10px;
+                color: rgba(0, 255, 224, 0.3);
+                letter-spacing: 2px;
+                margin-top: 12px;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="wrapper">
+            <div class="card">
+                <div class="logo-section">
+                    <div class="logo">CODEBUDDY</div>
+                    <div class="logo-sub">AI-POWERED CODING COMPANION</div>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="greeting">
+                    Welcome, <span class="name">{username}</span>! 🎉
+                </div>
+
+                <div class="thank-you">
+                    <p>Thank you for registering on <strong>CodeBuddy</strong>! We're excited to have you on board.</p>
+                    <p>Your account has been successfully created and is ready to use. You can now log in and start exploring all the features we've built to supercharge your coding journey.</p>
+                </div>
+
+                <div class="features-title">What You Can Do</div>
+
+                <div class="feature-item">
+                    <span class="feature-icon">🤖</span>
+                    <div class="feature-text">
+                        <strong>AI Chat Assistant</strong> — Ask coding questions, debug errors, and get instant help from your AI programming buddy.
+                    </div>
+                </div>
+
+                <div class="feature-item">
+                    <span class="feature-icon">👥</span>
+                    <div class="feature-text">
+                        <strong>Real-time Collaboration</strong> — Share code sessions with friends and work together in real-time.
+                    </div>
+                </div>
+
+                <div class="feature-item">
+                    <span class="feature-icon">🏆</span>
+                    <div class="feature-text">
+                        <strong>Leaderboard & XP</strong> — Earn experience points, climb the ranks, and compete with other coders.
+                    </div>
+                </div>
+
+                <div class="feature-item">
+                    <span class="feature-icon">🎙️</span>
+                    <div class="feature-text">
+                        <strong>Voice Clone</strong> — Create a custom AI voice that sounds like you for text-to-speech responses.
+                    </div>
+                </div>
+
+                <div class="cta-section">
+                    <a href="https://codebuddy.onrender.com/login" class="cta-btn">Start Coding Now ▶</a>
+                </div>
+
+                <div class="footer">
+                    <div class="footer-text">
+                        This email was sent because you registered on CodeBuddy.<br>
+                        If you didn't create this account, you can safely ignore this email.
+                    </div>
+                    <div class="footer-brand">CODEBUDDY · SECURE · AUTOMATED</div>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    body_text = (
+        f"Welcome, {username}!\n\n"
+        f"Thank you for registering on CodeBuddy! We are excited to have you on board.\n\n"
+        f"Your account has been successfully created and is ready to use.\n\n"
+        f"What you can do:\n"
+        f"  - AI Chat Assistant: Ask coding questions and get instant help\n"
+        f"  - Real-time Collaboration: Share code sessions with friends\n"
+        f"  - Leaderboard and XP: Earn points and climb the ranks\n"
+        f"  - Voice Clone: Create a custom AI voice\n\n"
+        f"Start coding now: https://codebuddy.onrender.com/login\n\n"
+        f"Best regards,\n"
+        f"The CodeBuddy Team"
+    )
+    send_email(to_email, subject, body_html, body_text)
+
+def send_reset_email(to_email, username, reset_url):
+    subject = "Reset your CodeBuddy password"
+    body_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <style>
+            body {{
+                font-family: 'Inter', system-ui, -apple-system, sans-serif;
+                background-color: #020408;
+                color: #e2f4ff;
+                margin: 0;
+                padding: 0;
+            }}
+            .card {{
+                max-width: 500px;
+                margin: 40px auto;
+                background: rgba(6, 13, 26, 0.95);
+                border: 1px solid rgba(0, 255, 224, 0.25);
+                border-radius: 8px;
+                padding: 32px;
+                box-shadow: 0 0 30px rgba(0, 255, 224, 0.1);
+            }}
+            .logo {{
+                color: #00ffe0;
+                font-size: 24px;
+                font-weight: 800;
+                letter-spacing: 3px;
+                text-align: center;
+                margin-bottom: 24px;
+            }}
+            .text {{
+                font-size: 15px;
+                line-height: 1.6;
+                color: #e2f4ff;
+            }}
+            .btn-wrap {{
+                text-align: center;
+                margin: 28px 0;
+            }}
+            .btn {{
+                background-color: rgba(0, 255, 224, 0.1);
+                color: #00ffe0;
+                border: 1px solid #00ffe0;
+                padding: 12px 24px;
+                text-decoration: none;
+                border-radius: 4px;
+                font-weight: bold;
+                letter-spacing: 1.5px;
+                display: inline-block;
+            }}
+            .btn:hover {{
+                background-color: rgba(0, 255, 224, 0.2);
+            }}
+            .footer {{
+                margin-top: 32px;
+                padding-top: 16px;
+                border-top: 1px solid rgba(0, 255, 224, 0.08);
+                font-size: 12px;
+                color: rgba(226, 244, 255, 0.45);
+                text-align: center;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="card">
+            <div class="logo">CODEBUDDY</div>
+            <div class="text">
+                <p>Hello {username},</p>
+                <p>A password reset request was initialized for your CodeBuddy credentials. Click the link below to configure a new access key. This link is valid for 1 hour.</p>
+            </div>
+            <div class="btn-wrap">
+                <a href="{reset_url}" class="btn">RESET ACCESS KEY</a>
+            </div>
+            <div class="text">
+                <p>If you did not request this, you can safely ignore this email.</p>
+            </div>
+            <div class="footer">
+                CODEBUDDY · PASSWORD SERVICES · SECURE TRANSMISSION
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    body_text = f"Hello {username},\n\nA password reset request was initialized for your CodeBuddy credentials. Use the link below to configure a new access key:\n\n{reset_url}\n\nThis link is valid for 1 hour."
+    send_email(to_email, subject, body_html, body_text)
+
+def send_delete_otp_email(to_email, username, otp):
+    subject = "Your CodeBuddy verification code"
+    body_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <style>
+            body {{
+                font-family: 'Inter', system-ui, -apple-system, sans-serif;
+                background-color: #020408;
+                color: #e2f4ff;
+                margin: 0;
+                padding: 0;
+            }}
+            .card {{
+                max-width: 500px;
+                margin: 40px auto;
+                background: rgba(6, 13, 26, 0.95);
+                border: 1px solid rgba(255, 74, 74, 0.4);
+                border-radius: 8px;
+                padding: 32px;
+                box-shadow: 0 0 30px rgba(255, 74, 74, 0.15);
+            }}
+            .logo {{
+                color: #ff4a4a;
+                font-size: 24px;
+                font-weight: 800;
+                letter-spacing: 3px;
+                text-align: center;
+                margin-bottom: 24px;
+            }}
+            .text {{
+                font-size: 15px;
+                line-height: 1.6;
+                color: #e2f4ff;
+            }}
+            .otp-wrap {{
+                text-align: center;
+                margin: 28px 0;
+            }}
+            .otp {{
+                font-family: monospace;
+                font-size: 32px;
+                color: #ff4a4a;
+                border: 1px dashed rgba(255, 74, 74, 0.4);
+                padding: 12px 24px;
+                letter-spacing: 6px;
+                display: inline-block;
+                background: rgba(255, 74, 74, 0.05);
+            }}
+            .footer {{
+                margin-top: 32px;
+                padding-top: 16px;
+                border-top: 1px solid rgba(255, 74, 74, 0.15);
+                font-size: 12px;
+                color: rgba(226, 244, 255, 0.45);
+                text-align: center;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="card">
+            <div class="logo">CODEBUDDY WARNING</div>
+            <div class="text">
+                <p>Hello {username},</p>
+                <p>You requested to permanently delete your CodeBuddy account. This action is irreversible and will erase all data, chats, and records associated with this account.</p>
+                <p>Use the following OTP to confirm deletion. This code is valid for 5 minutes:</p>
+            </div>
+            <div class="otp-wrap">
+                <div class="otp">{otp}</div>
+            </div>
+            <div class="text">
+                <p>If you did not request this, please change your password immediately.</p>
+            </div>
+            <div class="footer">
+                CODEBUDDY · SECURITY WARNING · SECURE TRANSMISSION
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    body_text = f"Hello {username},\n\nYou requested to permanently delete your CodeBuddy account. This action is irreversible.\n\nYour 6-digit deletion OTP is: {otp}\n\nValid for 5 minutes."
+    send_email(to_email, subject, body_html, body_text)
+
+
 # ================= CHANGE 8: SECURE STAT HELPER =================
 
 # Whitelist of allowed stat fields — prevents SQL injection
@@ -1045,6 +1597,9 @@ _ALLOWED_STAT_FIELDS = frozenset({
     "total_messages", "total_chats", "debug_count",
     "interview_count", "optimize_count", "code_runs", "streak_days"
 })
+
+import threading as _threading
+_stat_thread_local = _threading.local()
 
 def bump_stat(user_id, field, amount=1):
     """Securely increment a stat column using a whitelist.
@@ -1057,16 +1612,11 @@ def bump_stat(user_id, field, amount=1):
     if field not in _ALLOWED_STAT_FIELDS:
         app.logger.warning(f"bump_stat: rejected unknown field '{field}'")
         return
-    import threading as _threading
-    _tl = getattr(bump_stat, "_tl", None)
-    if _tl is None:
-        bump_stat._tl = _threading.local()
-        _tl = bump_stat._tl
-    conn = getattr(_tl, "conn", None)
+    conn = getattr(_stat_thread_local, "conn", None)
     if conn is None:
         conn = sqlite3.connect("codebuddy.db", check_same_thread=False)
         conn.execute("PRAGMA journal_mode=WAL")
-        _tl.conn = conn
+        _stat_thread_local.conn = conn
     # Safe because field is whitelisted — not user-supplied
     # Use EXCLUDED + table-qualified name for PostgreSQL compatibility
     now_str = datetime.now().isoformat()
@@ -1080,61 +1630,63 @@ def bump_stat(user_id, field, amount=1):
     conn.commit()
 
 def update_streak(user_id):
-    """Update daily streak — auto-heals using message history if needed."""
+    """Update daily streak safely, preserving count even if message history is deleted/cleared."""
     conn = sqlite3.connect("codebuddy.db")
     conn.row_factory = sqlite3.Row
     
-    # 1. Fetch unique active dates from messages
-    rows_dates = conn.execute("""
-        SELECT DISTINCT substr(m.timestamp, 1, 10) as msg_date
-        FROM messages m
-        JOIN conversations c ON m.conversation_id = c.id
-        WHERE c.user_id = ?
-        ORDER BY msg_date DESC LIMIT 100
-    """, (user_id,)).fetchall()
+    # Fetch current stats
+    row = conn.execute("SELECT streak_days, last_active FROM user_stats WHERE user_id=?", (user_id,)).fetchone()
     
-    active_dates = {r["msg_date"] for r in rows_dates if r["msg_date"]}
-    
-    # Also check user_stats.last_active if it's not in messages
-    row_stats = conn.execute("SELECT last_active, streak_days FROM user_stats WHERE user_id=?", (user_id,)).fetchone()
-    if row_stats and row_stats["last_active"]:
-        last_val = row_stats["last_active"]
-        if isinstance(last_val, str):
-            active_dates.add(last_val[:10])
-        elif hasattr(last_val, "strftime"):
-            active_dates.add(last_val.strftime("%Y-%m-%d"))
-            
     today = date.today()
+    now_str = datetime.now().isoformat()
     
-    # Calculate streak from active_dates
-    streak = 0
-    current_date = today
+    if not row:
+        # First time stats creation
+        conn.execute("""
+            INSERT INTO user_stats(user_id, streak_days, last_active)
+            VALUES (?, 1, ?)
+        """, (user_id, now_str))
+        conn.commit()
+        conn.close()
+        return
+
+    current_streak = row["streak_days"] or 0
+    last_active_str = row["last_active"]
     
-    # If they weren't active today, check if they were active yesterday to preserve/calculate the streak
-    if current_date.isoformat() not in active_dates:
-        from datetime import timedelta
-        current_date = today - timedelta(days=1)
-        
-    while current_date.isoformat() in active_dates:
-        streak += 1
-        from datetime import timedelta
-        current_date = current_date - timedelta(days=1)
-        
-    # Ensure streak is at least 1 if they are active today
-    if streak == 0 and today.isoformat() in active_dates:
-        streak = 1
-        
-    # Correct the streak to reflect the calculated consecutive active days
-    new_streak = streak
-    if new_streak == 0:
+    if not last_active_str:
+        # No last active info, initialize
+        conn.execute("""
+            UPDATE user_stats SET streak_days = 1, last_active = ? WHERE user_id = ?
+        """, (now_str, user_id))
+        conn.commit()
+        conn.close()
+        return
+
+    # Parse last active date
+    try:
+        # Handles both ISO formats (e.g. 2026-07-18T12:00:00 or just date 2026-07-18)
+        last_active_date = datetime.fromisoformat(last_active_str).date()
+    except Exception:
+        try:
+            last_active_date = datetime.strptime(last_active_str[:10], "%Y-%m-%d").date()
+        except Exception:
+            last_active_date = today
+
+    days_diff = (today - last_active_date).days
+    
+    # If the user is active on the same day, preserve the streak
+    if days_diff == 0:
+        new_streak = max(current_streak, 1)
+    # If the user is active on the consecutive day, increment the streak by 1
+    elif days_diff == 1:
+        new_streak = current_streak + 1
+    # If they missed a day (days_diff > 1), the streak breaks and resets to 1
+    else:
         new_streak = 1
         
-    now_str = datetime.now().isoformat()
     conn.execute("""
-        INSERT INTO user_stats(user_id, streak_days, last_active)
-        VALUES (?, ?, ?)
-        ON CONFLICT(user_id) DO UPDATE SET streak_days=?, last_active=?
-    """, (user_id, new_streak, now_str, new_streak, now_str))
+        UPDATE user_stats SET streak_days = ?, last_active = ? WHERE user_id = ?
+    """, (new_streak, now_str, user_id))
     conn.commit()
     conn.close()
 
@@ -1204,6 +1756,10 @@ def is_programming_related(text):
     """
     # Layer 1: Fast keyword check (English tech terms + common Indic transliterations)
     PROG_KEYWORDS = {
+        # Conversational filler/greetings (always permitted to prevent latency)
+        "hi", "hello", "hey", "help", "yes", "no", "ok", "okay", "thanks", "thank you",
+        "please", "cool", "awesome", "explain", "why", "how", "what", "where", "who",
+        "run", "execute", "start", "stop", "reset", "clear", "show", "get", "set",
         # Core English terms always present even in native-language questions
         "python", "java", "javascript", "js", "html", "css", "sql", "code", "coding",
         "program", "programming", "function", "variable", "loop", "array", "class",
@@ -2279,32 +2835,190 @@ def register():
         email = request.form.get("email", "").strip()
         password = request.form["password"]
 
-        if len(username) < 3:
-            return render_template("register.html", error="Username must be at least 3 characters.")
+        if len(username) < 3 or len(username) > 15:
+            return render_template("register.html", error="Username must be between 3 and 15 characters.")
+        if " " in username:
+            return render_template("register.html", error="Username cannot contain spaces.")
         if not email or "@" not in email:
             return render_template("register.html", error="Please enter a valid email address.")
         if len(password) < 6:
             return render_template("register.html", error="Password must be at least 6 characters.")
 
+        # Check if username is already taken
+        conn = sqlite3.connect("codebuddy.db")
+        conn.row_factory = sqlite3.Row
+        existing_user = conn.execute("SELECT id FROM users WHERE LOWER(username) = LOWER(?)", (username,)).fetchone()
+        if existing_user:
+            conn.close()
+            return render_template("register.html", error="The name you chose is already taken. Please try a different one.")
+
+        # Check if email is already taken
+        existing_email = conn.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone()
+        if existing_email:
+            conn.close()
+            return render_template("register.html", error="Email address already registered.")
+
         hashed = bcrypt.generate_password_hash(password).decode()
         try:
-            conn = sqlite3.connect("codebuddy.db")
-            # Check if email is already taken
-            existing_email = conn.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone()
-            if existing_email:
-                conn.close()
-                return render_template("register.html", error="Email address already registered.")
-                
             conn.execute("INSERT INTO users(username,password,email) VALUES (?,?,?)", (username, hashed, email))
             now_str = datetime.now().isoformat()
             conn.execute("""INSERT INTO user_stats(user_id, last_active)
                            VALUES ((SELECT id FROM users WHERE username=?), ?)""", (username, now_str))
             conn.commit()
             conn.close()
+            
+            try:
+                send_welcome_email(email, username)
+            except Exception as e:
+                app.logger.error(f"Failed to trigger welcome email: {e}")
+                
             return redirect(url_for("login"))
         except sqlite3.IntegrityError:
-            return render_template("register.html", error="Username already taken.")
+            return render_template("register.html", error="The name you chose is already taken. Please try a different one.")
     return render_template("register.html")
+
+def generate_valid_username(email_or_name):
+    clean = re.sub(r'[^a-zA-Z0-9]', '', email_or_name.split('@')[0])
+    prefix = clean[:10]
+    p_lower = "".join(c for c in prefix if c.isalpha()).lower()
+    if not p_lower:
+        p_lower = "usr"
+    username = f"G_{p_lower[:8]}_{secrets.randbelow(100)}!"
+    return username
+
+@app.route("/login/google")
+def login_google():
+    client_id = os.getenv("GOOGLE_CLIENT_ID")
+    if not client_id or client_id.startswith("your-google-client-id"):
+        return render_template("login.html", error="Google OAuth is not configured on this server.")
+    
+    state = secrets.token_urlsafe(16)
+    session["google_oauth_state"] = state
+    
+    redirect_uri = url_for("login_google_callback", _external=True)
+    auth_url = (
+        "https://accounts.google.com/o/oauth2/v2/auth"
+        f"?response_type=code"
+        f"&client_id={client_id}"
+        f"&redirect_uri={redirect_uri}"
+        f"&scope=openid%20email%20profile"
+        f"&state={state}"
+    )
+    return redirect(auth_url)
+
+@app.route("/login/google/callback")
+def login_google_callback():
+    state = request.args.get("state")
+    code = request.args.get("code")
+    
+    if not state or state != session.get("google_oauth_state"):
+        return render_template("login.html", error="OAuth state mismatch. Please try again.")
+        
+    session.pop("google_oauth_state", None)
+    
+    if not code:
+        return render_template("login.html", error="OAuth code missing.")
+        
+    client_id = os.getenv("GOOGLE_CLIENT_ID")
+    client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
+    redirect_uri = url_for("login_google_callback", _external=True)
+    
+    token_url = "https://oauth2.googleapis.com/token"
+    data = {
+        "code": code,
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "redirect_uri": redirect_uri,
+        "grant_type": "authorization_code"
+    }
+    
+    try:
+        r = requests.post(token_url, data=data)
+        if not r.ok:
+            app.logger.error(f"Google token exchange returned status {r.status_code}: {r.text}")
+        r.raise_for_status()
+        token_data = r.json()
+        access_token = token_data.get("access_token")
+    except Exception as e:
+        app.logger.error(f"Google token exchange failed: {e}")
+        return render_template("login.html", error=f"Authentication with Google failed. (Error details logged to console)")
+        
+    userinfo_url = "https://www.googleapis.com/oauth2/v3/userinfo"
+    headers = {"Authorization": f"Bearer {access_token}"}
+    try:
+        ru = requests.get(userinfo_url, headers=headers)
+        ru.raise_for_status()
+        user_info = ru.json()
+    except Exception as e:
+        app.logger.error(f"Google userinfo request failed: {e}")
+        return render_template("login.html", error="Failed to fetch profile details from Google.")
+        
+    email = user_info.get("email")
+    google_id = user_info.get("sub")
+    
+    if not email or not google_id:
+        return render_template("login.html", error="Failed to retrieve email or Google ID.")
+        
+    conn = sqlite3.connect("codebuddy.db")
+    conn.row_factory = sqlite3.Row
+    
+    user = conn.execute("SELECT * FROM users WHERE google_id=?", (google_id,)).fetchone()
+    
+    if user:
+        conn.close()
+        login_user(User(user["id"], user["username"], user["email"]))
+        session.permanent = True
+        update_streak(user["id"])
+        return redirect(url_for("dashboard"))
+        
+    user_by_email = conn.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+    if user_by_email:
+        conn.execute("UPDATE users SET google_id=? WHERE id=?", (google_id, user_by_email["id"]))
+        conn.commit()
+        conn.close()
+        login_user(User(user_by_email["id"], user_by_email["username"], email))
+        session.permanent = True
+        update_streak(user_by_email["id"])
+        return redirect(url_for("dashboard"))
+        
+    base_username = generate_valid_username(email)
+    username = base_username
+    attempts = 0
+    while attempts < 10:
+        existing_username = conn.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone()
+        if not existing_username:
+            break
+        username = generate_valid_username(email)
+        attempts += 1
+        
+    dummy_pass = secrets.token_hex(16)
+    hashed = bcrypt.generate_password_hash(dummy_pass).decode()
+    
+    try:
+        conn.execute("INSERT INTO users(username, password, email, google_id) VALUES (?,?,?,?)", 
+                     (username, hashed, email, google_id))
+        new_user = conn.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone()
+        user_id = new_user["id"]
+        
+        now_str = datetime.now().isoformat()
+        conn.execute("INSERT INTO user_stats(user_id, last_active) VALUES (?, ?)", (user_id, now_str))
+        conn.commit()
+        conn.close()
+        
+        try:
+            send_welcome_email(email, username)
+        except Exception as e:
+            app.logger.error(f"Failed to trigger welcome email: {e}")
+            
+        login_user(User(user_id, username, email))
+        session.permanent = True
+        update_streak(user_id)
+        return redirect(url_for("dashboard"))
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        app.logger.error(f"Google registration failed: {e}")
+        return render_template("register.html", error="An error occurred during Google registration. Please try again.")
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -2312,7 +3026,7 @@ def login():
     if current_user.is_authenticated:
         return redirect(url_for("dashboard"))
     if request.method == "POST":
-        username = request.form["username"].strip()
+        email = request.form["email"].strip()
         password = request.form["password"]
         # Only set a persistent remember-me cookie if the user explicitly checked
         # the "Remember me" box. Without this, the session ends when the browser closes.
@@ -2320,7 +3034,7 @@ def login():
 
         conn = sqlite3.connect("codebuddy.db")
         conn.row_factory = sqlite3.Row
-        user = conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
+        user = conn.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
         conn.close()
 
         if user and bcrypt.check_password_hash(user["password"], password):
@@ -2330,7 +3044,7 @@ def login():
             update_streak(user["id"])
             return redirect(url_for("dashboard"))
 
-        return render_template("login.html", error="Invalid username or password.")
+        return render_template("login.html", error="Invalid email or password.")
     return render_template("login.html")
 
 @app.route("/logout")
@@ -2342,11 +3056,100 @@ def logout():
     logout_user()
     return redirect(url_for("login"))
 
+@app.route("/forgot_password", methods=["GET", "POST"])
+def forgot_password():
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard"))
+        
+    if request.method == "POST":
+        email = request.form.get("email", "").strip()
+        if not email:
+            return render_template("forgot_password.html", error="Please enter a valid email address.")
+            
+        conn = sqlite3.connect("codebuddy.db")
+        conn.row_factory = sqlite3.Row
+        user = conn.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+        conn.close()
+        
+        if user:
+            s = get_reset_serializer()
+            token = s.dumps(email, salt="password-reset-salt")
+            reset_url = url_for("reset_password", token=token, _external=True)
+            
+            try:
+                send_reset_email(email, user["username"], reset_url)
+            except Exception as e:
+                app.logger.error(f"Failed to trigger password reset email: {e}")
+                
+        return render_template("forgot_password.html", success="If that email is registered, we have sent a reset password link to it. Please check your email and spam folder.")
+        
+    return render_template("forgot_password.html")
+
+@app.route("/reset_password/<token>", methods=["GET", "POST"])
+def reset_password(token):
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard"))
+        
+    s = get_reset_serializer()
+    try:
+        email = s.loads(token, salt="password-reset-salt", max_age=3600)  # 1 hour expiration
+    except (SignatureExpired, BadSignature):
+        return render_template("forgot_password.html", error="The password reset link is invalid or has expired. Please request a new one.")
+        
+    if request.method == "POST":
+        password = request.form.get("password")
+        if not password or len(password) < 6:
+            return render_template("reset_password.html", token=token, error="Password must be at least 6 characters.")
+            
+        hashed = bcrypt.generate_password_hash(password).decode()
+        
+        conn = sqlite3.connect("codebuddy.db")
+        conn.execute("UPDATE users SET password=? WHERE email=?", (hashed, email))
+        conn.commit()
+        conn.close()
+        
+        return render_template("login.html", success="Your password has been successfully reset. You can now log in.")
+        
+    return render_template("reset_password.html", token=token)
+
+
+@app.route("/delete_account/request_otp", methods=["POST"])
+@login_required
+def delete_account_request_otp():
+    email = request.form.get("email", "").strip()
+    if not email:
+        return jsonify({"success": False, "error": "Email is required."}), 400
+        
+    conn = sqlite3.connect("codebuddy.db")
+    conn.row_factory = sqlite3.Row
+    user = conn.execute("SELECT * FROM users WHERE id=?", (current_user.id,)).fetchone()
+    conn.close()
+    
+    if not user:
+        return jsonify({"success": False, "error": "User not found."}), 404
+        
+    db_email = user["email"] if "email" in user.keys() else None
+    if not db_email or db_email.lower() != email.lower():
+        return jsonify({"success": False, "error": "Incorrect confirmation email address."}), 400
+        
+    otp = str(secrets.randbelow(900000) + 100000)
+    session["delete_otp"] = otp
+    session["delete_otp_expires"] = time.time() + 300
+    
+    try:
+        send_delete_otp_email(db_email, user["username"], otp)
+    except Exception as e:
+        app.logger.error(f"Failed to send delete OTP email: {e}")
+        return jsonify({"success": False, "error": "Failed to send verification code. Please check your SMTP config."}), 500
+        
+    return jsonify({"success": True, "message": "Verification code sent to your email."})
+
 @app.route("/delete_account", methods=["POST"])
 @login_required
 def delete_account():
     email = request.form.get("email", "").strip()
     password = request.form.get("password")
+    otp = request.form.get("otp", "").strip()
 
     conn = sqlite3.connect("codebuddy.db")
     conn.row_factory = sqlite3.Row
@@ -2362,9 +3165,26 @@ def delete_account():
         conn.close()
         return jsonify({"success": False, "error": "Incorrect confirmation email address."}), 400
         
-    if not bcrypt.check_password_hash(user["password"], password):
+    is_google_user = bool(user["google_id"]) if "google_id" in user.keys() else False
+    
+    if not (is_google_user and not password):
+        if not bcrypt.check_password_hash(user["password"], password):
+            conn.close()
+            return jsonify({"success": False, "error": "Incorrect password."}), 400
+            
+    session_otp = session.get("delete_otp")
+    session_otp_expires = session.get("delete_otp_expires", 0)
+    
+    if not session_otp or not otp or session_otp != otp:
         conn.close()
-        return jsonify({"success": False, "error": "Incorrect password."}), 400
+        return jsonify({"success": False, "error": "Invalid verification code."}), 400
+        
+    if time.time() > session_otp_expires:
+        conn.close()
+        return jsonify({"success": False, "error": "Verification code has expired. Please request a new one."}), 400
+        
+    session.pop("delete_otp", None)
+    session.pop("delete_otp_expires", None)
 
     try:
         # Delete user record and all associated records from other tables:
@@ -2449,11 +3269,52 @@ def pwa_manifest():
     }
     return jsonify(manifest)
 
+# ================= SEO: robots.txt & sitemap.xml =================
+
+@app.route("/robots.txt")
+def robots_txt():
+    content = """User-agent: *
+Allow: /login
+Allow: /register
+Allow: /forgot_password
+Disallow: /api/
+Disallow: /delete_account/
+Disallow: /update_username
+Disallow: /admin/
+Disallow: /tts
+Disallow: /voice_clone/
+Disallow: /collab/
+
+Sitemap: https://codebuddy.onrender.com/sitemap.xml
+"""
+    return app.response_class(content, mimetype="text/plain")
+
+@app.route("/sitemap.xml")
+def sitemap_xml():
+    from datetime import date
+    today = date.today().isoformat()
+    pages = [
+        {"url": "https://codebuddy.onrender.com/login",           "priority": "1.0", "changefreq": "weekly"},
+        {"url": "https://codebuddy.onrender.com/register",        "priority": "0.9", "changefreq": "monthly"},
+        {"url": "https://codebuddy.onrender.com/forgot_password",  "priority": "0.5", "changefreq": "monthly"},
+    ]
+    xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    for p in pages:
+        xml += f'  <url>\n'
+        xml += f'    <loc>{p["url"]}</loc>\n'
+        xml += f'    <lastmod>{today}</lastmod>\n'
+        xml += f'    <changefreq>{p["changefreq"]}</changefreq>\n'
+        xml += f'    <priority>{p["priority"]}</priority>\n'
+        xml += f'  </url>\n'
+    xml += '</urlset>'
+    return app.response_class(xml, mimetype="application/xml")
+
 @app.route("/sw.js")
 def service_worker():
     sw_code = """
 const CACHE_NAME = 'codebuddy-v4';
-const STATIC_ASSETS = ['/', '/static/codebuddy_voice.js'];
+const STATIC_ASSETS = ['/', '/static/js/codebuddy_voice.js'];
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -2506,6 +3367,38 @@ def update_profile():
     conn.commit()
     conn.close()
     return jsonify({"status": "updated"})
+
+@app.route("/update_username", methods=["POST"])
+@login_required
+def update_username():
+    new_username = request.form.get("username", "").strip()
+    if not new_username:
+        return jsonify({"success": False, "error": "Username cannot be empty."}), 400
+        
+    # Validate format: 3-15 chars, no spaces, at least 1 lowercase, 1 uppercase, 1 special character
+    import re
+    username_regex = re.compile(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9])\S{3,15}$")
+    if not username_regex.match(new_username):
+        return jsonify({"success": False, "error": "Username must be 3-15 characters, contain no spaces, and have at least one lowercase letter, one uppercase letter, and one special character."}), 400
+
+    conn = sqlite3.connect("codebuddy.db")
+    conn.row_factory = sqlite3.Row
+    try:
+        # Check for duplicates
+        existing = conn.execute("SELECT id FROM users WHERE LOWER(username) = LOWER(?) AND id != ?", (new_username, current_user.id)).fetchone()
+        if existing:
+            conn.close()
+            return jsonify({"success": False, "error": "This username is already taken by another operator."}), 400
+            
+        conn.execute("UPDATE users SET username=? WHERE id=?", (new_username, current_user.id))
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True, "message": "Username updated successfully."})
+    except Exception as e:
+        if conn:
+            conn.close()
+        app.logger.error(f"Failed to update username: {e}")
+        return jsonify({"success": False, "error": "Database error occurred."}), 500
 
 # ================= CHANGE 5: MEMORY API =================
 
@@ -3177,10 +4070,20 @@ def chat():
     if not convo:
         return Response("Chat not found.", mimetype="text/plain")
 
+    # Fetch number of user messages in this chat to skip classifier on follow-ups
+    conn_cnt = sqlite3.connect("codebuddy.db")
+    conn_cnt.row_factory = sqlite3.Row
+    cnt_row = conn_cnt.execute(
+        "SELECT COUNT(*) as cnt FROM messages WHERE conversation_id=? AND role='user'",
+        (conversation_id,)
+    ).fetchone()
+    user_message_count = cnt_row["cnt"] if cnt_row else 0
+    conn_cnt.close()
+
     if mode not in ("interview", "roadmap"):
         # Skip filter for non-English — filter cannot understand Tamil/Hindi etc.
         _skip_filter = lang_code not in ("en-US", "", None)
-        if not _skip_filter and not is_programming_related(user_message):
+        if not _skip_filter and user_message_count == 0 and not is_programming_related(user_message):
             return Response(
                 "🚫 CodeBuddy is a programming-only assistant.\n\n"
                 "I can only help with: code, algorithms, debugging, software development, "
@@ -3204,7 +4107,15 @@ def chat():
 
     if convo["title"] in ("New Chat", "", None):
         try:
-            smart_title = generate_chat_title(user_message)
+            import re
+            clean_msg = re.sub(r'\s+', ' ', user_message).strip()
+            clean_msg = re.sub(r'[*`#_\-]', '', clean_msg)
+            words = clean_msg.split()
+            smart_title = " ".join(words[:5])
+            if len(smart_title) > 40:
+                smart_title = smart_title[:37] + "..."
+            if not smart_title:
+                smart_title = "New Session"
             conn.execute(
                 "UPDATE conversations SET title=?, mode=?, updated_at=? WHERE id=?",
                 (smart_title, mode, datetime.now().isoformat(), conversation_id)
@@ -3247,7 +4158,10 @@ def chat():
             save_conn.commit()
             save_conn.close()
 
-        return Response(local_generate(), mimetype="text/plain")
+        resp = Response(local_generate(), mimetype="text/plain")
+        resp.headers["X-Accel-Buffering"] = "no"
+        resp.headers["Cache-Control"] = "no-cache, must-revalidate"
+        return resp
 
     # CHANGE 5: Inject persistent memory into system prompt
     memory_context = build_memory_context(current_user.id)
@@ -3387,6 +4301,8 @@ def chat():
         "messages": api_messages
     }
 
+    cur_user_id = current_user.id
+
     def generate():
         # Check user hourly message rate limit to protect API keys (for cloud calls)
         # Note: we only apply this if Ollama is NOT running, because Ollama is free/unlimited!
@@ -3394,8 +4310,9 @@ def chat():
         
         if not is_local_ollama:
             try:
-                db_limit = get_db()
-                user_row = db_limit.execute("SELECT is_pro FROM users WHERE id = ?", (current_user.id,)).fetchone()
+                db_limit = sqlite3.connect("codebuddy.db")
+                db_limit.row_factory = sqlite3.Row
+                user_row = db_limit.execute("SELECT is_pro FROM users WHERE id = ?", (cur_user_id,)).fetchone()
                 user_is_pro = user_row["is_pro"] if user_row else 0
                 
                 if not user_is_pro:
@@ -3406,19 +4323,21 @@ def chat():
                         """SELECT COUNT(*) as cnt FROM messages m
                            JOIN conversations c ON m.conversation_id = c.id
                            WHERE c.user_id = ? AND m.role = 'user' AND m.timestamp > ?""",
-                        (current_user.id, one_hour_ago)
+                        (cur_user_id, one_hour_ago)
                     ).fetchone()
                     msg_count = count_row["cnt"] if count_row else 0
                     
                     HOURLY_LIMIT = 15
                     if msg_count >= HOURLY_LIMIT:
+                        db_limit.close()
                         yield f"⚠ Hourly rate limit reached ({HOURLY_LIMIT} messages/hour). Upgrade to Pro for unlimited chats and voice coding!"
                         return
+                db_limit.close()
             except Exception as e:
                 app.logger.warning(f"Rate limit database check failed: {e}")
 
-        full = ""
-        stream_buf = ""
+        full: str = ""
+        stream_buf: str = ""
         used_groq = False
         used_ollama = False
 
@@ -3432,7 +4351,7 @@ def chat():
                 token = _filter_response(token)
                 stream_buf += token
                 full += token
-                if any(c in stream_buf for c in '.!?,\n') or len(stream_buf) > 80:
+                if len(stream_buf) >= 12 or any(c in stream_buf for c in ' \n\t'):
                     yield _filter_response(stream_buf)
                     stream_buf = ""
             if stream_buf:
@@ -3494,7 +4413,7 @@ def chat():
                         token = _filter_response(token)
                         stream_buf += token
                         full += token
-                        if any(c in stream_buf for c in '.!?,\n') or len(stream_buf) > 80:
+                        if len(stream_buf) >= 12 or any(c in stream_buf for c in ' \n\t'):
                             yield _filter_response(stream_buf)
                             stream_buf = ""
                     if stream_buf:
@@ -3535,7 +4454,7 @@ def chat():
                             token = _filter_response(token)
                             stream_buf += token
                             full += token
-                            if any(c in stream_buf for c in '.!?,\n') or len(stream_buf) > 80:
+                            if len(stream_buf) >= 12 or any(c in stream_buf for c in ' \n\t'):
                                 yield _filter_response(stream_buf)
                                 stream_buf = ""
                         except (json.JSONDecodeError, KeyError, IndexError):
@@ -3605,7 +4524,10 @@ def chat():
                 (conversation_id,"assistant",full,datetime.now().isoformat()))
             save_conn.commit();save_conn.close()
 
-    return Response(generate(), mimetype="text/plain")
+    response = Response(generate(), mimetype="text/plain")
+    response.headers["X-Accel-Buffering"] = "no"
+    response.headers["Cache-Control"] = "no-cache, must-revalidate"
+    return response
 
 # ================= QUICK EXPLAIN =================
 
@@ -5233,7 +6155,7 @@ def _extract_video_frames(video_path, max_frames=6):
     """
     frames = []
     try:
-        import cv2
+        import cv2  # type: ignore[import-not-found]
         cap = cv2.VideoCapture(video_path)
         total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         if total <= 0:
@@ -5264,7 +6186,7 @@ def _extract_video_frames(video_path, max_frames=6):
 def _video_to_base64_thumbnail(video_path):
     """Return a single base64 JPEG thumbnail (first keyframe) for fallback."""
     try:
-        import cv2, base64
+        import cv2, base64  # type: ignore[import-not-found]
         cap = cv2.VideoCapture(video_path)
         ret, frame = cap.read()
         cap.release()
@@ -5340,15 +6262,16 @@ def analyze_video():
 
         if has_frames:
             # Build vision message with extracted frames
-            content_parts = [{"type": "text", "text": prompt + f"\n\n[Video: {fname}, {file_size_mb:.1f}MB, {len(frames)} frames extracted]"}]
+            content_parts: list = [{"type": "text", "text": prompt + f"\n\n[Video: {fname}, {file_size_mb:.1f}MB, {len(frames)} frames extracted]"}]
             for i, (frame_idx, b64) in enumerate(frames):
-                content_parts.append({
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:image/jpeg;base64,{b64}",
-                        "detail": "high"
-                    }
-                })
+                img_part = dict(
+                    type="image_url",
+                    image_url=dict(
+                        url=f"data:image/jpeg;base64,{b64}",
+                        detail="high"
+                    )
+                )
+                content_parts.append(img_part)
             messages = [
                 {
                     "role": "system",
@@ -5394,7 +6317,7 @@ def analyze_video():
         }
 
         def generate():
-            full = ""
+            full: str = ""
             tried_models = [model_to_use]
 
             if not has_frames:
@@ -5716,8 +6639,8 @@ def _load_xtts():
         if _xtts_model is not None:
             return _xtts_model, True
         try:
-            from TTS.api import TTS as _TTS
-            import torch
+            from TTS.api import TTS as _TTS  # type: ignore[import-not-found]
+            import torch  # type: ignore[import-not-found]
             device = "cuda" if torch.cuda.is_available() else "cpu"
             app.logger.info(f"Loading XTTS-v2 on {device} — this takes ~30s first time...")
             _xtts_model = _TTS("tts_models/multilingual/multi-dataset/xtts_v2").to(device)
@@ -5785,6 +6708,7 @@ def _to_wav(audio_bytes, mime="audio/webm"):
         in_path = f.name
     out_path = in_path + "_out.wav"
     converted = False
+    wav = b""
     try:
         ffmpeg_bin, _ = _find_ffmpeg()
         if ffmpeg_bin:
@@ -5806,7 +6730,7 @@ def _to_wav(audio_bytes, mime="audio/webm"):
         return wav
     # pydub fallback
     try:
-        from pydub import AudioSegment
+        from pydub import AudioSegment  # type: ignore[import-not-found]
         import io as _bio
         seg = AudioSegment.from_file(_bio.BytesIO(audio_bytes))
         seg = seg.set_frame_rate(22050).set_channels(1)
@@ -5848,8 +6772,8 @@ def voice_clone_status():
     meta_path = _vc_meta_path(current_user.id)
     audio_path = _vc_audio_path(current_user.id)
     try:
-        from TTS.api import TTS as _T; xtts_ok = True
-    except ImportError:
+        from TTS.api import TTS as _T; xtts_ok = True  # type: ignore[import-not-found]
+    except Exception:
         xtts_ok = False
     if _vc_os.path.exists(meta_path):
         try:
@@ -5905,8 +6829,8 @@ def voice_clone_upload():
     # Save voice sample as WAV for XTTS-v2
     audio_saved = False
     try:
-        from TTS.api import TTS as _T; xtts_ok = True
-    except ImportError:
+        from TTS.api import TTS as _T; xtts_ok = True  # type: ignore[import-not-found]
+    except Exception:
         xtts_ok = False
 
     if audio_file:
@@ -6050,7 +6974,15 @@ def tts_diagnose():
         "profile_exists": False, "audio_saved": False,
         "python_version": sys.version,
         "test_english": False, "test_tamil": False, "test_malayalam": False,
-        "click_version": "?"
+        "click_version": "?",
+        "audio_size_kb": 0,
+        "profile_lang": None,
+        "profile_lang_name": None,
+        "tts_engine": "gtts",
+        "xtts_device": "cpu",
+        "xtts_model_loaded": False,
+        "xtts_error": "",
+        "gtts_error": ""
     }
     try:
         import click; results["click_version"] = click.__version__
@@ -6075,8 +7007,8 @@ def tts_diagnose():
     except ImportError as e:
         results["gtts_error"] = str(e)
     try:
-        from TTS.api import TTS as _T
-        import torch
+        from TTS.api import TTS as _T  # type: ignore[import-not-found]
+        import torch  # type: ignore[import-not-found]
         results["xtts_installed"] = True
         results["xtts_device"] = "cuda" if torch.cuda.is_available() else "cpu"
         results["xtts_model_loaded"] = _XTTS_READY
@@ -6158,7 +7090,7 @@ def collab_chat():
     }
 
     def generate():
-        full = ""
+        full: str = ""
         try:
             resp = requests.post(
                 OPENROUTER_URL,
@@ -6303,7 +7235,7 @@ def collab_end(room_code):
         return jsonify({"error": "Only host can end"}), 403
     _room_delete(room_code)
     if socketio:
-        socketio.emit("session_ended", {"message": "Host ended the session"}, room=room_code)
+        socketio.emit("session_ended", {"message": "Host ended the session"}, to=room_code)
     return jsonify({"ended": True})
 
 
@@ -6315,7 +7247,7 @@ if _SOCKETIO_OK and socketio:
         if not room_code or not username: return
         join_room(room_code)
         room = _room_load(room_code) or {}
-        emit("user_joined", {"username": username, "members": room.get("members", []), "message": f"{username} joined"}, room=room_code)
+        emit("user_joined", {"username": username, "members": room.get("members", []), "message": f"{username} joined"}, to=room_code)
 
     @socketio.on("leave_collab")
     def on_leave(data):
@@ -6327,27 +7259,27 @@ if _SOCKETIO_OK and socketio:
             if username in room.get("members", []):
                 room["members"].remove(username)
                 _room_save(room_code, room)
-        emit("user_left", {"username": username, "members": (room or {}).get("members", []), "message": f"{username} left"}, room=room_code)
+        emit("user_left", {"username": username, "members": (room or {}).get("members", []), "message": f"{username} left"}, to=room_code)
 
     @socketio.on("collab_message")
     def on_msg(data):
         room_code = data.get("room_code")
-        if room_code: emit("new_message", data, room=room_code)
+        if room_code: emit("new_message", data, to=room_code)
 
     @socketio.on("collab_typing")
     def on_typing(data):
         room_code = data.get("room_code")
-        if room_code: emit("user_typing", data, room=room_code, include_self=False)
+        if room_code: emit("user_typing", data, to=room_code, include_self=False)
 
     @socketio.on("webrtc_signal")
     def on_webrtc(data):
         room_code = data.get("room_code")
-        if room_code: emit("webrtc_signal", data, room=room_code, include_self=False)
+        if room_code: emit("webrtc_signal", data, to=room_code, include_self=False)
 
     @socketio.on("voice_state")
     def on_voice(data):
         room_code = data.get("room_code")
-        if room_code: emit("voice_state_update", data, room=room_code)
+        if room_code: emit("voice_state_update", data, to=room_code)
 
 
 

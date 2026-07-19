@@ -165,7 +165,7 @@
       background: var(--plasma-dim);
       color: var(--plasma);
       font-family: var(--display);
-      font-size: 8px;
+      font-size: 11px;
       font-weight: 700;
       letter-spacing: 2px;
       text-transform: uppercase;
@@ -358,7 +358,7 @@
 
     .user-role {
       font-family: var(--display);
-      font-size: 9px;
+      font-size: 11px;
       font-weight: 500;
       letter-spacing: 3px;
       text-transform: uppercase;
@@ -389,7 +389,7 @@
       background: var(--surface);
       border-radius: 2px;
       font-family: var(--display);
-      font-size: 7px;
+      font-size: 11px;
       font-weight: 600;
       letter-spacing: 2px;
       text-transform: uppercase;
@@ -416,7 +416,7 @@
 
     .section-title {
       font-family: var(--display);
-      font-size: 8px;
+      font-size: 11px;
       font-weight: 700;
       letter-spacing: 3px;
       text-transform: uppercase;
@@ -468,7 +468,7 @@
 
     .stat-label {
       font-family: var(--display);
-      font-size: 7px;
+      font-size: 11px;
       font-weight: 600;
       letter-spacing: 2px;
       text-transform: uppercase;
@@ -514,7 +514,7 @@
 
     .info-key {
       font-family: var(--display);
-      font-size: 8px;
+      font-size: 11px;
       font-weight: 600;
       letter-spacing: 2px;
       text-transform: uppercase;
@@ -534,7 +534,7 @@
 
     .info-val .tag {
       font-family: var(--display);
-      font-size: 8px;
+      font-size: 11px;
       font-weight: 600;
       letter-spacing: 1.5px;
       padding: 2px 8px;
@@ -590,7 +590,7 @@
 
     .activity-label {
       font-family: var(--display);
-      font-size: 8px;
+      font-size: 11px;
       color: var(--text-3);
       letter-spacing: 1.5px;
       margin-top: 8px;
@@ -611,7 +611,7 @@
       align-items: center;
       gap: 6px;
       font-family: var(--display);
-      font-size: 8px;
+      font-size: 11px;
       letter-spacing: 1.5px;
       color: var(--text-3);
     }
@@ -642,7 +642,7 @@
       align-items: center;
       gap: 6px;
       font-family: var(--display);
-      font-size: 8px;
+      font-size: 11px;
       font-weight: 700;
       letter-spacing: 2px;
       text-transform: uppercase;
@@ -791,7 +791,10 @@
       <div class="section-title">Operator Data</div>
       <div class="info-row">
         <div class="info-key">Identifier</div>
-        <div class="info-val">{{ username }}</div>
+        <div class="info-val" style="display:flex;align-items:center;gap:8px;">
+          <span id="usernameVal">{{ username }}</span>
+          <button onclick="editUsername()" class="tag tag-online" style="border:none;cursor:pointer;padding:2px 6px;font-size:9px;font-family:var(--display);letter-spacing:1px;font-weight:700;">EDIT</button>
+        </div>
       </div>
       <div class="info-row">
         <div class="info-key">Access Level</div>
@@ -838,8 +841,74 @@
 
   <script>
     /* ── AVATAR INITIAL ── */
-    const uname = "{{ username }}";
+    let uname = "{{ username }}";
     document.getElementById('avatarInitial').textContent = uname.charAt(0).toUpperCase();
+
+    /* ── EDIT USERNAME ── */
+    function editUsername() {
+      const container = document.getElementById('usernameVal').parentNode;
+      const current = document.getElementById('usernameVal').textContent;
+      
+      const formHtml = `
+        <div style="display:flex;align-items:center;gap:6px;width:100%;">
+          <input type="text" id="newUsernameInput" value="${current}" style="background:rgba(6,11,25,0.7);border:1px solid rgba(0,255,224,0.3);border-radius:4px;color:#fff;font-family:var(--mono);font-size:11px;padding:3px 6px;outline:none;width:120px;" />
+          <button onclick="saveUsername()" class="tag tag-online" style="border:none;cursor:pointer;padding:3px 6px;font-size:9px;font-weight:700;">SAVE</button>
+          <button onclick="cancelEditUsername('${current}')" class="tag" style="border:none;cursor:pointer;padding:3px 6px;font-size:9px;background:rgba(256,256,256,0.1);color:#fff;">CANCEL</button>
+        </div>
+      `;
+      container.innerHTML = formHtml;
+      
+      const input = document.getElementById('newUsernameInput');
+      input.focus();
+      input.select();
+    }
+    
+    function cancelEditUsername(oldVal) {
+      const container = document.getElementById('newUsernameInput').parentNode.parentNode;
+      container.innerHTML = `
+        <span id="usernameVal">${oldVal}</span>
+        <button onclick="editUsername()" class="tag tag-online" style="border:none;cursor:pointer;padding:2px 6px;font-size:9px;font-family:var(--display);letter-spacing:1px;font-weight:700;">EDIT</button>
+      `;
+    }
+    
+    function saveUsername() {
+      const newVal = document.getElementById('newUsernameInput').value.trim();
+      if (!newVal) return;
+      
+      const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[^a-zA-Z0-9])\S{3,15}$/;
+      if (!regex.test(newVal)) {
+        alert("Invalid username format. Must be 3-15 chars, contain no spaces, and have at least 1 lowercase letter, 1 uppercase letter, and 1 special character (e.g. G_username_99!).");
+        return;
+      }
+      
+      const formData = new FormData();
+      formData.append('username', newVal);
+      
+      fetch('/update_username', {
+        method: 'POST',
+        body: formData
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          uname = newVal;
+          const container = document.getElementById('newUsernameInput').parentNode.parentNode;
+          container.innerHTML = `
+            <span id="usernameVal">${newVal}</span>
+            <button onclick="editUsername()" class="tag tag-online" style="border:none;cursor:pointer;padding:2px 6px;font-size:9px;font-family:var(--display);letter-spacing:1px;font-weight:700;">EDIT</button>
+          `;
+          document.querySelector('.username-display').textContent = newVal;
+          document.getElementById('avatarInitial').textContent = newVal.charAt(0).toUpperCase();
+          alert("Username updated successfully!");
+        } else {
+          alert(data.error || "Failed to update username.");
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        alert("Network error occurred.");
+      });
+    }
 
     /* ── ACTIVITY BARS ── */
     (function () {
