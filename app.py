@@ -1155,6 +1155,47 @@ def get_reset_serializer():
     return URLSafeTimedSerializer(app.config.get("SECRET_KEY", "codebuddy-reset-2026-03-21-newkey"))
 
 def _send_email_async(to_email, subject, body_html, body_text):
+    """Send email via Brevo HTTP API (primary) or SMTP (fallback)."""
+    # ── Try Brevo HTTP API first (works on Render Free Tier) ──
+    brevo_api_key = os.getenv("BREVO_API_KEY")
+    if brevo_api_key:
+        try:
+            smtp_sender = os.getenv("SMTP_SENDER") or os.getenv("SMTP_USERNAME") or "codebuddy.offical@gmail.com"
+            # Extract plain email from "Name <email>" format
+            sender_email = smtp_sender
+            sender_name = "CodeBuddy"
+            if "<" in smtp_sender and ">" in smtp_sender:
+                sender_name = smtp_sender.split("<")[0].strip()
+                sender_email = smtp_sender.split("<")[1].replace(">", "").strip()
+
+            payload = {
+                "sender": {"name": sender_name, "email": sender_email},
+                "to": [{"email": to_email}],
+                "subject": subject,
+                "htmlContent": body_html,
+            }
+            if body_text:
+                payload["textContent"] = body_text
+
+            resp = requests.post(
+                "https://api.brevo.com/v3/smtp/email",
+                headers={
+                    "api-key": brevo_api_key,
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                },
+                json=payload,
+                timeout=15,
+            )
+            if resp.status_code in (200, 201):
+                app.logger.info(f"Email sent via Brevo to {to_email}. Subject: {subject}")
+                return
+            else:
+                app.logger.warning(f"Brevo API returned {resp.status_code}: {resp.text[:200]}")
+        except Exception as e:
+            app.logger.warning(f"Brevo API failed for {to_email}: {e}")
+
+    # ── Fallback: traditional SMTP ──
     smtp_server = os.getenv("SMTP_SERVER")
     smtp_port = os.getenv("SMTP_PORT")
     smtp_username = os.getenv("SMTP_USERNAME")
