@@ -8313,7 +8313,26 @@
               errDiv.style.background = 'rgba(0,255,224,0.08)';
               errDiv.style.borderColor = 'rgba(0,255,224,0.25)';
               errDiv.style.color = '#00ffe0';
-              sendBtn.textContent = 'SENT ✓';
+              
+              // Start a 60-second resend cooldown timer
+              let cooldown = 60;
+              sendBtn.textContent = `RESEND IN ${cooldown}S`;
+              sendBtn.disabled = true;
+              const timer = setInterval(() => {
+                const btn = document.getElementById('sendDeleteOtpBtn');
+                if (!btn) {
+                  clearInterval(timer);
+                  return;
+                }
+                cooldown--;
+                if (cooldown <= 0) {
+                  clearInterval(timer);
+                  btn.disabled = false;
+                  btn.textContent = 'SEND OTP';
+                } else {
+                  btn.textContent = `RESEND IN ${cooldown}S`;
+                }
+              }, 1000);
             } else {
               errDiv.textContent = data.error || 'Failed to send OTP.';
               errDiv.style.display = 'block';
