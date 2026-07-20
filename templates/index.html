@@ -1199,13 +1199,16 @@
 
     .welcome-forge {
       font-family: var(--display);
-      font-size: 10px;
+      font-size: 9px;
       font-weight: 500;
       letter-spacing: 1.5px;
       color: var(--text-3);
       text-transform: uppercase;
       white-space: nowrap;
       flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      line-height: 1.4;
     }
 
     .welcome-forge em {
@@ -1214,8 +1217,8 @@
       max-width: 140px;
       overflow: hidden;
       text-overflow: ellipsis;
-      display: inline-block;
-      vertical-align: bottom;
+      white-space: nowrap;
+      display: block;
     }
 
     .topbar-center,
@@ -6564,7 +6567,7 @@
         <div class="hud-badge">
           <div class="pulse"></div><span id="modeLabel">GENERAL</span>
         </div>
-        <div class="welcome-forge">CODEBUDDY / <em>{{ username }}</em></div>
+        <div class="welcome-forge"><span>CODEBUDDY /</span><em>{{ username }}</em></div>
         <!-- v4: Model indicator -->
 
       </div>
