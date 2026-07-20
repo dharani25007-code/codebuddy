@@ -315,11 +315,25 @@ def _connect_db(database=None, *args, **kwargs):
         if _pg_pool:
             try:
                 pg_conn = _pg_pool.getconn()
-                # Reset any stale transaction state
+                is_stale = False
                 if pg_conn.closed:
-                    _pg_pool.putconn(pg_conn, close=True)
+                    is_stale = True
+                else:
+                    try:
+                        # Ping check to ensure connection is alive
+                        with pg_conn.cursor() as cur:
+                            cur.execute("SELECT 1")
+                    except Exception:
+                        is_stale = True
+
+                if is_stale:
+                    try:
+                        _pg_pool.putconn(pg_conn, close=True)
+                    except Exception:
+                        pass
                     pg_conn = psycopg2.connect(DATABASE_URL)
                     return PostgresConnectionWrapper(pg_conn, None)
+                
                 pg_conn.rollback()
                 return PostgresConnectionWrapper(pg_conn, _pg_pool)
             except Exception:
@@ -1274,6 +1288,15 @@ def send_email(to_email, subject, body_html, body_text=""):
 
 def send_welcome_email(to_email, username):
     subject = "Welcome to CodeBuddy - Thank you for registering"
+    
+    # Generate the correct URL dynamically based on the current server host
+    try:
+        login_url = url_for("login", _external=True)
+        if "onrender.com" in login_url or (request and request.headers.get("X-Forwarded-Proto") == "https"):
+            login_url = login_url.replace("http://", "https://")
+    except Exception:
+        login_url = "https://codebuddy-0slh.onrender.com/login"
+
     body_html = f"""
     <!DOCTYPE html>
     <html>
@@ -1460,7 +1483,7 @@ def send_welcome_email(to_email, username):
                 </div>
 
                 <div class="cta-section">
-                    <a href="https://codebuddy.onrender.com/login" class="cta-btn">Start Coding Now ▶</a>
+                    <a href="{login_url}" class="cta-btn">Start Coding Now ▶</a>
                 </div>
 
                 <div class="footer">
@@ -1484,7 +1507,7 @@ def send_welcome_email(to_email, username):
         f"  - Real-time Collaboration: Share code sessions with friends\n"
         f"  - Leaderboard and XP: Earn points and climb the ranks\n"
         f"  - Voice Clone: Create a custom AI voice\n\n"
-        f"Start coding now: https://codebuddy.onrender.com/login\n\n"
+        f"Start coding now: {login_url}\n\n"
         f"Best regards,\n"
         f"The CodeBuddy Team"
     )
@@ -3441,7 +3464,7 @@ Disallow: /tts
 Disallow: /voice_clone/
 Disallow: /collab/
 
-Sitemap: https://codebuddy.onrender.com/sitemap.xml
+Sitemap: https://codebuddy-0slh.onrender.com/sitemap.xml
 """
     return app.response_class(content, mimetype="text/plain")
 
@@ -3450,9 +3473,9 @@ def sitemap_xml():
     from datetime import date
     today = date.today().isoformat()
     pages = [
-        {"url": "https://codebuddy.onrender.com/login",           "priority": "1.0", "changefreq": "weekly"},
-        {"url": "https://codebuddy.onrender.com/register",        "priority": "0.9", "changefreq": "monthly"},
-        {"url": "https://codebuddy.onrender.com/forgot_password",  "priority": "0.5", "changefreq": "monthly"},
+        {"url": "https://codebuddy-0slh.onrender.com/login",           "priority": "1.0", "changefreq": "weekly"},
+        {"url": "https://codebuddy-0slh.onrender.com/register",        "priority": "0.9", "changefreq": "monthly"},
+        {"url": "https://codebuddy-0slh.onrender.com/forgot_password",  "priority": "0.5", "changefreq": "monthly"},
     ]
     xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
     xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
