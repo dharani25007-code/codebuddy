@@ -6,7 +6,7 @@
 
 ![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-3.0%2B-000000?style=for-the-badge&logo=flask&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
+![Supabase](https://img.shields.io/badge/PostgreSQL-Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-Local%20Dev-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
 ![Ollama](https://img.shields.io/badge/Ollama-Local%20AI-FF6F00?style=for-the-badge&logo=ollama&logoColor=white)
 ![Free AI Fallbacks](https://img.shields.io/badge/Free%20AI%20Fallbacks-Open%20Source%20%2B%20Free%20Tier-7C3AED?style=for-the-badge)
@@ -19,16 +19,15 @@
 
 > ⚡ **25+ Features · 5 Themes · 20+ Languages · Ollama Local AI + Free Cloud Fallbacks · Live on Render**
 
-🌐 **[Live Demo → https://codebuddy-0slh.onrender.com](https://codebuddy-0slh.onrender.com)**
+🌐 **[Live Demo → https://codebuddy-ai-nzea.onrender.com](https://codebuddy-ai-nzea.onrender.com)**
 
 </div>
-
 
 --- 
 
 ## 📌 Overview
 
-CodeBuddy is a full-stack AI-powered programming assistant with **25+ features** — including Tanglish (Tamil + English) voice coding, File Forge upload/edit/run, Video Analyzer, Code DNA fingerprinting, Rubber Duck+ Mode, and a **triple-provider AI architecture** (Ollama local GPU → Groq → OpenRouter). The app is deployed live on **Render** with a **Neon PostgreSQL** database for permanent, free cloud storage, and also supports SQLite for local development with zero configuration.
+CodeBuddy is a full-stack AI-powered programming assistant with **25+ features** — including Tanglish (Tamil + English) voice coding, File Forge upload/edit/run, Video Analyzer, Code DNA fingerprinting, Rubber Duck+ Mode, and a **triple-provider AI architecture** (Ollama local GPU → Groq → OpenRouter). The app is deployed live on **Render** with a **Supabase PostgreSQL** database for permanent cloud storage, and also supports SQLite for local development with zero configuration.
 
 ---
 
@@ -173,40 +172,42 @@ Open: `http://127.0.0.1:5000` → Register → New Chat → Pick a mode 🚀
 
 ---
 
-## ☁️ Free Cloud Deployment (Render + Neon)
+## ☁️ Free Cloud Deployment (Render + Supabase)
 
 CodeBuddy is deployed 100% free using:
 - **[Render.com](https://render.com)** — Free web hosting (no credit card required)
-- **[Neon.tech](https://neon.tech)** — Free PostgreSQL cloud database (no credit card required)
+- **[Supabase.com](https://supabase.com)** — Free PostgreSQL cloud database (no credit card required)
 
 ### Deploy Your Own Instance
 
 1. **Fork** this repository to your GitHub account.
-2. **Create a free Neon database** at [neon.tech](https://neon.tech) and copy the connection string.
+2. **Create a free Supabase project** at [supabase.com](https://supabase.com) and copy your PostgreSQL connection string (`DATABASE_URL`).
 3. **Create a new Web Service** on [render.com](https://render.com) and connect your GitHub repo.
 4. **Set the following Environment Variables** in the Render dashboard:
 
 | Key | Value |
 |---|---|
 | `SECRET_KEY` | Any long random string |
-| `DATABASE_URL` | Your Neon `postgresql://...` connection string |
+| `DATABASE_URL` | Your Supabase `postgresql://...` connection string |
 | `OPENROUTER_API_KEY` | Your OpenRouter free API key |
 | `GROQ_API_KEY` | Your Groq free API key |
 | `FREE_ONLY_MODE` | `false` |
-| `OLLAMA_ENABLED` | `false` (no Ollama on Render) |
 | `COOKIE_SECURE` | `true` |
+| `BREVO_API_KEY` | *(Optional)* Brevo API key for transactional emails |
+| `GOOGLE_CLIENT_ID` | *(Optional)* Google OAuth Client ID |
+| `GOOGLE_CLIENT_SECRET` | *(Optional)* Google OAuth Client Secret |
 | `SMTP_SERVER` | *(Optional)* SMTP server address (e.g., `smtp.gmail.com`) |
 | `SMTP_PORT` | *(Optional)* SMTP server port (e.g., `587`) |
 | `SMTP_USERNAME` | *(Optional)* SMTP auth username/email |
-| `SMTP_PASSWORD` | *(Optional)* SMTP app/account password |
+| `SMTP_PASSWORD` | *(Optional)* SMTP app password |
 | `SMTP_SENDER` | *(Optional)* Mail sender email header address |
 
-5. Click **Deploy** — Render will automatically build and launch your app!
+5. Click **Deploy** — Render will automatically build, run database migrations, and launch your app!
 
 ### How it works
-The app uses a smart **database compatibility wrapper** built into `app.py`:
-- **Locally** (no `DATABASE_URL` set): Uses fast local SQLite.
-- **On Render** (`DATABASE_URL` set): Automatically connects to Neon PostgreSQL. All SQLite-specific syntax (`?` params, `AUTOINCREMENT`, `PRAGMA`, `datetime('now')`, `ON CONFLICT`) is transparently translated to PostgreSQL on the fly — zero code duplication.
+The app uses a smart **database compatibility layer** in `appcore/db.py`:
+- **Locally** (no `DATABASE_URL` set): Uses fast local SQLite (`codebuddy.db`).
+- **On Render / Cloud** (`DATABASE_URL` set): Automatically connects to Supabase PostgreSQL via connection pooling (`psycopg2`). All queries (`?` params, `AUTOINCREMENT`, `PRAGMA table_info`, `datetime('now')`) are transparently translated to PostgreSQL on the fly.
 
 ---
 
@@ -250,13 +251,13 @@ If any provider fails (offline/rate-limited/error) → the next provider is trie
 | Flask-Login | Authentication management |
 | Flask-Bcrypt | Password hashing |
 | Flask-SocketIO | Real-time WebSocket collaboration |
-| PostgreSQL / SQLite | Cloud database (Neon) / Local database |
+| PostgreSQL (Supabase) / SQLite | Cloud database / Local database |
 | psycopg2-binary | PostgreSQL driver |
 | Ollama | Local GPU AI — zero cost, unlimited, offline capable |
 | OpenRouter / Groq | Cloud AI fallback chain (free tier) |
 | AI Output Simulator | Predicts and simulates run outputs of 50+ languages via Ollama/Groq/OpenRouter + local compiler fallbacks |
 | gTTS / XTTS-v2 | Text-to-speech and voice cloning |
-| Gunicorn (gthread) | Production WSGI server |
+| Gunicorn | Production WSGI server |
 | python-dotenv | Load `.env` configuration |
 | requests | HTTP requests to external APIs |
 
