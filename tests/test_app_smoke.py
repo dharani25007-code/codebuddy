@@ -12,6 +12,15 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 APP_PATH = REPO_ROOT / "app.py"
 TEST_USERNAME = "smoke_user_test"
 TEST_PASSWORD = "SmokePass123!"
+TEST_EMAIL = "smoke_user_test@example.com"
+
+# IMPORTANT: keep tests hermetic. app.py calls load_dotenv() at import time and
+# _connect_db() routes to PostgreSQL whenever DATABASE_URL is truthy — including
+# when it comes from the developer's real .env. If we let that through, tests
+# would connect to (and mutate) the production Neon database. load_dotenv()
+# uses override=False, so pre-seeding DATABASE_URL as empty (set BEFORE app.py
+# is imported, otherwise load_dotenv adds it from .env) guarantees SQLite.
+os.environ["DATABASE_URL"] = ""
 
 
 class FakeResponse:
@@ -98,11 +107,11 @@ class AppSmokeTests(unittest.TestCase):
         password_hash = cls.module.bcrypt.generate_password_hash(password).decode()
         if row:
             user_id = row["id"]
-            conn.execute("UPDATE users SET password=? WHERE id=?", (password_hash, user_id))
+            conn.execute("UPDATE users SET password=?, email=? WHERE id=?", (password_hash, TEST_EMAIL, user_id))
         else:
             cursor = conn.execute(
-                "INSERT INTO users(username, password) VALUES (?, ?)",
-                (username, password_hash),
+                "INSERT INTO users(username, password, email) VALUES (?, ?, ?)",
+                (username, password_hash, TEST_EMAIL),
             )
             user_id = cursor.lastrowid
         conn.execute(
@@ -118,7 +127,7 @@ class AppSmokeTests(unittest.TestCase):
     def login(self):
         response = self.client.post(
             "/login",
-            data={"username": TEST_USERNAME, "password": TEST_PASSWORD},
+            data={"email": TEST_EMAIL, "password": TEST_PASSWORD},
             follow_redirects=False,
         )
         self.assertIn(response.status_code, (200, 302))
@@ -270,12 +279,14 @@ class AppSmokeTests(unittest.TestCase):
         public_chat = self.client.get(f"/public_chat/{token}")
         self.assertEqual(public_chat.status_code, 200)
 
+        # NOTE: /run_code uses the AI output simulator (not a Piston API call),
+        # so with the mocked upstreams the deterministic output is "Smoke response".
         run_code = self.client.post(
             "/run_code",
             json={"language": "python", "code": "print('ok')"},
         )
         self.assertEqual(run_code.status_code, 200)
-        self.assertIn("benchmark run ok", run_code.get_json()["output"])
+        self.assertEqual(run_code.get_json()["output"], "Smoke response")
 
         memory = self.client.get("/get_memory")
         self.assertEqual(memory.status_code, 200)

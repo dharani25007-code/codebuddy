@@ -1,5 +1,5 @@
 <div align="center">
-<img src="https://capsule-render.vercel.app/api?type=waving&color=0:0f1117,50:7C3AED,100:4ecdc4&height=200&section=header&text=CodeBuddy%20AI&fontSize=52&fontColor=ffffff&fontAlignY=40&desc=World's%20First%20Tanglish%20AI%20Coding%20Assistant&descAlignY=60&descSize=18&animation=fadeIn"/>
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:0f1117,50:7C3AED,100:4ecdc4&height=200&section=header&text=CodeBuddy%20AI&fontSize=52&fontColor=ffffff&fontAlignY=40&desc=Tanglish%20AI%20Coding%20Assistant&descAlignY=60&descSize=18&animation=fadeIn"/>
 </div>
 
 <div align="center">
@@ -17,7 +17,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-brightgreen.svg?style=for-the-badge)](https://github.com/dharani25007-code/codebuddy/pulls)
 
-> ⚡ **28 World-First Features · 5 Themes · 20+ Languages · Ollama Local AI + Free Cloud Fallbacks · Live on Render**
+> ⚡ **25+ Features · 5 Themes · 20+ Languages · Ollama Local AI + Free Cloud Fallbacks · Live on Render**
 
 🌐 **[Live Demo → https://codebuddy-0slh.onrender.com](https://codebuddy-0slh.onrender.com)**
 
@@ -28,7 +28,7 @@
 
 ## 📌 Overview
 
-CodeBuddy is a full-stack AI-powered programming assistant with **28 world-first features** — including Tanglish (Tamil + English) voice coding, File Forge upload/edit/run, Video Analyzer, Code DNA fingerprinting, Rubber Duck+ Mode, and a **triple-provider AI architecture** (Ollama local GPU → Groq → OpenRouter). The app is deployed live on **Render** with a **Neon PostgreSQL** database for permanent, free cloud storage, and also supports SQLite for local development with zero configuration.
+CodeBuddy is a full-stack AI-powered programming assistant with **25+ features** — including Tanglish (Tamil + English) voice coding, File Forge upload/edit/run, Video Analyzer, Code DNA fingerprinting, Rubber Duck+ Mode, and a **triple-provider AI architecture** (Ollama local GPU → Groq → OpenRouter). The app is deployed live on **Render** with a **Neon PostgreSQL** database for permanent, free cloud storage, and also supports SQLite for local development with zero configuration.
 
 ---
 
@@ -65,7 +65,10 @@ CodeBuddy is a full-stack AI-powered programming assistant with **28 world-first
 
 ```
 codebuddy/
-├── app.py                          # Main Flask backend (~9000 lines) with integrated PWA/SMTP helpers
+├── app.py                          # Main Flask backend (being decomposed — routes + orchestration)
+├── appcore/                        # Layered helpers extracted from the historical monolith
+│   ├── __init__.py
+│   └── db.py                       # SQLite ↔ PostgreSQL connection layer (patches sqlite3.connect)
 ├── Procfile                        # Render/Heroku startup command
 ├── .env                            # API keys (local dev only, not committed)
 ├── codebuddy.db                    # SQLite database (auto-created for local dev)
@@ -88,7 +91,7 @@ codebuddy/
 │   ├── profile.html
 │   ├── leaderboard.html
 │   ├── collab.html
-│   └── codebuddy_world_first.html  # 28 Features Hub
+│   └── codebuddy_world_first.html  # Features Hub
 ├── scripts/
 │   └── load_benchmark.py           # Concurrent endpoint benchmark harness
 ├── scratch/
@@ -128,6 +131,11 @@ GROQ_API_KEY=your-groq-key
 OLLAMA_ENABLED=true
 OLLAMA_MODEL=qwen2.5-coder:7b
 # OLLAMA_URL=http://localhost:11434
+
+# Alphanumeric code accepted for account-deletion OTP ONLY when SMTP is
+# unreachable in local dev. LEAVE UNSET in production — when unset there is no
+# bypass at all and the recovery path is the generated code in the server logs.
+# OTP_FALLBACK_CODE=some-secret-dev-only-code
 
 # SMTP Config for Password Recovery (optional, logs fallback if omitted)
 SMTP_SERVER=smtp.gmail.com
