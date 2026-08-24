@@ -148,204 +148,13 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 USE_SOCKETIO_REDIS = os.getenv("USE_SOCKETIO_REDIS", "false").lower() == "true"
 SOCKETIO_MESSAGE_QUEUE = REDIS_URL if USE_SOCKETIO_REDIS else None
 
-# Keep existing sqlite3.connect(...) calls working while allowing the DB path to come from .env.
-_sqlite_connect = sqlite3.connect
-
-
-_pg_pool = None  # PostgreSQL connection pool — initialized on first DB call
-
-
-def _start_db_keepalive():
-    """Ping Neon every 4 minutes to prevent free-tier compute auto-suspend."""
-    import threading
-    DATABASE_URL = os.getenv("DATABASE_URL")
-    if not DATABASE_URL:
-        return
-
-    def _keepalive_loop():
-        import time as _time
-        while True:
-            _time.sleep(240)  # 4 minutes
-            try:
-                import psycopg2
-                conn = psycopg2.connect(DATABASE_URL, connect_timeout=5)
-                conn.cursor().execute("SELECT 1")
-                conn.close()
-            except Exception:
-                pass  # silently ignore — server may be restarting
-
-    t = threading.Thread(target=_keepalive_loop, daemon=True, name="neon-keepalive")
-    t.start()
-
-_start_db_keepalive()
-
-
-def _configure_sqlite_connection(conn):
-    try:
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA synchronous=NORMAL")
-        conn.execute("PRAGMA cache_size=-32000")
-        conn.execute("PRAGMA busy_timeout=5000")
-        conn.execute("PRAGMA foreign_keys=ON")
-    except sqlite3.Error:
-        pass
-    return conn
-
-
-def _connect_db(database=None, *args, **kwargs):
-    DATABASE_URL = os.getenv("DATABASE_URL")
-    if DATABASE_URL:
-        import psycopg2
-        import psycopg2.extras
-        import psycopg2.pool
-
-        # -- Persistent connection pool (created once, reused per request) ------
-        # Avoids a new TCP+TLS handshake to Neon on every sqlite3.connect() call.
-        global _pg_pool
-        if _pg_pool is None:
-            try:
-                _pg_pool = psycopg2.pool.ThreadedConnectionPool(
-                    minconn=1, maxconn=10,
-                    dsn=DATABASE_URL,
-                    connect_timeout=10,
-                )
-            except Exception as _pe:
-                print(f"[DB] Pool creation failed: {_pe} — falling back to direct connect")
-                _pg_pool = None
-
-        class PostgresCursorWrapper:
-            def __init__(self, cursor):
-                self._cursor = cursor
-                self._lastrowid = None
-            def execute(self, sql, parameters=None):
-                sql = sql.replace("?", "%s")
-                sql = sql.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY")
-                sql = sql.replace("AUTOINCREMENT", "SERIAL")
-                sql = sql.replace("datetime('now')", "CURRENT_TIMESTAMP")
-
-                # PostgreSQL handle PRAGMA
-                if sql.strip().upper().startswith("PRAGMA"):
-                    match = re.search(r"PRAGMA\s+table_info\((.*?)\)", sql, re.IGNORECASE)
-                    if match:
-                        table_name = match.group(1).strip("'\"")
-                        sql = f"SELECT 0 as cid, column_name as name, data_type as type, 0 as notnull, null as dflt_value, 0 as pk FROM information_schema.columns WHERE table_name = '{table_name}'"
-                    else:
-                        return self
-
-                is_insert = sql.strip().upper().startswith("INSERT INTO") and "COLLAB_ROOMS" not in sql.upper()
-                if is_insert:
-                    sql = sql.rstrip('; \t\n\r') + " RETURNING id"
-
-                if parameters:
-                    self._cursor.execute(sql, parameters)
-                else:
-                    self._cursor.execute(sql)
-
-                if is_insert:
-                    try:
-                        row = self._cursor.fetchone()
-                        if row:
-                            self._lastrowid = row[0]
-                    except Exception:
-                        self._lastrowid = None
-                else:
-                    self._lastrowid = None
-
-                return self
-
-            @property
-            def lastrowid(self):
-                return self._lastrowid
-
-            def executemany(self, sql, parameters):
-                sql = sql.replace("?", "%s")
-                self._cursor.executemany(sql, parameters)
-                return self
-
-            def fetchone(self):
-                return self._cursor.fetchone()
-
-            def fetchall(self):
-                return self._cursor.fetchall()
-
-            def __iter__(self):
-                return iter(self._cursor)
-
-            def close(self):
-                self._cursor.close()
-
-        class PostgresConnectionWrapper:
-            def __init__(self, conn, pool):
-                self._conn = conn
-                self._pool = pool
-                self.row_factory = None
-            def cursor(self):
-                return PostgresCursorWrapper(self._conn.cursor(cursor_factory=psycopg2.extras.DictCursor))
-            def execute(self, sql, parameters=None):
-                cur = self.cursor()
-                cur.execute(sql, parameters)
-                return cur
-            def executemany(self, sql, parameters):
-                cur = self.cursor()
-                cur.executemany(sql, parameters)
-                return cur
-            def commit(self):
-                self._conn.commit()
-            def rollback(self):
-                self._conn.rollback()
-            def close(self):
-                if self._conn:
-                    if self._pool:
-                        try:
-                            self._conn.rollback()  # reset any open txn
-                            self._pool.putconn(self._conn)
-                        except Exception:
-                            try:
-                                self._pool.putconn(self._conn, close=True)
-                            except Exception:
-                                pass
-                    else:
-                        try:
-                            self._conn.close()
-                        except Exception:
-                            pass
-                    self._conn = None
-
-        # Get a connection from pool, or fall back to direct connect
-        if _pg_pool:
-            try:
-                pg_conn = _pg_pool.getconn()
-                is_stale = False
-                if pg_conn.closed:
-                    is_stale = True
-                else:
-                    try:
-                        # Ping check to ensure connection is alive
-                        with pg_conn.cursor() as cur:
-                            cur.execute("SELECT 1")
-                    except Exception:
-                        is_stale = True
-
-                if is_stale:
-                    try:
-                        _pg_pool.putconn(pg_conn, close=True)
-                    except Exception:
-                        pass
-                    pg_conn = psycopg2.connect(DATABASE_URL)
-                    return PostgresConnectionWrapper(pg_conn, None)
-                
-                pg_conn.rollback()
-                return PostgresConnectionWrapper(pg_conn, _pg_pool)
-            except Exception:
-                pass
-        return PostgresConnectionWrapper(psycopg2.connect(DATABASE_URL), None)
-
-    if database in (None, "", "codebuddy.db"):
-        database = DB_PATH
-    kwargs.setdefault("timeout", 30)
-    return _configure_sqlite_connection(_sqlite_connect(database, *args, **kwargs))
-
-sqlite3.connect = _connect_db
+# -- DB layer ---------------------------------------------------------------
+# sqlite3.connect(...) calls throughout the app transparently route to the
+# correct backend (SQLite in dev, PostgreSQL in production) through appcore.db.
+# install_db patches sqlite3.connect globally and points the default path at
+# DB_PATH (resolved above, anchored to app.py's directory).
+from appcore.db import install_db
+install_db(DB_PATH)
 
 # -- STABLE SECRET KEY ---------------------------------------------------------
 # FIX: secrets.token_hex(32) generates a NEW key every restart, invalidating
@@ -383,11 +192,10 @@ _socketio_mode: str = os.getenv(
 )
 socketio = None
 if _SOCKETIO_OK:
-    _SIO = SocketIO
-    socketio = _SIO(app, cors_allowed_origins="*",
-                    async_mode=_socketio_mode,
-                    message_queue=SOCKETIO_MESSAGE_QUEUE,
-                    logger=False, engineio_logger=False)
+    socketio = SocketIO(app, cors_allowed_origins="*",  # type: ignore
+                        async_mode=_socketio_mode,      # type: ignore
+                        message_queue=SOCKETIO_MESSAGE_QUEUE,
+                        logger=False, engineio_logger=False)
 _collab_rooms = {}   # in-memory cache for fast SocketIO lookups (populated from DB on access)
 
 def _init_collab_table():
@@ -893,24 +701,7 @@ def init_db():
         is_pro INTEGER DEFAULT 0,
         google_id TEXT UNIQUE
     )""")
-
-    try:
-        c.execute("ALTER TABLE users ADD COLUMN email TEXT")
-        conn.commit()
-    except Exception:
-        try:
-            conn.rollback()
-        except Exception:
-            pass
-
-    try:
-        c.execute("ALTER TABLE users ADD COLUMN google_id TEXT")
-        conn.commit()
-    except Exception:
-        try:
-            conn.rollback()
-        except Exception:
-            pass
+    conn.commit()
 
     c.execute("""CREATE TABLE IF NOT EXISTS conversations(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1078,6 +869,8 @@ def init_db():
         ("conversations", "pinned",       "INTEGER DEFAULT 0"),
         ("conversations", "created_at",   "TEXT"),
         ("conversations", "updated_at",   "TEXT"),
+        ("users",         "email",        "TEXT"),
+        ("users",         "google_id",    "TEXT"),
         ("users",         "bio",          "TEXT DEFAULT ''"),
         ("users",         "avatar_color", "TEXT DEFAULT '#00ffe0'"),
         ("users",         "created_at",   "TEXT DEFAULT (datetime('now'))"),
@@ -1115,31 +908,25 @@ def generate_pwa_icons():
         return
         
     try:
-        from PIL import Image, ImageDraw
-        has_pil = True
-    except ImportError:
-        has_pil = False
-
-    if has_pil:
-        try:
-            for size, path in ((192, icon_192), (512, icon_512)):
-                img = Image.new("RGBA", (size, size), (6, 13, 26, 255))
-                draw = ImageDraw.Draw(img)
-                # Nice rounded circle outer glow
-                draw.ellipse([size*0.1, size*0.1, size*0.9, size*0.9], fill=(6, 13, 26, 255), outline=(0, 255, 224, 255), width=max(2, int(size*0.04)))
-                # Draw a nice lightning bolt/PWA indicator in the center
-                draw.polygon([
-                    (size*0.5, size*0.25),
-                    (size*0.65, size*0.48),
-                    (size*0.52, size*0.48),
-                    (size*0.58, size*0.75),
-                    (size*0.35, size*0.52),
-                    (size*0.48, size*0.52)
-                ], fill=(0, 255, 224, 255))
-                img.save(path)
-            return
-        except Exception:
-            pass
+        from PIL import Image as _PIL_Image, ImageDraw as _PIL_ImageDraw  # type: ignore[import-untyped, import-not-found]
+        for size, path in ((192, icon_192), (512, icon_512)):
+            img = _PIL_Image.new("RGBA", (size, size), (6, 13, 26, 255))
+            draw = _PIL_ImageDraw.Draw(img)
+            # Nice rounded circle outer glow
+            draw.ellipse([size*0.1, size*0.1, size*0.9, size*0.9], fill=(6, 13, 26, 255), outline=(0, 255, 224, 255), width=max(2, int(size*0.04)))
+            # Draw a nice lightning bolt/PWA indicator in the center
+            draw.polygon([
+                (size*0.5, size*0.25),
+                (size*0.65, size*0.48),
+                (size*0.52, size*0.48),
+                (size*0.58, size*0.75),
+                (size*0.35, size*0.52),
+                (size*0.48, size*0.52)
+            ], fill=(0, 255, 224, 255))
+            img.save(path)
+        return
+    except Exception:
+        pass
 
     # Fallback tiny 1x1 transparent PNG to satisfy network requests and prevent 404
     tiny_png = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4\x00\x00\x00\rIDATx\x9cc`\x00\x01\x00\x00\x0c\x00\x01\x12\xac\x1a\x1b\x00\x00\x00\x00IEND\xaeB`\x82'
@@ -1150,17 +937,17 @@ def generate_pwa_icons():
         except Exception:
             pass
 
-def _async_startup():
+# Run database initialization synchronously so tables are ready before first request
+try:
+    init_db()
+except Exception as e:
     try:
-        init_db()
-        generate_pwa_icons()
-    except Exception as e:
-        try:
-            app.logger.error(f"Startup async init failed: {e}")
-        except Exception:
-            print(f"Startup async init failed: {e}")
+        app.logger.error(f"Startup DB init failed: {e}")
+    except Exception:
+        print(f"Startup DB init failed: {e}")
 
-threading.Thread(target=_async_startup, daemon=True).start()
+# Run PWA icon generation in background thread
+threading.Thread(target=generate_pwa_icons, daemon=True).start()
 
 # ================= EMAIL & SECURITY HELPERS =================
 
@@ -1719,23 +1506,33 @@ def bump_stat(user_id, field, amount=1, conn=None):
         owns_conn = conn is None
         if owns_conn:
             conn = sqlite3.connect("codebuddy.db")
-        now_str = datetime.now().isoformat()
-        # IMPORTANT: read/compare last_active BEFORE the UPSERT below overwrites
-        # it to "now" — otherwise the streak day-diff always sees 0.
-        update_streak(user_id, conn=conn)
-        conn.execute(f"""
-            INSERT INTO user_stats(user_id, {field}, last_active)
-            VALUES (?, ?, ?)
-            ON CONFLICT(user_id) DO UPDATE SET
-                {field} = user_stats.{field} + ?,
-                last_active = ?
-        """, (user_id, amount, now_str, amount, now_str))
-        if owns_conn:
+        try:
+            now_str = datetime.now().isoformat()
+            # IMPORTANT: read/compare last_active BEFORE the UPSERT below overwrites
+            # it to "now" — otherwise the streak day-diff always sees 0.
+            update_streak(user_id, conn=conn)
+            conn.execute(f"""
+                INSERT INTO user_stats(user_id, {field}, last_active)
+                VALUES (?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    {field} = user_stats.{field} + ?,
+                    last_active = ?
+            """, (user_id, amount, now_str, amount, now_str))
             conn.commit()
-            conn.close()
+        finally:
+            # Always release the pool slot, even if an exception is raised mid-write.
+            if owns_conn:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
         return
 
-    conn = getattr(_stat_thread_local, "conn", None)
+    # Reuse a caller-provided connection when given (avoids a second open
+    # connection and a "database is locked" race while the caller holds an
+    # uncommitted write open). Otherwise fall back to a cached thread-local one.
+    caller_conn = conn
+    conn = caller_conn or getattr(_stat_thread_local, "conn", None)
     if conn is None:
         conn = sqlite3.connect("codebuddy.db", check_same_thread=False)
         conn.execute("PRAGMA journal_mode=WAL")
@@ -1752,7 +1549,10 @@ def bump_stat(user_id, field, amount=1, conn=None):
             {field} = user_stats.{field} + ?,
             last_active = ?
     """, (user_id, amount, now_str, amount, now_str))
-    conn.commit()
+    # Only commit when we own the connection — a caller-provided conn is the
+    # caller's transaction to commit (matches the PostgreSQL branch above).
+    if not caller_conn:
+        conn.commit()
 
 def get_user_today():
     """Get the user's local date based on their browser's timezone offset cookie, falling back to UTC."""
@@ -1796,79 +1596,85 @@ def get_user_date(utc_dt):
 def update_streak(user_id, conn=None):
     """Update daily streak safely, preserving count even if message history is deleted/cleared.
 
-    Uses user's local timezone offset cookie to correctly compute consecutive days in their timezone.
+    Uses user's local timezone (UTC) to correctly compute consecutive days in their timezone.
     """
     owns_conn = conn is None
     if owns_conn:
         conn = sqlite3.connect("codebuddy.db")
-    conn.row_factory = sqlite3.Row
+    try:
+        conn.row_factory = sqlite3.Row
 
-    row = conn.execute("SELECT streak_days, last_active FROM user_stats WHERE user_id=?", (user_id,)).fetchone()
+        row = conn.execute("SELECT streak_days, last_active FROM user_stats WHERE user_id=?", (user_id,)).fetchone()
 
-    today = get_user_today()
-    now_str = datetime.now().isoformat()
+        today = get_user_today()
+        now_str = datetime.now().isoformat()
 
-    if not row:
-        conn.execute("""
-            INSERT INTO user_stats(user_id, streak_days, last_active)
-            VALUES (?, 1, ?)
-        """, (user_id, now_str))
-        if owns_conn:
+        if not row:
+            conn.execute("""
+                INSERT INTO user_stats(user_id, streak_days, last_active)
+                VALUES (?, 1, ?)
+            """, (user_id, now_str))
             conn.commit()
-            conn.close()
-        return
+            return
 
-    current_streak = row["streak_days"] or 0
-    last_active_str = row["last_active"]
+        current_streak = row["streak_days"] or 0
+        last_active_str = row["last_active"]
 
-    if not last_active_str:
-        conn.execute("""
-            UPDATE user_stats SET streak_days = 1, last_active = ? WHERE user_id = ?
-        """, (now_str, user_id))
-        if owns_conn:
+        if not last_active_str:
+            conn.execute("""
+                UPDATE user_stats SET streak_days = 1, last_active = ? WHERE user_id = ?
+            """, (now_str, user_id))
             conn.commit()
-            conn.close()
-        return
+            return
 
-    last_active_date = get_user_date(last_active_str)
-    days_diff = (today - last_active_date).days
+        last_active_date = get_user_date(last_active_str)
+        days_diff = (today - last_active_date).days
 
-    if days_diff == 0:
-        new_streak = max(current_streak, 1)
-    elif days_diff == 1:
-        new_streak = current_streak + 1
-    else:
-        new_streak = 1
+        if days_diff == 0:
+            new_streak = max(current_streak, 1)
+        elif days_diff == 1:
+            new_streak = current_streak + 1
+        else:
+            new_streak = 1
 
-    conn.execute("""
-        UPDATE user_stats SET streak_days = ?, last_active = ? WHERE user_id = ?
-    """, (new_streak, now_str, user_id))
-    if owns_conn:
+        conn.execute("""
+            UPDATE user_stats SET streak_days = ?, last_active = ? WHERE user_id = ?
+        """, (new_streak, now_str, user_id))
         conn.commit()
-        conn.close()
+    finally:
+        # Always release the pool slot, even on exception.
+        if owns_conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 # ================= CHANGE 5: PERSISTENT MEMORY HELPERS =================
 
 def get_user_memory(user_id):
     """Load all stored memory for a user as a dict."""
     conn = sqlite3.connect("codebuddy.db")
-    conn.row_factory = sqlite3.Row
-    rows = conn.execute(
-        "SELECT key, value FROM user_memory WHERE user_id=?", (user_id,)
-    ).fetchall()
-    conn.close()
-    return {r["key"]: r["value"] for r in rows}
+    try:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT key, value FROM user_memory WHERE user_id=?", (user_id,)
+        ).fetchall()
+        return {r["key"]: r["value"] for r in rows}
+    finally:
+        conn.close()
 
 def set_user_memory(user_id, key, value):
     """Store or update a memory key for a user."""
     conn = sqlite3.connect("codebuddy.db")
-    conn.execute("""
-        INSERT INTO user_memory(user_id, key, value, updated_at)
-        VALUES (?, ?, ?, datetime('now'))
-        ON CONFLICT(user_id, key) DO UPDATE SET value=?, updated_at=datetime('now')
-    """, (user_id, key, value, value))
-    conn.commit()
-    conn.close()
+    try:
+        conn.execute("""
+            INSERT INTO user_memory(user_id, key, value, updated_at)
+            VALUES (?, ?, ?, datetime('now'))
+            ON CONFLICT(user_id, key) DO UPDATE SET value=?, updated_at=datetime('now')
+        """, (user_id, key, value, value))
+        conn.commit()
+    finally:
+        conn.close()
 
 def build_memory_context(user_id):
     """Build a personalized context string to inject into system prompts."""
@@ -3302,22 +3108,27 @@ def delete_account_request_otp():
     otp = str(secrets.randbelow(900000) + 100000)
     session["delete_otp"] = otp
     session["delete_otp_expires"] = time.time() + 300
-    
-    # Log the generated OTP to the application logs for admin visibility/troubleshooting
+
+    # Log the generated OTP to the application logs for operator visibility/troubleshooting.
+    # This is the ONLY recovery path for an SMTP outage; we never expose a static code to users.
     app.logger.info(f"[DELETE OTP] Generated code for {db_email}: {otp}")
 
     try:
         send_delete_otp_email(db_email, user["username"], otp)
     except Exception as e:
         app.logger.error(f"Failed to send delete OTP email: {e}")
-        # Mark fallback in session so it remains valid
+        # Keep the freshly generated code valid so a re-send succeeds quickly.
         session["delete_otp"] = otp
         session["delete_otp_expires"] = time.time() + 300
         return jsonify({
-            "success": True, 
-            "message": "We encountered an SMTP error, but a fallback code has been logged to your Render server console logs. Please use the fallback code 999999."
+            "success": True,
+            "message": (
+                "We ran into a problem sending the verification email. A verification "
+                "code has been logged to the server logs for recovery. Please check the "
+                "email configuration and request a new code."
+            ),
         })
-        
+
     return jsonify({"success": True, "message": "Verification code sent to your email."})
 
 @app.route("/delete_account", methods=["POST"])
@@ -3328,49 +3139,48 @@ def delete_account():
     otp = request.form.get("otp", "").strip()
 
     conn = sqlite3.connect("codebuddy.db")
-    conn.row_factory = sqlite3.Row
-    user = conn.execute("SELECT * FROM users WHERE id=?", (current_user.id,)).fetchone()
-    
-    if not user:
-        conn.close()
-        return jsonify({"success": False, "error": "User not found."}), 404
-        
-    db_email = user["email"] if "email" in user.keys() else None
-    
-    if not db_email or db_email.lower() != email.lower():
-        conn.close()
-        return jsonify({"success": False, "error": "Incorrect confirmation email address."}), 400
-        
-    is_google_user = bool(user["google_id"]) if "google_id" in user.keys() else False
-    
-    if not (is_google_user and not password):
-        if not bcrypt.check_password_hash(user["password"], password):
-            conn.close()
-            return jsonify({"success": False, "error": "Incorrect password."}), 400
-            
-    session_otp = session.get("delete_otp")
-    session_otp_expires = session.get("delete_otp_expires", 0)
-    
-    # Allow 999999 as a safety bypass when SMTP fails in production
-    if otp == "999999":
-        pass
-    elif not session_otp or not otp or session_otp != otp:
-        conn.close()
-        return jsonify({"success": False, "error": "Invalid verification code."}), 400
-        
-    if otp != "999999" and time.time() > session_otp_expires:
-        conn.close()
-        return jsonify({"success": False, "error": "Verification code has expired. Please request a new one."}), 400
-        
-    session.pop("delete_otp", None)
-    session.pop("delete_otp_expires", None)
-
     try:
+        conn.row_factory = sqlite3.Row
+        user = conn.execute("SELECT * FROM users WHERE id=?", (current_user.id,)).fetchone()
+
+        if not user:
+            return jsonify({"success": False, "error": "User not found."}), 404
+
+        db_email = user["email"] if "email" in user.keys() else None
+
+        if not db_email or db_email.lower() != email.lower():
+            return jsonify({"success": False, "error": "Incorrect confirmation email address."}), 400
+
+        is_google_user = bool(user["google_id"]) if "google_id" in user.keys() else False
+
+        if not (is_google_user and not password):
+            if not bcrypt.check_password_hash(user["password"], password):
+                return jsonify({"success": False, "error": "Incorrect password."}), 400
+
+        session_otp = session.get("delete_otp")
+        session_otp_expires = session.get("delete_otp_expires", 0)
+
+        # Safety bypass is OFF unless the operator explicitly opts in with an
+        # OTP_FALLBACK_CODE env var (local dev / SMTP-down scenario only). There is
+        # no hardcoded universal code anymore — the only recovery path for a real
+        # SMTP outage is the generated code logged to the server logs.
+        configured_fallback = os.getenv("OTP_FALLBACK_CODE", "").strip()
+        fallback_used = bool(configured_fallback) and otp == configured_fallback
+
+        if not fallback_used:
+            if not session_otp or not otp or session_otp != otp:
+                return jsonify({"success": False, "error": "Invalid verification code."}), 400
+            if time.time() > session_otp_expires:
+                return jsonify({"success": False, "error": "Verification code has expired. Please request a new one."}), 400
+
+        session.pop("delete_otp", None)
+        session.pop("delete_otp_expires", None)
+
         # Delete user record and all associated records from other tables:
         conn.execute("DELETE FROM users WHERE id=?", (current_user.id,))
         conn.execute("DELETE FROM user_stats WHERE user_id=?", (current_user.id,))
         conn.execute("DELETE FROM user_memory WHERE user_id=?", (current_user.id,))
-        
+
         convo_ids = [row["id"] for row in conn.execute("SELECT id FROM conversations WHERE user_id=?", (current_user.id,)).fetchall()]
         if convo_ids:
             placeholders = ",".join("?" for _ in convo_ids)
@@ -3382,19 +3192,22 @@ def delete_account():
         conn.execute("DELETE FROM karma_events WHERE user_id=?", (current_user.id,))
         conn.execute("DELETE FROM blind_submissions WHERE user_id=?", (current_user.id,))
         conn.execute("DELETE FROM blind_reviews WHERE reviewer_id=?", (current_user.id,))
-        
+
         conn.commit()
-        conn.close()
-        
+
         session.clear()
         logout_user()
-        
+
         return jsonify({"success": True, "message": "Your account has been deleted permanently."})
     except Exception as e:
-        conn.rollback()
-        conn.close()
+        try:
+            conn.rollback()
+        except Exception:
+            pass
         app.logger.error(f"Failed to delete account: {e}")
         return jsonify({"success": False, "error": "Internal server error. Please try again later."}), 500
+    finally:
+        conn.close()
 
 @app.route("/")
 @login_required
