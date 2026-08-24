@@ -3007,7 +3007,7 @@ def login():
 
         conn = sqlite3.connect("codebuddy.db")
         conn.row_factory = sqlite3.Row
-        user = conn.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+        user = conn.execute("SELECT * FROM users WHERE LOWER(email) = LOWER(?) OR LOWER(username) = LOWER(?)", (email, email)).fetchone()
         conn.close()
 
         if user and bcrypt.check_password_hash(user["password"], password):
@@ -3041,7 +3041,7 @@ def forgot_password():
             
         conn = sqlite3.connect("codebuddy.db")
         conn.row_factory = sqlite3.Row
-        user = conn.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+        user = conn.execute("SELECT * FROM users WHERE LOWER(email) = LOWER(?) OR LOWER(username) = LOWER(?)", (email, email)).fetchone()
         conn.close()
         
         if user:
