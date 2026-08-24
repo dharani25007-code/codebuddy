@@ -15,6 +15,7 @@ gunicorn>=21.2.0
 flask-socketio>=5.3.6
 gevent>=24.2.1
 gevent-websocket>=0.10.1
+packaging>=23.0
 
 # Redis for rate limiting (optional — falls back to in-memory if unavailable)
 redis>=5.0.0
